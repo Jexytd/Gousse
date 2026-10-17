@@ -3,6 +3,7 @@
     Gousse Script Hub - Arsenal Module
     Universe ID: 111958650
     Tailored combat, visuals, and weapon modifications for Arsenal.
+    Desktop Utility Edition powered by GousseUI & Lucide Icons.
     ========================================================================
 ]]
 
@@ -11,13 +12,15 @@ local env = (getgenv and getgenv()) or _G or {}
 local GousseUI = passedUI or env.GousseUI
 
 if not GousseUI then
-    local ok, res = pcall(function()
-        return game:HttpGet("https://raw.githubusercontent.com/Jexytd/Gousse/main/library.luau")
+    local okLocal, localRes = pcall(function()
+        return game:HttpGet("http://localhost:3456/library.luau")
     end)
-    if not ok or not res then
-        res = game:HttpGet("http://localhost:3456/library.luau")
+    if okLocal and localRes and not localRes:find("File Not Found") and not localRes:find("Cannot GET") then
+        GousseUI = loadstring(localRes)()
+    else
+        local ghRes = game:HttpGet("https://raw.githubusercontent.com/Jexytd/Gousse/main/library.luau")
+        GousseUI = loadstring(ghRes)()
     end
-    GousseUI = loadstring(res)()
 end
 
 local Players = game:GetService("Players")
@@ -34,9 +37,9 @@ local Window = GousseUI:CreateWindow({
 })
 
 -- ============================================================================
--- TAB 1: COMBAT
+-- TAB 1: COMBAT (Lucide Icon: "crosshair")
 -- ============================================================================
-local CombatTab = Window:CreateTab({ Name = "Combat", Icon = "🎯" })
+local CombatTab = Window:CreateTab({ Name = "Combat", Icon = "crosshair" })
 
 CombatTab:CreateSection("Hitbox Expansion")
 
@@ -83,13 +86,14 @@ end
 
 CombatTab:CreateToggle({
     Name = "Hitbox Expander (Head)",
+    SubTitle = "Scale enemy head bounding volume for bullet registration",
     Default = false,
     Callback = function(val)
         hitboxEnabled = val
         UpdateHitboxes()
         GousseUI:Notify({
             Title = "Hitbox Expander",
-            Content = val and "Hitboxes expanded." or "Hitboxes reset.",
+            Content = val and "Hitboxes expanded." or "Hitboxes restored.",
             Type = val and "success" or "info",
             Duration = 2
         })
@@ -97,7 +101,7 @@ CombatTab:CreateToggle({
 })
 
 CombatTab:CreateSlider({
-    Name = "Hitbox Size",
+    Name = "Hitbox Radius",
     Min = 2,
     Max = 25,
     Default = 10,
@@ -107,10 +111,11 @@ CombatTab:CreateSlider({
     end
 })
 
-CombatTab:CreateSection("Gun Mechanics")
+CombatTab:CreateSection("Weapon Handling")
 
 CombatTab:CreateToggle({
-    Name = "No Recoil / Camera Shake",
+    Name = "No Recoil Compensation",
+    SubTitle = "Neutralize camera punch and spring perturbation",
     Default = false,
     Callback = function(val)
         GousseUI:Notify({ Title = "Gun Mods", Content = val and "No Recoil active." or "No Recoil disabled.", Type = "info" })
@@ -118,7 +123,8 @@ CombatTab:CreateToggle({
 })
 
 CombatTab:CreateToggle({
-    Name = "Fast Reload",
+    Name = "Fast Reload Routine",
+    SubTitle = "Speed up active magazine reload sequence",
     Default = false,
     Callback = function(val)
         GousseUI:Notify({ Title = "Gun Mods", Content = val and "Fast Reload enabled." or "Fast Reload disabled.", Type = "info" })
@@ -126,9 +132,9 @@ CombatTab:CreateToggle({
 })
 
 -- ============================================================================
--- TAB 2: VISUALS
+-- TAB 2: VISUALS (Lucide Icon: "eye")
 -- ============================================================================
-local VisualsTab = Window:CreateTab({ Name = "Visuals", Icon = "👁" })
+local VisualsTab = Window:CreateTab({ Name = "Visuals", Icon = "eye" })
 
 VisualsTab:CreateSection("Player ESP (Team-colored)")
 
@@ -146,9 +152,9 @@ local function ApplyArsenalHighlight(plr: Player)
     local isEnemy = IsEnemy(plr)
     local hl = Instance.new("Highlight")
     hl.Name = "ArsenalESP"
-    hl.FillColor = isEnemy and Color3.fromRGB(248, 81, 73) or Color3.fromRGB(46, 160, 67)
-    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-    hl.FillTransparency = 0.4
+    hl.FillColor = isEnemy and Color3.fromRGB(248, 81, 73) or Color3.fromRGB(103, 216, 121)
+    hl.OutlineColor = Color3.fromRGB(224, 229, 236)
+    hl.FillTransparency = 0.45
     hl.OutlineTransparency = 0.1
     hl.Adornee = plr.Character
     hl.Parent = plr.Character
@@ -163,7 +169,8 @@ local function ClearArsenalESP()
 end
 
 VisualsTab:CreateToggle({
-    Name = "Player Chams (Red=Enemy, Green=Team)",
+    Name = "Team-colored Chams",
+    SubTitle = "Render red silhouettes for enemies and green for teammates",
     Default = false,
     Callback = function(val)
         espEnabled = val
@@ -195,9 +202,9 @@ VisualsTab:CreateSlider({
 })
 
 -- ============================================================================
--- TAB 3: MOVEMENT
+-- TAB 3: MOVEMENT (Lucide Icon: "gauge")
 -- ============================================================================
-local MovementTab = Window:CreateTab({ Name = "Movement", Icon = "⚡" })
+local MovementTab = Window:CreateTab({ Name = "Movement", Icon = "gauge" })
 
 MovementTab:CreateSection("Locomotion")
 
@@ -220,13 +227,14 @@ local function ToggleBHop(val: boolean)
 end
 
 MovementTab:CreateToggle({
-    Name = "Auto Bunny Hop (Hold Move Key)",
+    Name = "Auto Bunny Hop",
+    SubTitle = "Auto-jump immediately upon ground contact while moving",
     Default = false,
     Callback = ToggleBHop
 })
 
 MovementTab:CreateSlider({
-    Name = "Arsenal Speed Boost",
+    Name = "WalkSpeed Modifier",
     Min = 16,
     Max = 65,
     Default = 16,
@@ -239,28 +247,33 @@ MovementTab:CreateSlider({
 })
 
 -- ============================================================================
--- TAB 4: SETTINGS & INFO
+-- TAB 4: SETTINGS (Lucide Icon: "settings")
 -- ============================================================================
-local SettingsTab = Window:CreateTab({ Name = "Settings", Icon = "⚙" })
+local SettingsTab = Window:CreateTab({ Name = "Settings", Icon = "settings" })
 
+SettingsTab:CreateSection("Module Information")
 SettingsTab:CreateParagraph({
-    Title = "Arsenal Enhancement Suite",
-    Content = "Version 1.2.0 • Gousse Hub\nPress RightControl to hide this window.\nHitbox expansion and ESP automatically adjust for Arsenal team mechanics."
+    Title = "Arsenal Combat Suite",
+    Content = "Version 2.0.0 • Gousse Hub\nTeam awareness is hooked to Player.Team to prevent friendly targeting."
 })
 
+SettingsTab:CreateSection("Lifecycle Management")
 SettingsTab:CreateButton({
-    Name = "Unload Arsenal Script",
+    Name = "Unload Arsenal Module",
+    SubTitle = "Restore hitbox dimensions, clean highlights & disconnect hooks",
+    ButtonText = "Unload",
+    Variant = "danger",
     Callback = function()
         hitboxEnabled = false
         UpdateHitboxes()
         ClearArsenalESP()
         ToggleBHop(false)
         Window:Destroy()
-        GousseUI:Notify({ Title = "Arsenal Hub", Content = "Script cleanly unloaded.", Duration = 3 })
+        GousseUI:Notify({ Title = "Arsenal Hub", Content = "Module unloaded cleanly.", Duration = 3 })
     end
 })
 
-print("[Gousse Hub] Arsenal Module fully loaded and attached.")
+print("[Gousse Hub] Arsenal Module loaded with Desktop Utility aesthetic.")
 
 return {
     Window = Window,

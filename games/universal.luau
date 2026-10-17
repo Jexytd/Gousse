@@ -2,7 +2,7 @@
     ========================================================================
     Gousse Script Hub - Universal Game Script
     Runs across any Roblox game with high-performance utility, movement,
-    and visual features powered by GousseUI.
+    and visual features powered by GousseUI (Desktop Utility Edition).
     ========================================================================
 ]]
 
@@ -11,14 +11,15 @@ local env = (getgenv and getgenv()) or _G or {}
 local GousseUI = passedUI or env.GousseUI
 
 if not GousseUI then
-    -- Fallback standalone loader
-    local ok, res = pcall(function()
-        return game:HttpGet("https://raw.githubusercontent.com/Jexytd/Gousse/main/library.luau")
+    local okLocal, localRes = pcall(function()
+        return game:HttpGet("http://localhost:3456/library.luau")
     end)
-    if not ok or not res then
-        res = game:HttpGet("http://localhost:3456/library.luau")
+    if okLocal and localRes and not localRes:find("File Not Found") and not localRes:find("Cannot GET") then
+        GousseUI = loadstring(localRes)()
+    else
+        local ghRes = game:HttpGet("https://raw.githubusercontent.com/Jexytd/Gousse/main/library.luau")
+        GousseUI = loadstring(ghRes)()
     end
-    GousseUI = loadstring(res)()
 end
 
 local Players = game:GetService("Players")
@@ -27,7 +28,6 @@ local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
-local StarterGui = game:GetService("StarterGui")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -38,7 +38,7 @@ pcall(function()
     placeName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
 end)
 
--- Window Instance
+-- Window Instance (Desktop Utility Aesthetic with Green Identity Outline)
 local Window = GousseUI:CreateWindow({
     Title = "Gousse Hub",
     SubTitle = "Universal • " .. placeName,
@@ -46,11 +46,11 @@ local Window = GousseUI:CreateWindow({
 })
 
 -- ============================================================================
--- TAB 1: MOVEMENT
+-- TAB 1: MOVEMENT (Lucide Icon: "gauge")
 -- ============================================================================
-local MovementTab = Window:CreateTab({ Name = "Movement", Icon = "⚡" })
+local MovementTab = Window:CreateTab({ Name = "Movement", Icon = "gauge" })
 
-MovementTab:CreateSection("Character Speed & Jump")
+MovementTab:CreateSection("Locomotion")
 
 local currentSpeed = 16
 local speedEnabled = false
@@ -76,7 +76,8 @@ local function UpdateCharacterPhysics()
 end
 
 MovementTab:CreateToggle({
-    Name = "Enable Speed Modifier",
+    Name = "WalkSpeed Override",
+    SubTitle = "Force character linear movement velocity",
     Default = false,
     Callback = function(val)
         speedEnabled = val
@@ -90,7 +91,7 @@ MovementTab:CreateToggle({
 })
 
 MovementTab:CreateSlider({
-    Name = "WalkSpeed",
+    Name = "Target WalkSpeed",
     Min = 16,
     Max = 250,
     Default = 16,
@@ -104,7 +105,8 @@ MovementTab:CreateSlider({
 })
 
 MovementTab:CreateToggle({
-    Name = "Enable Jump Modifier",
+    Name = "JumpPower Override",
+    SubTitle = "Adjust upward impulse velocity on jump",
     Default = false,
     Callback = function(val)
         jumpEnabled = val
@@ -120,7 +122,7 @@ MovementTab:CreateToggle({
 })
 
 MovementTab:CreateSlider({
-    Name = "JumpPower",
+    Name = "Target JumpPower",
     Min = 50,
     Max = 350,
     Default = 50,
@@ -138,7 +140,7 @@ LocalPlayer.CharacterAdded:Connect(function()
     UpdateCharacterPhysics()
 end)
 
-MovementTab:CreateSection("Physics & Gliding")
+MovementTab:CreateSection("Physics & Traversal")
 
 -- Infinite Jump
 local infiniteJumpEnabled = false
@@ -153,6 +155,7 @@ end)
 
 MovementTab:CreateToggle({
     Name = "Infinite Jump",
+    SubTitle = "Trigger jump state repeatedly mid-air",
     Default = false,
     Callback = function(val)
         infiniteJumpEnabled = val
@@ -184,7 +187,8 @@ local function SetNoclip(enabled: boolean)
 end
 
 MovementTab:CreateToggle({
-    Name = "Noclip (Walk through walls)",
+    Name = "Noclip Traversal",
+    SubTitle = "Disable part collision masks on active character",
     Default = false,
     Callback = SetNoclip
 })
@@ -235,24 +239,12 @@ local function ToggleFly(enabled: boolean)
         local camCFrame = Camera.CFrame
         local direction = Vector3.zero
 
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-            direction = direction + camCFrame.LookVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-            direction = direction - camCFrame.LookVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-            direction = direction - camCFrame.RightVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-            direction = direction + camCFrame.RightVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-            direction = direction + Vector3.new(0, 1, 0)
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
-            direction = direction - Vector3.new(0, 1, 0)
-        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then direction = direction + camCFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then direction = direction - camCFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then direction = direction - camCFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then direction = direction + camCFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then direction = direction + Vector3.new(0, 1, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then direction = direction - Vector3.new(0, 1, 0) end
 
         if direction.Magnitude > 0 then
             flyVelocity.Velocity = direction.Unit * flySpeed
@@ -265,13 +257,14 @@ local function ToggleFly(enabled: boolean)
 end
 
 MovementTab:CreateToggle({
-    Name = "Fly (WASD + Space/Shift)",
+    Name = "Free Flight System",
+    SubTitle = "Vector-based 3D flight (WASD + Space/Shift)",
     Default = false,
     Callback = ToggleFly
 })
 
 MovementTab:CreateSlider({
-    Name = "Fly Speed",
+    Name = "Flight Velocity",
     Min = 20,
     Max = 200,
     Default = 50,
@@ -282,13 +275,12 @@ MovementTab:CreateSlider({
 })
 
 -- ============================================================================
--- TAB 2: VISUALS
+-- TAB 2: VISUALS (Lucide Icon: "eye")
 -- ============================================================================
-local VisualsTab = Window:CreateTab({ Name = "Visuals", Icon = "👁" })
+local VisualsTab = Window:CreateTab({ Name = "Visuals", Icon = "eye" })
 
-VisualsTab:CreateSection("World & Lighting")
+VisualsTab:CreateSection("Lighting & Perspective")
 
--- Fullbright
 local fullbrightEnabled = false
 local originalLighting = {
     Brightness = Lighting.Brightness,
@@ -328,7 +320,8 @@ local function SetFullbright(enabled: boolean)
 end
 
 VisualsTab:CreateToggle({
-    Name = "Fullbright (No Shadows & Max Light)",
+    Name = "Fullbright World",
+    SubTitle = "Eliminate shadow occlusions & maximize world ambient",
     Default = false,
     Callback = SetFullbright
 })
@@ -344,14 +337,13 @@ VisualsTab:CreateSlider({
     end
 })
 
-VisualsTab:CreateSection("Player ESP (Chams)")
+VisualsTab:CreateSection("Player Recognition")
 
 local espEnabled = false
 local espHighlights = {}
 
 local function ApplyHighlight(plr: Player)
-    if plr == LocalPlayer then return end
-    if not plr.Character then return end
+    if plr == LocalPlayer or not plr.Character then return end
 
     if espHighlights[plr] then
         espHighlights[plr]:Destroy()
@@ -360,10 +352,10 @@ local function ApplyHighlight(plr: Player)
 
     local highlight = Instance.new("Highlight")
     highlight.Name = "GousseESP"
-    highlight.FillColor = Color3.fromRGB(56, 139, 253)
-    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.FillColor = Color3.fromRGB(103, 216, 121)
+    highlight.OutlineColor = Color3.fromRGB(224, 229, 236)
     highlight.FillTransparency = 0.5
-    highlight.OutlineTransparency = 0
+    highlight.OutlineTransparency = 0.1
     highlight.Adornee = plr.Character
     highlight.Parent = plr.Character
 
@@ -414,40 +406,61 @@ Players.PlayerRemoving:Connect(function(plr)
 end)
 
 VisualsTab:CreateToggle({
-    Name = "Player ESP Box / Chams",
+    Name = "Player Chams (ESP)",
+    SubTitle = "Draw green silhouette highlights around other players",
     Default = false,
     Callback = ToggleESP
 })
 
 -- ============================================================================
--- TAB 3: UTILITY & TELEPORT
+-- TAB 3: UTILITY (Lucide Icon: "wrench")
 -- ============================================================================
-local UtilityTab = Window:CreateTab({ Name = "Utility", Icon = "🛠" })
+local UtilityTab = Window:CreateTab({ Name = "Utility", Icon = "wrench" })
 
 UtilityTab:CreateSection("Player Teleportation")
 
-local playerNames = {}
-for _, plr in ipairs(Players:GetPlayers()) do
-    if plr ~= LocalPlayer then
-        table.insert(playerNames, plr.Name)
+local function GetPlayerList(): {string}
+    local names = {}
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            table.insert(names, plr.Name)
+        end
     end
+    if #names == 0 then table.insert(names, "No players in server") end
+    return names
 end
-local selectedTarget = playerNames[1] or ""
 
+local currentPlayers = GetPlayerList()
+local selectedTarget = currentPlayers[1] or ""
+
+-- Player selection: compact row, selector aligned to the right
 local targetDropdown = UtilityTab:CreateDropdown({
-    Name = "Select Player",
-    Options = #playerNames > 0 and playerNames or { "No players found" },
+    Name = "Select Target Player",
+    SubTitle = "Target entity for spatial translocation",
+    Options = currentPlayers,
     Default = selectedTarget,
     Callback = function(choice)
         selectedTarget = choice
     end
 })
 
+-- Periodic player list refresh
+Players.PlayerAdded:Connect(function()
+    targetDropdown.Refresh(GetPlayerList(), selectedTarget)
+end)
+Players.PlayerRemoving:Connect(function()
+    targetDropdown.Refresh(GetPlayerList(), selectedTarget)
+end)
+
+-- Teleport action: Primary action with visual emphasis (restrained green)
 UtilityTab:CreateButton({
-    Name = "Teleport to Selected Player",
+    Name = "Teleport to Player",
+    SubTitle = "Translate HumanoidRootPart CFrame +3 studs above target",
+    ButtonText = "Teleport",
+    Variant = "primary",
     Callback = function()
-        if not selectedTarget or selectedTarget == "" or selectedTarget == "No players found" then
-            GousseUI:Notify({ Title = "Teleport", Content = "No valid player selected.", Type = "warning" })
+        if not selectedTarget or selectedTarget == "" or selectedTarget == "No players in server" then
+            GousseUI:Notify({ Title = "Teleport", Content = "No valid target selected.", Type = "warning" })
             return
         end
 
@@ -456,29 +469,36 @@ UtilityTab:CreateButton({
             local myChar = LocalPlayer.Character
             if myChar and myChar:FindFirstChild("HumanoidRootPart") then
                 myChar.HumanoidRootPart.CFrame = targetPlr.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
-                GousseUI:Notify({ Title = "Teleport", Content = "Teleported to " .. selectedTarget, Type = "success" })
+                GousseUI:Notify({ Title = "Teleport", Content = "Position updated to " .. selectedTarget, Type = "success" })
             end
         else
-            GousseUI:Notify({ Title = "Teleport", Content = "Target player is not spawned.", Type = "error" })
+            GousseUI:Notify({ Title = "Teleport", Content = "Target character not found in workspace.", Type = "error" })
         end
     end
 })
 
 UtilityTab:CreateSection("Server & Session")
 
+-- Server actions: Restrained secondary buttons with consistent dimensions
 UtilityTab:CreateButton({
     Name = "Rejoin Current Server",
+    SubTitle = "Reconnect client to place instance " .. tostring(game.PlaceId),
+    ButtonText = "Rejoin",
+    Variant = "secondary",
     Callback = function()
-        GousseUI:Notify({ Title = "Server", Content = "Rejoining server...", Duration = 3 })
+        GousseUI:Notify({ Title = "Session", Content = "Reconnecting to current server...", Duration = 3 })
         task.wait(0.5)
         TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
     end
 })
 
 UtilityTab:CreateButton({
-    Name = "Server Hop (Different Server)",
+    Name = "Server Hop",
+    SubTitle = "Find open public instance with vacant player slots",
+    ButtonText = "Hop",
+    Variant = "secondary",
     Callback = function()
-        GousseUI:Notify({ Title = "Server Hop", Content = "Searching for active servers...", Duration = 3 })
+        GousseUI:Notify({ Title = "Server Hop", Content = "Querying Roblox public servers API...", Duration = 3 })
         local sfUrl = ("https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Desc&limit=50"):format(tostring(game.PlaceId))
         local ok, data = pcall(function()
             return HttpService:JSONDecode(game:HttpGet(sfUrl))
@@ -494,25 +514,29 @@ UtilityTab:CreateButton({
                 end
             end
         end
-        GousseUI:Notify({ Title = "Server Hop", Content = "Could not find an open alternate server.", Type = "warning" })
+        GousseUI:Notify({ Title = "Server Hop", Content = "No alternative open server found.", Type = "warning" })
     end
 })
 
 UtilityTab:CreateButton({
-    Name = "Copy Job ID to Clipboard",
+    Name = "Copy Job ID",
+    SubTitle = "Write active server GUID to clipboard",
+    ButtonText = "Copy",
+    Variant = "secondary",
     Callback = function()
         if setclipboard then
             setclipboard(game.JobId)
-            GousseUI:Notify({ Title = "Clipboard", Content = "Job ID copied!", Type = "success" })
+            GousseUI:Notify({ Title = "Clipboard", Content = "Job ID copied: " .. game.JobId:sub(1, 8) .. "...", Type = "success" })
         else
             GousseUI:Notify({ Title = "Clipboard", Content = "setclipboard API not supported on this executor.", Type = "warning" })
         end
     end
 })
 
--- Anti-AFK
+-- Anti-AFK: Distinct settings row with name, subtitle, and green accent only when enabled
 local antiAfkEnabled = false
 local antiAfkConnection = nil
+
 local function SetAntiAfk(val: boolean)
     antiAfkEnabled = val
     if antiAfkConnection then antiAfkConnection:Disconnect(); antiAfkConnection = nil end
@@ -523,42 +547,48 @@ local function SetAntiAfk(val: boolean)
             if antiAfkEnabled then
                 VirtualUser:CaptureController()
                 VirtualUser:ClickButton2(Vector2.new())
-                GousseUI:Notify({ Title = "Anti-AFK", Content = "Idle kick bypassed.", Type = "info", Duration = 2 })
+                GousseUI:Notify({ Title = "Anti-AFK", Content = "Simulated input dispatched.", Type = "info", Duration = 2 })
             end
         end)
-        GousseUI:Notify({ Title = "Anti-AFK", Content = "Anti-AFK is now active.", Type = "success" })
+        GousseUI:Notify({ Title = "Anti-AFK", Content = "Idle kick prevention is now active.", Type = "success" })
     end
 end
 
 UtilityTab:CreateToggle({
-    Name = "Anti-AFK (Prevent 20-min kick)",
+    Name = "Anti-AFK Watchdog",
+    SubTitle = "Simulate controller events on idle to bypass 20-min kick",
     Default = false,
     Callback = SetAntiAfk
 })
 
 -- ============================================================================
--- TAB 4: SETTINGS & ABOUT
+-- TAB 4: ABOUT (Lucide Icon: "info")
 -- ============================================================================
-local SettingsTab = Window:CreateTab({ Name = "About", Icon = "ℹ" })
+local AboutTab = Window:CreateTab({ Name = "About", Icon = "info" })
 
-SettingsTab:CreateSection("Environment Details")
-SettingsTab:CreateParagraph({
-    Title = "Gousse Script Studio",
-    Content = ("Loaded for: %s\nUniverse ID: %s | Place ID: %s\nExecutor: %s"):format(
+AboutTab:CreateSection("Session Telemetry")
+AboutTab:CreateParagraph({
+    Title = "Gousse Hub Environment",
+    Content = ("Game: %s\nUniverse ID: %s | Place ID: %s\nExecutor: %s"):format(
         placeName,
         tostring(game.GameId),
         tostring(game.PlaceId),
-        (identifyexecutor and identifyexecutor()) or "Luau Executor"
+        (identifyexecutor and identifyexecutor()) or "Luau Environment"
     )
 })
 
-SettingsTab:CreateParagraph({
-    Title = "Controls & Shortcuts",
-    Content = "Press RightControl to hide or show this window.\nYou can click and drag the top header bar to reposition anywhere on screen."
+AboutTab:CreateSection("Keybinds & Navigation")
+AboutTab:CreateParagraph({
+    Title = "Desktop Hotkey",
+    Content = "Press RightControl to hide or restore this window.\nDrag the top titlebar to reposition across the viewport."
 })
 
-SettingsTab:CreateButton({
+AboutTab:CreateSection("Lifecycle Management")
+AboutTab:CreateButton({
     Name = "Unload Gousse Hub",
+    SubTitle = "Terminate background threads, reset physics & remove UI",
+    ButtonText = "Unload",
+    Variant = "danger",
     Callback = function()
         SetNoclip(false)
         ToggleFly(false)
@@ -570,7 +600,7 @@ SettingsTab:CreateButton({
     end
 })
 
-print(("[Gousse Universal] Successfully initialized for Place: %s (%d)"):format(placeName, game.PlaceId))
+print(("[Gousse Universal] Initialized with Desktop Utility UI for Place: %s (%d)"):format(placeName, game.PlaceId))
 
 return {
     Window = Window,

@@ -23,4 +23,8 @@ globs:
    - Every game script must implement an unload mechanism that disconnects all `RBXScriptConnection` handles, destroys created `Highlight` or `Drawing` instances, and restores default character physics.
 
 5. **Theme Conformity**:
-   - UI elements must utilize standard GousseUI palette tokens (`Background`, `Sidebar`, `Surface`, `Border`, `Primary`, `Success`, `Danger`). Do not introduce arbitrary hardcoded neon colors.
+   - UI elements must utilize standard GousseUI palette tokens (`Background`, `Sidebar`, `Surface`, `Border`, `WindowOutline`, `Accent`, `Primary`, `Danger`). Do not introduce arbitrary hardcoded neon colors.
+
+6. **Icon Standardization (No Emoticons)**:
+   - Use authentic Lucide icons mapped via `icons.luau` or `GousseUI:GetIcon(name)`.
+   - Never use emojis or emoticons (e.g. ⚡, 🎯, 👁, 🛠, ⚙) in tabs, buttons, or headers.

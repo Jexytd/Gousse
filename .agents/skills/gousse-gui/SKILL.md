@@ -7,25 +7,28 @@ description: >-
 
 # GousseUI Library & Development Phases Guide
 
-GousseUI is a lightweight, modern, dark-themed Luau UI Library engineered for Roblox execution environments and the Gousse Script Hub ecosystem.
+GousseUI is a lightweight, authentic desktop utility UI Library engineered for Roblox execution environments and the Gousse Script Hub ecosystem.
 
 ---
 
 ## 1. Core Architecture & Theme System
 
-GousseUI adopts an Obsidian / GitHub Dark aesthetic with high contrast and restrained accents:
+GousseUI adopts an authentic desktop utility companion aesthetic: near-black charcoal surfaces, slate borders, and a signature thin green window outline preserving the Gousse Hub identity.
 
 | Token | RGB Value | Hex | Usage |
 | :--- | :--- | :--- | :--- |
-| `Background` | `15, 18, 24` | `#0f1218` | Outer window background |
-| `Sidebar` | `19, 23, 31` | `#13171f` | Tab sidebar & sub-containers |
-| `Surface` | `24, 29, 39` | `#181d27` | Element cards & inputs |
-| `Border` | `38, 45, 60` | `#262d3c` | Standard structural borders |
-| `Primary` | `56, 139, 253` | `#388bfd` | Active tabs, knobs, accent bars |
-| `Success` | `46, 160, 67` | `#2ea043` | Positive toasts, friendly Chams |
-| `Danger` | `248, 81, 73` | `#f85149` | Error toasts, enemy Chams |
-| `TextPrimary`| `240, 246, 252` | `#f0f6fc` | Headings & primary labels |
-| `TextSecondary`| `139, 148, 158` | `#8b949e`| Subtitles & body descriptions |
+| `Background` | `16, 19, 24` | `#101318` | Outer window background |
+| `Sidebar` | `21, 25, 32` | `#151920` | Navigation sidebar & sub-containers |
+| `Surface` | `25, 31, 40` | `#191F28` | Compact control rows |
+| `SurfaceHover` | `34, 42, 54` | `#222A36` | Interactive hover state |
+| `Border` | `42, 50, 62` | `#2A323E` | Slate borders and dividers |
+| `WindowOutline`| `103, 216, 121` | `#67D879` | Thin green window outline |
+| `Accent` | `103, 216, 121` | `#67D879` | Restrained green accent, active toggles |
+| `Blue` | `56, 139, 253` | `#388BFD` | Retained strictly for semantic info |
+| `Danger` | `248, 81, 73` | `#F85149` | Destructive/unload actions & error toasts |
+| `TextPrimary`| `224, 229, 236` | `#E0E5EC` | Soft white titles and main labels |
+| `TextSecondary`| `137, 147, 163` | `#8993A3`| Muted gray subtitles and descriptions |
+| `TextMuted` | `90, 101, 120` | `#5A6578`| Small section headers & placeholders |
 
 ### Safe Parenting Invariant
 To prevent game-level detection, all GUI instances must resolve parents using:
@@ -43,121 +46,188 @@ end
 
 ---
 
-## 2. API Reference Cheatsheet
+## 2. Lucide Icons Engine (No Emoticons Rule)
 
-### 2.1 Window Creation
+> [!IMPORTANT]
+> **Strict Invariant**: Do **not** use emojis or emoticons (e.g. `⚡`, `🎯`, `👁`, `🛠`, `⚙`) in UI tabs, buttons, or section headers. Always use authentic **Lucide icon names** resolved through `icons.luau` or `GousseUI:GetIcon(name)`.
+
+### Popular Icon Names
+- **Movement**: `"gauge"`, `"move"`, `"navigation"`, `"zap"`, `"activity"`
+- **Visuals**: `"eye"`, `"eye-off"`, `"camera"`, `"maximize-2"`
+- **Combat**: `"crosshair"`, `"target"`, `"flame"`, `"shield"`
+- **Utility**: `"wrench"`, `"sliders"`, `"terminal"`, `"server"`, `"refresh-cw"`, `"copy"`
+- **Player**: `"user"`, `"users"`, `"user-check"`
+- **General / Settings**: `"settings"`, `"info"`, `"power"`, `"trash-2"`
+
+### Icon Resolution Example
+```luau
+local iconAssetId = GousseUI:GetIcon("crosshair") -- Returns "rbxassetid://10709818534"
+```
+When creating tabs in `GousseUI`, pass the icon name directly:
+```luau
+local CombatTab = Window:CreateTab({ Name = "Combat", Icon = "crosshair" })
+local MovementTab = Window:CreateTab({ Name = "Movement", Icon = "gauge" })
+local VisualsTab = Window:CreateTab({ Name = "Visuals", Icon = "eye" })
+local UtilityTab = Window:CreateTab({ Name = "Utility", Icon = "wrench" })
+local AboutTab = Window:CreateTab({ Name = "About", Icon = "info" })
+```
+
+---
+
+## 3. API Reference & Component Cheatsheet
+
+### 3.1 Window Creation
 ```luau
 local Window = GousseUI:CreateWindow({
     Title = "Gousse Hub",
-    SubTitle = "Universal Edition",
-    Keybind = Enum.KeyCode.RightControl, -- Default hotkey to hide/show
-    Size = UDim2.new(0, 680, 0, 440)     -- Optional custom size
+    SubTitle = "Universal • Authentic Desktop Edition",
+    Keybind = Enum.KeyCode.RightControl,
+    Size = UDim2.new(0, 650, 0, 420)
 })
 ```
 - **Methods**:
   - `Window:Toggle(state: boolean?)`: Toggle or set visibility.
-  - `Window:Destroy()`: Completely cleans up the ScreenGui.
-  - `Window:CreateTab({ Name: string, Icon: string? })`: Instantiates a new navigation tab.
+  - `Window:Destroy()`: Safely unloads the ScreenGui.
+  - `Window:CreateTab({ Name: string, Icon: string? })`: Instantiates a navigation tab.
 
-### 2.2 Tab & Section Creation
+### 3.2 Section Divider
+Creates an understated uppercase category label with a subtle 1px divider line:
 ```luau
-local CombatTab = Window:CreateTab({ Name = "Combat", Icon = "🎯" })
-CombatTab:CreateSection("Targeting")
+UtilityTab:CreateSection("Player Teleportation")
+UtilityTab:CreateSection("Server & Session")
 ```
 
-### 2.3 Interactive Controls
+### 3.3 Interactive Controls
 
-#### Button
+#### Button Row (Primary, Secondary, or Danger)
+Buttons have distinct visual variants instead of generic blue cards:
+- `"primary"`: Subtle green highlight for focal actions (e.g., Teleport).
+- `"secondary"`: Restrained dark utility button with slate border for standard actions.
+- `"danger"`: Muted red highlight for destructive or unload actions.
+
 ```luau
-CombatTab:CreateButton({
-    Name = "Trigger Teleport",
+-- Primary action button
+UtilityTab:CreateButton({
+    Name = "Teleport to Player",
+    SubTitle = "Translate HumanoidRootPart CFrame +3 studs above target",
+    ButtonText = "Teleport",
+    Variant = "primary",
     Callback = function()
-        print("Action triggered")
+        -- teleport logic
+    end
+})
+
+-- Restrained secondary utility button
+UtilityTab:CreateButton({
+    Name = "Rejoin Current Server",
+    SubTitle = "Reconnect client to current place instance",
+    ButtonText = "Rejoin",
+    Variant = "secondary",
+    Callback = function()
+        -- rejoin logic
+    end
+})
+
+-- Destructive action
+SettingsTab:CreateButton({
+    Name = "Unload Module",
+    SubTitle = "Restore state, disconnect connections and remove UI",
+    ButtonText = "Unload",
+    Variant = "danger",
+    Callback = function()
+        -- unload logic
     end
 })
 ```
 
-#### Toggle
+#### Toggle Row
+Features an aligned switch toggle on the right. Turns green (`#67D879`) **only** when active.
 ```luau
-local HitboxToggle = CombatTab:CreateToggle({
-    Name = "Expand Hitboxes",
+local AntiAfkToggle = UtilityTab:CreateToggle({
+    Name = "Anti-AFK Watchdog",
+    SubTitle = "Simulate controller events on idle to bypass 20-min kick",
     Default = false,
     Callback = function(enabled: boolean)
-        print("Toggle state:", enabled)
+        print("Anti-AFK state:", enabled)
     end
 })
--- Methods: HitboxToggle.Set(true), HitboxToggle.Get()
+-- Methods: AntiAfkToggle.Set(true), AntiAfkToggle.Get()
 ```
 
-#### Slider
+#### Slider Row
+Compact row featuring real-time value output in code font (`#67D879`) and a thin 4px track:
 ```luau
-local SpeedSlider = CombatTab:CreateSlider({
-    Name = "WalkSpeed",
+local SpeedSlider = MovementTab:CreateSlider({
+    Name = "Target WalkSpeed",
     Min = 16,
     Max = 250,
     Default = 16,
     Decimals = 0,
     Suffix = " studs/s",
-    Callback = function(value: number)
-        print("Slider value:", value)
+    Callback = function(val: number)
+        print("WalkSpeed:", val)
     end
 })
 -- Methods: SpeedSlider.Set(50), SpeedSlider.Get()
 ```
 
-#### Dropdown
+#### Dropdown Row
+Compact row with right-aligned selector button and animated options container:
 ```luau
-local ModeDrop = CombatTab:CreateDropdown({
-    Name = "Aim Mode",
-    Options = { "Head", "Torso", "Random" },
-    Default = "Head",
+local PlayerDropdown = UtilityTab:CreateDropdown({
+    Name = "Select Target Player",
+    SubTitle = "Target entity for spatial translocation",
+    Options = { "Player1", "Player2", "Player3" },
+    Default = "Player1",
     Callback = function(selected: string)
         print("Selected:", selected)
     end
 })
--- Methods: ModeDrop.Set("Torso"), ModeDrop.Get()
+-- Methods: PlayerDropdown.Set("Player2"), PlayerDropdown.Refresh(newOptions, defaultOpt), PlayerDropdown.Get()
 ```
 
-#### Input Field
+#### Text Input Field
+Compact row with monospace input box aligned to the right:
 ```luau
-local KeyInput = CombatTab:CreateInput({
-    Name = "Webhook URL",
-    Placeholder = "https://discord.com/api/...",
+local WebhookInput = UtilityTab:CreateInput({
+    Name = "Discord Webhook",
+    SubTitle = "Remote URL for drop logs",
+    Placeholder = "https://discord.com/api/webhooks/...",
     Callback = function(text: string)
         print("Input:", text)
     end
 })
--- Methods: KeyInput.Set("value"), KeyInput.Get()
+-- Methods: WebhookInput.Set("value"), WebhookInput.Get()
 ```
 
 #### Paragraph (Info Card)
+Understated info card for changelogs, keybind reminders, and environment telemetry:
 ```luau
-CombatTab:CreateParagraph({
-    Title = "Usage Instructions",
-    Content = "Press RightControl to toggle the menu. Drag the titlebar to move."
+AboutTab:CreateParagraph({
+    Title = "Session Telemetry",
+    Content = "Universe ID: 111958650\nPlace ID: 286090429\nExecutor: Potassium"
 })
 ```
 
-### 2.4 In-Game Toast Notifications
+### 3.4 In-Game Toast Notifications
+Toast notification sliding from bottom-right with colored accent bar:
 ```luau
 GousseUI:Notify({
     Title = "Gousse Hub",
-    Content = "Module initialized successfully!",
-    Type = "success", -- "info" | "success" | "warning" | "error"
-    Duration = 4
+    Content = "Position updated successfully.",
+    Type = "success", -- "success" (green) | "info" (blue) | "warning" (amber) | "error" (red)
+    Duration = 3
 })
 ```
 
 ---
 
-## 3. Development Phases (Fase Pengembangan)
-
-When developing a new game script or extending an existing one, follow these 5 phases:
+## 4. 5 Development Phases (Fase Pengembangan)
 
 ```mermaid
 flowchart TD
     P1[Phase 1: Manifest Registration] --> P2[Phase 2: Bootstrap & GUI Injection]
-    P2 --> P3[Phase 3: Tab & Section Layout]
+    P2 --> P3[Phase 3: Tab & Section Layout with Lucide Icons]
     P3 --> P4[Phase 4: Game Logic & Safe Callbacks]
     P4 --> P5[Phase 5: Unload Lifecycle & Cleanup]
 ```
@@ -187,13 +257,15 @@ if not GousseUI then
 end
 ```
 
-### Phase 3: Tab & Section Layout
-Create logical tabs aligned with player workflows:
-- `Combat`: Weapons, hitboxes, silent aim, triggerbot.
-- `Visuals`: ESP, chams, lighting, FOV, tracers.
-- `Movement`: Speed, jump, fly, noclip, bunny hop.
-- `Utility`: Server hop, rejoin, player teleport, anti-AFK.
-- `Settings`: Unload button, hotkey reminders, credits.
+### Phase 3: Tab & Section Layout (Lucide Icons)
+Always assign authentic Lucide icon keys (no emoticons):
+```luau
+local CombatTab = Window:CreateTab({ Name = "Combat", Icon = "crosshair" })
+local VisualsTab = Window:CreateTab({ Name = "Visuals", Icon = "eye" })
+local MovementTab = Window:CreateTab({ Name = "Movement", Icon = "gauge" })
+local UtilityTab = Window:CreateTab({ Name = "Utility", Icon = "wrench" })
+local SettingsTab = Window:CreateTab({ Name = "Settings", Icon = "settings" })
+```
 
 ### Phase 4: Game Logic & Safe Callbacks
 - Wrap remote calls, character physics, and metatables inside `pcall`.
@@ -201,32 +273,28 @@ Create logical tabs aligned with player workflows:
 - Use event throttling (`RunService.RenderStepped` or `Stepped`) rather than busy `while true do` loops.
 
 ### Phase 5: Unload Lifecycle & Cleanup
-Always provide an Unload button in the Settings tab to ensure a clean state:
+Always provide an Unload button with `Variant = "danger"`:
 ```luau
 SettingsTab:CreateButton({
     Name = "Unload Script",
+    SubTitle = "Disconnect loops, remove highlights & reset physics",
+    ButtonText = "Unload",
+    Variant = "danger",
     Callback = function()
-        -- 1. Disconnect all RBXScriptConnections
         if noclipConn then noclipConn:Disconnect(); noclipConn = nil end
         if bHopConn then bHopConn:Disconnect(); bHopConn = nil end
-        
-        -- 2. Clean up visual highlights and drawing objects
         for _, hl in pairs(highlights) do hl:Destroy() end
-        
-        -- 3. Reset physics
         local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if hum then hum.WalkSpeed = 16 end
-        
-        -- 4. Destroy GUI
         Window:Destroy()
-        GousseUI:Notify({ Title = "Gousse Hub", Content = "Unloaded cleanly.", Duration = 3 })
+        GousseUI:Notify({ Title = "Gousse Hub", Content = "Cleanly unloaded.", Duration = 3 })
     end
 })
 ```
 
 ---
 
-## 4. Universal Loader (`Init.luau`) Pipeline
+## 5. Universal Loader (`Init.luau`) Pipeline
 
 The Universal Loader provides a unified entry link:
 1. **GousseUI Preloading**: Loads `library.luau` and exposes it via `getgenv().GousseUI`.
