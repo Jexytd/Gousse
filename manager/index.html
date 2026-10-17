@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gousse Studio | Developer Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="index.css?v=17">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+</head>
+<body>
+  <div class="workbench">
+    <!-- Compact Left Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-mark">GS</div>
+        <div class="brand-text">
+          <span class="brand-name">Gousse Studio</span>
+          <span class="brand-repo" id="git-branch-indicator">main · clean</span>
+        </div>
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="sidebar-nav">
+        <div class="nav-section-label">WORKSPACE</div>
+        <button class="nav-item active" data-view="pipeline">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          <span>Pipeline & Tasks</span>
+          <span class="nav-counter" id="nav-task-count">0</span>
+        </button>
+
+        <button class="nav-item" data-view="registry">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="2" y1="12" x2="22" y2="12"></line>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+          </svg>
+          <span>Game Registry</span>
+          <span class="nav-counter" id="nav-game-count">0</span>
+        </button>
+
+        <button class="nav-item" data-view="studio">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="16 18 22 12 16 6"></polyline>
+            <polyline points="8 6 2 12 8 18"></polyline>
+          </svg>
+          <span>Script Studio</span>
+        </button>
+
+        <button class="nav-item" data-view="deployment">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="6" y1="3" x2="6" y2="15"></line>
+            <circle cx="18" cy="6" r="3"></circle>
+            <circle cx="6" cy="18" r="3"></circle>
+            <path d="M18 9a9 9 0 0 1-9 9"></path>
+          </svg>
+          <span>Deploy & Git</span>
+          <span class="nav-counter" id="nav-git-status-dot">●</span>
+        </button>
+
+        <button class="nav-item" data-view="potassium">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+            <circle cx="6" cy="8" r="1" fill="currentColor"></circle>
+            <circle cx="9" cy="8" r="1" fill="currentColor"></circle>
+          </svg>
+          <span>Client Explorer</span>
+          <span class="nav-counter" id="nav-potassium-count">0</span>
+        </button>
+
+        <div class="nav-section-label" style="margin-top: 1.25rem;">TEAM FILTERS</div>
+        <button class="nav-filter active" data-assignee-filter="all">
+          <span class="filter-dot"></span>
+          <span>All Members</span>
+        </button>
+        <button class="nav-filter" data-assignee-filter="Jexytd">
+          <span class="filter-avatar">J</span>
+          <span>Jexytd</span>
+        </button>
+        <button class="nav-filter" data-assignee-filter="Gouang">
+          <span class="filter-avatar">G</span>
+          <span>Gouang</span>
+        </button>
+      </nav>
+
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
+        <button id="btn-quick-loader" class="quick-copy-btn" title="Copy Universal Loader Link">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span>Copy Loader Link</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="content-wrapper">
+      <!-- Top Action Bar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <h2 id="view-heading">Pipeline & Tasks</h2>
+          <span class="view-subheading" id="view-subheading">Active development pipeline and place status</span>
+        </div>
+
+        <div class="topbar-actions">
+          <!-- View switcher for Pipeline -->
+          <div class="btn-group" id="pipeline-view-switch">
+            <button class="btn btn-segmented active" id="btn-switch-kanban">Kanban</button>
+            <button class="btn btn-segmented" id="btn-switch-table">List View</button>
+          </div>
+
+          <button id="btn-top-action" class="btn btn-primary btn-sm">+ New Task</button>
+        </div>
+      </header>
+
+      <!-- VIEW 1: PIPELINE & TASKS -->
+      <section id="view-pipeline" class="view-panel active">
+        <!-- Pipeline Control Bar -->
+        <div class="filter-toolbar">
+          <div class="search-input-wrap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="task-search" placeholder="Filter tasks by ID, title, or keyword...">
+          </div>
+
+          <div class="filter-dropdowns">
+            <select id="filter-game" class="filter-select">
+              <option value="all">All Games</option>
+              <!-- Populated dynamically -->
+            </select>
+
+            <select id="filter-priority" class="filter-select">
+              <option value="all">All Priorities</option>
+              <option value="Urgent">Urgent</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Kanban Board -->
+        <div id="kanban-board" class="kanban-board">
+          <!-- Backlog -->
+          <div class="kanban-col" data-status="backlog">
+            <div class="kanban-col-header">
+              <div class="col-title">
+                <span class="status-marker marker-backlog"></span>
+                <span>Backlog</span>
+              </div>
+              <span class="col-count" id="count-backlog">0</span>
+            </div>
+            <div class="kanban-cards" id="cards-backlog"></div>
+          </div>
+
+          <!-- In Development -->
+          <div class="kanban-col" data-status="in_progress">
+            <div class="kanban-col-header">
+              <div class="col-title">
+                <span class="status-marker marker-progress"></span>
+                <span>In Development</span>
+              </div>
+              <span class="col-count" id="count-in_progress">0</span>
+            </div>
+            <div class="kanban-cards" id="cards-in_progress"></div>
+          </div>
+
+          <!-- Review & Testing -->
+          <div class="kanban-col" data-status="review">
+            <div class="kanban-col-header">
+              <div class="col-title">
+                <span class="status-marker marker-review"></span>
+                <span>Review & Testing</span>
+              </div>
+              <span class="col-count" id="count-review">0</span>
+            </div>
+            <div class="kanban-cards" id="cards-review"></div>
+          </div>
+
+          <!-- Production (Done) -->
+          <div class="kanban-col" data-status="done">
+            <div class="kanban-col-header">
+              <div class="col-title">
+                <span class="status-marker marker-done"></span>
+                <span>Production (Ready)</span>
+              </div>
+              <span class="col-count" id="count-done">0</span>
+            </div>
+            <div class="kanban-cards" id="cards-done"></div>
+          </div>
+        </div>
+
+        <!-- Task Table View (Dense) -->
+        <div id="task-table-view" class="table-container" style="display: none;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 80px;">ID</th>
+                <th>Task Title</th>
+                <th style="width: 140px;">Game Context</th>
+                <th style="width: 110px;">Assignee</th>
+                <th style="width: 100px;">Priority</th>
+                <th style="width: 110px;">Deadline</th>
+                <th style="width: 120px;">Status</th>
+                <th style="width: 70px; text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="task-table-body">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- VIEW 2: GAME REGISTRY -->
+      <section id="view-registry" class="view-panel">
+        <div class="registry-toolbar">
+          <input type="text" id="registry-search" class="compact-input" placeholder="Search by game name or Universe ID...">
+          <button id="btn-register-game" class="btn btn-primary btn-sm">+ Register Game</button>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 180px;">Game Experience</th>
+                <th style="width: 120px;">Universe ID</th>
+                <th>Sub-Worlds / Place IDs</th>
+                <th style="width: 110px;">Lead</th>
+                <th style="width: 100px;">Status</th>
+                <th style="width: 120px; text-align: right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="registry-table-body">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- VIEW 3: SCRIPT STUDIO -->
+      <section id="view-studio" class="view-panel">
+        <div class="studio-layout">
+          <!-- File Browser (VS Code Style Explorer) -->
+          <aside class="studio-filetree" id="studio-sidebar">
+            <div class="filetree-header">
+              <span class="filetree-title">EXPLORER</span>
+              <div class="filetree-header-actions">
+                <button id="btn-toggle-explorer-hide" class="tree-header-btn" title="Hide Explorer (Ctrl+B)">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M11 2L5 8l6 6V2z"/>
+                  </svg>
+                </button>
+                <button id="btn-explorer-more" class="tree-header-btn" title="More Actions">···</button>
+              </div>
+            </div>
+
+            <!-- Root Workspace Section: ∨ Gousse -->
+            <div class="workspace-root-header">
+              <div class="root-title-left" id="workspace-root-toggle">
+                <span class="tree-chevron root-chevron" id="root-chevron">▾</span>
+                <span class="root-folder-name">Gousse</span>
+              </div>
+              <div class="root-actions">
+                <button id="btn-tree-new-file" class="tree-act-btn" title="New File...">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
+                    <path d="M3 1h7l4 4v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z"/>
+                    <path d="M10 1v4h4"/>
+                    <path d="M7 7v4M5 9h4"/>
+                  </svg>
+                </button>
+                <button id="btn-tree-new-folder" class="tree-act-btn" title="New Folder...">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
+                    <path d="M1 3a1 1 0 0 1 1-1h4l2 2h6a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V3z"/>
+                    <path d="M8 7v4M6 9h4"/>
+                  </svg>
+                </button>
+                <button id="btn-refresh-files" class="tree-act-btn" title="Refresh Explorer">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
+                    <path d="M13.65 2.35A8 8 0 1 0 16 8h-2a6 6 0 1 1-1.76-4.24l-2.48 2.48H16V2.35z"/>
+                  </svg>
+                </button>
+                <button id="btn-collapse-all" class="tree-act-btn" title="Collapse Folders in Explorer">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
+                    <path d="M9 2H2a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/>
+                    <path d="M5 2V1a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-1"/>
+                    <path d="M3 7h5"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Dynamic File Tree -->
+            <div id="filetree-list" class="filetree-list">
+              <!-- Populated dynamically -->
+            </div>
+          </aside>
+
+          <!-- Editor -->
+          <div class="studio-editor-area">
+            <div class="editor-tabs-bar">
+              <button id="btn-show-explorer" class="btn-toggle-sidebar" title="Show Explorer (Ctrl+B)" style="display: none;">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M3 1h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2zm0 1a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3V2H3zm4 12h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H7v12z"/>
+                </svg>
+                <span>Explorer</span>
+              </button>
+              <div class="editor-tab active">
+                <span id="active-tab-icon" class="tab-file-icon"></span>
+                <span id="active-tab-name">Select a file</span>
+                <span class="dirty-indicator" id="file-dirty-dot" style="display:none;">●</span>
+              </div>
+              <div class="editor-tab-actions">
+                <button id="btn-toggle-explorer-editor" class="icon-btn" title="Toggle Explorer (Ctrl+B)">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M3 1h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2zm0 1a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3V2H3zm4 12h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H7v12z"/>
+                  </svg>
+                </button>
+                <div class="potassium-quick-run-wrap">
+                  <select id="studio-client-select" class="compact-select-mcp" title="Target Potassium Client">
+                    <option value="all">Target: All Clients</option>
+                  </select>
+                  <button id="btn-run-client" class="btn btn-success btn-sm btn-run-mcp" title="Execute script on Potassium client (Ctrl+Enter)">
+                    <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor">
+                      <polygon points="3,1 14,8 3,15"></polygon>
+                    </svg>
+                    <span>Run</span>
+                  </button>
+                </div>
+                <span id="editor-file-path-hint" class="meta-subtext">No file open</span>
+                <button id="btn-save-code" class="btn btn-primary btn-sm" disabled>Save (Ctrl+S)</button>
+              </div>
+            </div>
+            <div class="editor-workspace" id="editor-workspace-wrap">
+              <div id="monaco-container" class="monaco-host"></div>
+              <textarea id="studio-textarea-fallback" class="monaco-like-editor" style="display:none;" spellcheck="false" placeholder="-- Select a script from the explorer to view or edit..."></textarea>
+            </div>
+            <!-- Multi-tab Bottom Tray (Problems & Potassium Live Output) -->
+            <div id="problems-panel" class="problems-panel" style="display: none;">
+              <div class="problems-panel-header">
+                <div class="panel-header-tabs">
+                  <button class="panel-tab-btn active" id="tab-btn-problems" data-panel-tab="problems">
+                    <span>PROBLEMS</span>
+                    <span id="problems-total-badge" class="badge-mini">0</span>
+                  </button>
+                  <button class="panel-tab-btn" id="tab-btn-output" data-panel-tab="output">
+                    <span>POTASSIUM OUTPUT</span>
+                    <span id="output-live-dot" class="k-dot-pulse">●</span>
+                  </button>
+                </div>
+                <div class="panel-header-actions">
+                  <button id="btn-clear-studio-output" class="tree-act-btn" title="Clear Output Logs">
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
+                      <circle cx="8" cy="8" r="6"/>
+                      <line x1="4" y1="4" x2="12" y2="12"/>
+                    </svg>
+                  </button>
+                  <button id="btn-close-problems" class="icon-btn" title="Close Panel">✕</button>
+                </div>
+              </div>
+              <div id="problems-list" class="problems-list">
+                <div class="empty-hint">No problems detected in the active file.</div>
+              </div>
+              <div id="studio-output-list" class="studio-output-content" style="display: none;">
+                <div class="empty-hint">Ready to execute. Click "▶ Run" or press Ctrl+Enter to dispatch code to Potassium.</div>
+              </div>
+            </div>
+            <div class="editor-statusbar">
+              <div class="statusbar-left">
+                <div class="statusbar-item problems-btn" id="btn-toggle-problems" title="Toggle Problems Panel">
+                  <span class="stat-problem err" id="status-err-group"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 5.5l5 5M10.5 5.5l-5 5" stroke="currentColor" stroke-width="1.8"/></svg> <span id="status-error-count">0</span></span>
+                  <span class="stat-problem warn" id="status-warn-group"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.5l6.5 12h-13L8 1.5z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="11.5" r="0.9"/><line x1="8" y1="5.5" x2="8" y2="9" stroke="currentColor" stroke-width="1.8"/></svg> <span id="status-warn-count">0</span></span>
+                </div>
+                <div class="statusbar-item terminal-btn" id="btn-toggle-output" title="Toggle Potassium Output Console">
+                  <span class="stat-output-dot" id="studio-mcp-dot">●</span>
+                  <span>Output Console</span>
+                </div>
+                <span id="editor-line-col">Ln 1, Col 1</span>
+                <span id="editor-char-count">0 bytes</span>
+              </div>
+              <div class="statusbar-right">
+                <span class="luau-badge">Luau / Roblox API</span>
+                <span>UTF-8</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 4: DEPLOYMENT & GIT -->
+      <section id="view-deployment" class="view-panel">
+        <div class="deployment-grid">
+          <div class="work-card">
+            <div class="card-header-dense">
+              <h3 class="card-dense-title">Git Repository Status</h3>
+              <button id="btn-check-git" class="btn btn-secondary btn-sm">Refresh Status</button>
+            </div>
+            <div class="card-dense-body">
+              <div class="kv-row">
+                <span class="kv-key">Branch:</span>
+                <span class="kv-val" id="git-branch-val">main</span>
+              </div>
+              <div class="kv-row">
+                <span class="kv-key">Working Tree:</span>
+                <span class="kv-val" id="git-tree-val">Checking...</span>
+              </div>
+
+              <div style="margin-top: 1rem;">
+                <label class="dense-label">Modified / Untracked Files</label>
+                <div id="git-diff-list" class="diff-list">
+                  <div class="empty-hint">Working tree clean. All scripts are up to date.</div>
+                </div>
+              </div>
+
+              <div class="commit-box">
+                <label class="dense-label" for="deploy-commit-msg">Commit Message</label>
+                <input type="text" id="deploy-commit-msg" class="compact-input" value="Update scripts via Gousse Studio">
+                <button id="btn-exec-push" class="btn btn-primary" style="margin-top: 0.5rem; width: 100%;">
+                  Commit & Push to origin/main
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="work-card">
+            <div class="card-header-dense">
+              <h3 class="card-dense-title">Universal Loader Distribution</h3>
+            </div>
+            <div class="card-dense-body">
+              <p class="dense-desc">
+                Provide this exact snippet to players. The loader pulls <code>games.json</code> dynamically and routes the player by Universe ID and Place ID automatically.
+              </p>
+
+              <div class="code-box-dense">
+                <button id="btn-copy-box" class="copy-float-btn">Copy</button>
+                <code>loadstring(game:HttpGet("https://raw.githubusercontent.com/Jexytd/Gousse/main/Init.luau"))()</code>
+              </div>
+
+              <div class="spec-table" style="margin-top: 1rem;">
+                <div class="spec-row">
+                  <span class="spec-name">Manifest URI</span>
+                  <span class="spec-val">raw.githubusercontent.com/Jexytd/Gousse/main/games.json</span>
+                </div>
+                <div class="spec-row">
+                  <span class="spec-name">Multi-World Resolution</span>
+                  <span class="spec-val">game.GameId &gt; places[game.PlaceId] &gt; entry &gt; universal</span>
+                </div>
+                <div class="spec-row">
+                  <span class="spec-name">Fallback Module</span>
+                  <span class="spec-val">games/universal.luau</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 5: POTASSIUM CLIENT INSTANCES & DEVELOPER CONSOLE -->
+      <section id="view-potassium" class="view-panel">
+        <div class="potassium-layout">
+          <!-- Left Column: Client & Instance Explorer -->
+          <aside class="potassium-sidebar">
+            <div class="k-panel-header">
+              <div class="k-header-title">
+                <span class="k-status-dot online" id="mcp-server-dot">●</span>
+                <span>POTASSIUM INSTANCES</span>
+              </div>
+              <div class="k-header-actions">
+                <button id="btn-refresh-potassium" class="tree-act-btn" title="Refresh Clients & MCP">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
+                    <path d="M13.65 2.35A8 8 0 1 0 16 8h-2a6 6 0 1 1-1.76-4.24l-2.48 2.48H16V2.35z"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Client Processes Section -->
+            <div class="k-section-title">
+              <span>ATTACHED CLIENTS</span>
+              <span id="k-client-count-badge" class="badge-mini">0</span>
+            </div>
+            <div id="potassium-client-list" class="k-client-list">
+              <!-- Dynamically populated client cards -->
+            </div>
+
+            <!-- Live Instance Hierarchy Tree (DataModel) -->
+            <div class="k-section-title" style="margin-top: 12px;">
+              <span>ROBLOX INSTANCE TREE</span>
+              <button id="btn-inspect-datamodel" class="link-btn-xs" title="Query Live DataModel via Luau">Query Live</button>
+            </div>
+            <div id="potassium-instance-tree" class="k-instance-tree">
+              <!-- Dynamically populated hierarchy -->
+            </div>
+
+            <!-- Potassium Tabs -->
+            <div class="k-section-title" style="margin-top: 12px;">
+              <span>POTASSIUM EDITOR TABS</span>
+              <span id="k-tabs-count-badge" class="badge-mini">0</span>
+            </div>
+            <div id="potassium-tabs-list" class="k-tabs-list">
+              <!-- Dynamically populated tabs -->
+            </div>
+          </aside>
+
+          <!-- Right Column: Live Console, Output Stream & Luau REPL -->
+          <div class="potassium-terminal-area">
+            <div class="k-terminal-header">
+              <div class="k-term-title-group">
+                <span class="k-term-badge">MCP CONSOLE STREAM</span>
+                <span id="k-active-target-hint" class="k-target-label">Target: All Clients</span>
+              </div>
+              <div class="k-term-actions">
+                <label class="k-check-label">
+                  <input type="checkbox" id="k-auto-scroll" checked>
+                  <span>Auto-scroll</span>
+                </label>
+                <button id="btn-k-clear-console" class="btn btn-secondary btn-xs">Clear</button>
+                <button id="btn-k-poll-console" class="btn btn-secondary btn-xs">Poll Output</button>
+              </div>
+            </div>
+
+            <!-- Terminal Output Log Stream -->
+            <div id="potassium-console-logs" class="k-console-output">
+              <div class="k-log-welcome">
+                <div class="k-welcome-title">Potassium MCP Luau Execution Stream Connected</div>
+                <div class="k-welcome-sub">Dispatched scripts and print() / warn() / error() outputs will stream here in real-time.</div>
+              </div>
+            </div>
+
+            <!-- Luau REPL Command Bar -->
+            <div class="k-repl-container">
+              <div class="k-repl-quick-chips">
+                <button class="k-chip" data-cmd="print('Current GameId:', game.GameId, 'PlaceId:', game.PlaceId)">⚡ PlaceId & GameId</button>
+                <button class="k-chip" data-cmd="local p = game:GetService('Players').LocalPlayer; print('LocalPlayer:', p and p.Name, 'UserId:', p and p.UserId)">👤 LocalPlayer</button>
+                <button class="k-chip" data-cmd="for _, p in ipairs(game:GetService('Players'):GetPlayers()) do print('Player in server:', p.Name, 'UserId:', p.UserId) end">🎮 List Players</button>
+                <button class="k-chip" data-cmd="local ch = game.Players.LocalPlayer.Character; if ch and ch:FindFirstChild('Humanoid') then ch.Humanoid.WalkSpeed = 100; print('WalkSpeed set to 100') end">🚀 Speed 100</button>
+                <button class="k-chip" data-cmd="print('Executor:', identifyexecutor and identifyexecutor() or 'Potassium')">🛡️ Executor Name</button>
+              </div>
+              <div class="k-repl-input-row">
+                <span class="k-repl-prompt">luau&gt;</span>
+                <input type="text" id="k-repl-input" class="k-repl-input" placeholder="Type Luau expression or script and press Enter to execute...">
+                <button id="btn-k-repl-exec" class="btn btn-success btn-sm">Execute</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- TASK MODAL / DRAWER -->
+    <div id="task-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-window">
+        <div class="modal-header">
+          <h3 id="task-modal-title">Task Details</h3>
+          <button id="btn-close-task-modal" class="icon-btn">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-cell">
+              <label class="dense-label">Task ID</label>
+              <input type="text" id="task-input-id" class="compact-input" readonly>
+            </div>
+            <div class="form-cell">
+              <label class="dense-label">Status</label>
+              <select id="task-input-status" class="filter-select">
+                <option value="backlog">Backlog</option>
+                <option value="in_progress">In Development</option>
+                <option value="review">Review & Testing</option>
+                <option value="done">Production (Done)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-cell" style="margin-top: 0.75rem;">
+            <label class="dense-label">Task Title</label>
+            <input type="text" id="task-input-title" class="compact-input" placeholder="e.g. Implement auto-raid chip buyer">
+          </div>
+
+          <div class="form-row" style="margin-top: 0.75rem;">
+            <div class="form-cell">
+              <label class="dense-label">Target Game</label>
+              <select id="task-input-game" class="filter-select">
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+            <div class="form-cell">
+              <label class="dense-label">Assignee</label>
+              <select id="task-input-assignee" class="filter-select">
+                <option value="Jexytd">Jexytd</option>
+                <option value="Gouang">Gouang</option>
+                <option value="Unassigned">Unassigned</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 0.75rem;">
+            <div class="form-cell">
+              <label class="dense-label">Priority</label>
+              <select id="task-input-priority" class="filter-select">
+                <option value="Urgent">Urgent</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+            </div>
+            <div class="form-cell">
+              <label class="dense-label">Deadline</label>
+              <input type="date" id="task-input-deadline" class="compact-input">
+            </div>
+          </div>
+
+          <div class="form-cell" style="margin-top: 0.75rem;">
+            <label class="dense-label">Description / Scope Notes</label>
+            <textarea id="task-input-desc" class="dense-textarea" placeholder="Implementation details, hooked functions, or detection mitigation notes..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-delete-task" class="btn btn-danger btn-sm" style="margin-right: auto;">Delete</button>
+          <button id="btn-cancel-task" class="btn btn-secondary btn-sm">Cancel</button>
+          <button id="btn-save-task" class="btn btn-primary btn-sm">Save Task</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- GAME REGISTRATION MODAL -->
+    <div id="game-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-window" style="max-width: 600px;">
+        <div class="modal-header">
+          <h3 id="game-modal-title">Register Game Experience</h3>
+          <button id="btn-close-game-modal" class="icon-btn">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-cell">
+              <label class="dense-label">Game Name</label>
+              <input type="text" id="reg-game-name" class="compact-input" placeholder="e.g. Blox Fruits">
+            </div>
+            <div class="form-cell">
+              <label class="dense-label">Universe ID (game.GameId)</label>
+              <input type="text" id="reg-universe-id" class="compact-input" placeholder="e.g. 994732206">
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 0.75rem;">
+            <div class="form-cell">
+              <label class="dense-label">Lead Developer</label>
+              <select id="reg-lead" class="filter-select">
+                <option value="Jexytd">Jexytd</option>
+                <option value="Gouang">Gouang</option>
+              </select>
+            </div>
+            <div class="form-cell">
+              <label class="dense-label">Status</label>
+              <select id="reg-status" class="filter-select">
+                <option value="public">Public (Active)</option>
+                <option value="review">Review & Testing</option>
+                <option value="development">Development</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-cell" style="margin-top: 0.75rem;">
+            <label class="dense-label">Main Entry Script Path</label>
+            <input type="text" id="reg-entry-path" class="compact-input" placeholder="games/my_game/main.luau">
+          </div>
+
+          <div class="subplaces-section" style="margin-top: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+              <label class="dense-label" style="margin: 0;">Sub-Worlds / Place IDs (Optional)</label>
+              <button id="btn-reg-add-place" class="btn btn-secondary btn-sm" type="button">+ Add Sub-World</button>
+            </div>
+            <div id="reg-places-list" class="subplaces-list">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-cancel-game" class="btn btn-secondary btn-sm">Cancel</button>
+          <button id="btn-save-game-reg" class="btn btn-primary btn-sm">Save Game</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast"></div>
+  </div>
+
+  <script src="roblox-lsp.js?v=17"></script>
+  <script src="app.js?v=17"></script>
+</body>
+</html>

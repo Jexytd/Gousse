@@ -1,0 +1,92 @@
+{
+  "version": "1.0.0",
+  "universal": "games/universal.luau",
+  "games": {
+    "994732206": {
+      "name": "Blox Fruits",
+      "status": "public",
+      "lead": "Jexytd",
+      "entry": "games/blox_fruits/main.luau",
+      "places": {
+        "2753915549": {
+          "name": "First Sea (World 1)",
+          "script": "games/blox_fruits/sea1.luau"
+        },
+        "4442272183": {
+          "name": "Second Sea (World 2)",
+          "script": "games/blox_fruits/sea2.luau"
+        },
+        "7449423635": {
+          "name": "Third Sea (World 3)",
+          "script": "games/blox_fruits/sea3.luau"
+        }
+      }
+    },
+    "111958650": {
+      "name": "Arsenal",
+      "status": "review",
+      "lead": "Jexytd",
+      "entry": "games/arsenal/main.luau",
+      "places": {}
+    },
+    "1168263273": {
+      "name": "Bad Business",
+      "status": "development",
+      "lead": "Gouang",
+      "entry": "games/bad_business/main.luau",
+      "places": {}
+    }
+  },
+  "tasks": [
+    {
+      "id": "GS-101",
+      "title": "Bypass third-sea physics kick",
+      "gameId": "994732206",
+      "status": "in_progress",
+      "assignee": "Jexytd",
+      "priority": "High",
+      "deadline": "2026-10-22",
+      "description": "Fix telemetry detection on Potassium when teleporting between islands in Third Sea."
+    },
+    {
+      "id": "GS-102",
+      "title": "Silent aim raycast hook",
+      "gameId": "111958650",
+      "status": "review",
+      "assignee": "Gouang",
+      "priority": "Medium",
+      "deadline": "2026-10-20",
+      "description": "Replace __namecall Raycast interception with metamethod hook on FireServer."
+    },
+    {
+      "id": "GS-103",
+      "title": "ESP player bones and health bars",
+      "gameId": "universal",
+      "status": "done",
+      "assignee": "Jexytd",
+      "priority": "Low",
+      "deadline": "2026-10-15",
+      "description": "Drawing library bounding box and skeleton renderer fallback for all games."
+    },
+    {
+      "id": "GS-104",
+      "title": "Add projectile speed compensation",
+      "gameId": "1168263273",
+      "status": "backlog",
+      "assignee": "Gouang",
+      "priority": "Urgent",
+      "deadline": "2026-10-28",
+      "description": "Calculate target velocity vector delta and latency compensation for projectile drop."
+    },
+    {
+      "id": "GS-105",
+      "title": "Auto-raid trigger for Second Sea",
+      "gameId": "994732206",
+      "status": "backlog",
+      "assignee": "Jexytd",
+      "priority": "Medium",
+      "deadline": "2026-10-30",
+      "description": "Hook ClickDetector on microchip lab table to auto-buy raid chips."
+    }
+  ]
+}

@@ -17,8 +17,14 @@ local function CheckVariabel(Variable, Name)
     end
 end
 
-local function GetFunction(Name : string)
-    return SupportedFunction.Available[Name];
+local function GetN(T)
+    local N = 0;
+    for k,v in pairs(T) do
+        if v then
+            N = N + 1;
+        end
+    end
+    return N
 end
 
 Log("Checking exploit function compatibility...")
@@ -175,18 +181,10 @@ CheckVariabel(WebSocket.connect, 'WebSocketConnect')
 
 Log("Exploit functions have been collected, waiting for result...")
 
-local TotalFunction = #SupportedFunction.Available + #SupportedFunction.Unavailable
-local FunctionFound = #SupportedFunction.Available
+local TotalFunction = GetN(SupportedFunction.Available) + GetN(SupportedFunction.Unavailable)
+local FunctionFound = GetN(SupportedFunction.Available)
 local Percent = math.floor((FunctionFound / TotalFunction) * 100)
 
 Log(("Executor compatibility : %d%%"):format(Percent))
 
-local Gousse = {}
-function Gousse:retrieveGithub(Destination : string, File : string)
-    local Url = ("https://raw.githubusercontent.com/Jexytd/Gousse/refs/heads/main/%s/%s.luau"):format(Destination, File);
-    local Status, Content = pcall(GetFunction("Request"), Url);
-    
-    return Status and Content or nil
-end
-
-return SupportedFunction, Gousse
+return SupportedFunction

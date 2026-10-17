@@ -1,0 +1,130 @@
+# ==============================================================================
+# Gousse Hub - Git Ignore Configuration
+# Prevents sensitive, system, temporary, and large auto-generated files from
+# being committed and uploaded to GitHub.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Node.js & Dependencies
+# ------------------------------------------------------------------------------
+node_modules/
+jspm_packages/
+.npm
+.pnpm-store/
+package-lock.json.backup
+
+# ------------------------------------------------------------------------------
+# 2. Logs, Debugging & Crash Dumps
+# ------------------------------------------------------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Crash and memory dumps
+*.dmp
+*.dump
+*.stackdump
+crash-dumps/
+
+# ------------------------------------------------------------------------------
+# 3. Environment Variables & Secret Credentials
+# ------------------------------------------------------------------------------
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+*.pem
+*.key
+*.cert
+*.crt
+secrets.json
+auth.json
+credentials.json
+config.local.json
+*.credentials
+
+# ------------------------------------------------------------------------------
+# 4. Large Data / Raw API Dumps
+# (roblox-api-data.json is kept for LSP; raw multi-megabyte dumps are ignored)
+# ------------------------------------------------------------------------------
+*-dump.json
+*-api-dump.json
+manager/roblox-api-dump.json
+
+# ------------------------------------------------------------------------------
+# 5. Roblox & Executor Artifacts (Potassium / Exploit workspace)
+# ------------------------------------------------------------------------------
+potassium_logs/
+potassium_dumps/
+workspace/
+test_*.txt
+*_test_result*.txt
+gousse_test_result.txt
+output_*.txt
+
+# Roblox binary/xml place & model files (unless explicitly needed)
+*.rbxl
+*.rbxlx
+*.rbxm
+*.rbxmx
+
+# ------------------------------------------------------------------------------
+# 6. Temporary & Build Artifacts
+# ------------------------------------------------------------------------------
+dist/
+build/
+out/
+tmp/
+temp/
+.temp/
+.cache/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# ------------------------------------------------------------------------------
+# 7. Operating System Artifacts
+# ------------------------------------------------------------------------------
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Linux
+.directory
+.fuse_hidden*
+
+# ------------------------------------------------------------------------------
+# 8. IDE & Editor Configurations
+# ------------------------------------------------------------------------------
+.vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+.vs/
+.cursor/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.sublime-project
+*.sublime-workspace
