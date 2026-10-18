@@ -1054,6 +1054,21 @@ function GousseUI:CreateWindow(config: {
     tabLayout.Padding = UDim.new(0, 4)
     tabLayout.Parent = tabListContainer
 
+    -- Single animated emerald active indicator bar for sidebar (Glides smoothly between tabs)
+    local activeIndicator = Instance.new("Frame")
+    activeIndicator.Name = "ActiveIndicator"
+    activeIndicator.Size = UDim2.new(0, 3, 0, 18)
+    activeIndicator.Position = UDim2.new(0, 4, 0, 6)
+    activeIndicator.BackgroundColor3 = GousseUI.Theme.Accent
+    activeIndicator.BorderSizePixel = 0
+    activeIndicator.ZIndex = 10
+    activeIndicator.Visible = false
+    activeIndicator.Parent = sidebar
+
+    local indicatorCorner = Instance.new("UICorner")
+    indicatorCorner.CornerRadius = UDim.new(1, 0)
+    indicatorCorner.Parent = activeIndicator
+
     -- Right Content Area (Expands to 100% when sidebar is collapsed)
     local contentArea = Instance.new("Frame")
     contentArea.Name = "ContentArea"
@@ -1080,6 +1095,10 @@ function GousseUI:CreateWindow(config: {
         Tween(collapseIcon, {
             ImageColor3 = isSidebarCollapsed and GousseUI.Theme.Accent or GousseUI.Theme.TextSecondary
         }, 0.16)
+
+        if activeIndicator then
+            activeIndicator.Visible = not isSidebarCollapsed and (WindowObj and WindowObj.ActiveTab ~= nil)
+        end
     end
 
     collapseBtn.MouseButton1Click:Connect(function()
@@ -1264,6 +1283,35 @@ function GousseUI:CreateWindow(config: {
     -- ========================================================================
     -- Tab Creation
     -- ========================================================================
+    local currentTransitionToken = 0
+
+    local function GetIndicatorTargetY(btn: GuiButton): number
+        local btnAbsY = btn.AbsolutePosition.Y
+        local sideAbsY = sidebar.AbsolutePosition.Y
+        if btnAbsY == 0 and sideAbsY == 0 then
+            local tabIndex = 1
+            for idx, t in ipairs(WindowObj.Tabs) do
+                if t.Button == btn then
+                    tabIndex = idx
+                    break
+                end
+            end
+            local h = if isMobile then 38 else 32
+            return 6 + (tabIndex - 1) * (h + 4) + (h - 18) / 2
+        end
+        local relY = btnAbsY - sideAbsY
+        local btnHeight = btn.AbsoluteSize.Y
+        if btnHeight == 0 then btnHeight = if isMobile then 38 else 32 end
+        return relY + (btnHeight - 18) / 2
+    end
+
+    tabListContainer:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+        if WindowObj and WindowObj.ActiveTab and WindowObj.ActiveTab.Button and activeIndicator.Visible and not isSidebarCollapsed then
+            local targetY = GetIndicatorTargetY(WindowObj.ActiveTab.Button)
+            activeIndicator.Position = UDim2.new(0, 4, 0, targetY)
+        end
+    end)
+
     function WindowObj:CreateTab(tabConfig: { Name: string, Icon: string? })
         tabConfig = tabConfig or {}
         local tabName = tabConfig.Name or "Tab"
@@ -1284,20 +1332,6 @@ function GousseUI:CreateWindow(config: {
         local btnCorner = Instance.new("UICorner")
         btnCorner.CornerRadius = UDim.new(0, 6)
         btnCorner.Parent = tabBtn
-
-        -- Active Indicator: 3px rounded emerald bar on left edge
-        local activeBar = Instance.new("Frame")
-        activeBar.Name = "ActiveBar"
-        activeBar.Size = UDim2.new(0, 3, 0, 0)
-        activeBar.Position = UDim2.new(0, 0, 0.5, 0)
-        activeBar.BackgroundColor3 = GousseUI.Theme.Accent
-        activeBar.BorderSizePixel = 0
-        activeBar.BackgroundTransparency = 1
-        activeBar.Parent = tabBtn
-
-        local activeCorner = Instance.new("UICorner")
-        activeCorner.CornerRadius = UDim.new(1, 0)
-        activeCorner.Parent = activeBar
 
         -- Icon ImageLabel
         local iconAsset = GousseUI:GetIcon(tabIconKey)
@@ -1339,20 +1373,43 @@ function GousseUI:CreateWindow(config: {
         tabTextLabel.TextXAlignment = Enum.TextXAlignment.Left
         tabTextLabel.Parent = tabBtn
 
-        -- Tab Page Container (Placed below Search Bar)
+        -- Tab CanvasGroup Container (Handles whole-page fade & slide without child clipping issues)
         local pageTopOffset = 6 + searchBarHeight + 6
+        local tabCanvas: any
+        local okCg, cg = pcall(function()
+            local c = Instance.new("CanvasGroup")
+            c.GroupTransparency = 1
+            return c
+        end)
+        if okCg and cg then
+            tabCanvas = cg
+        else
+            local fallback = Instance.new("Frame")
+            fallback.BackgroundTransparency = 1
+            tabCanvas = fallback
+        end
+
+        tabCanvas.Name = "TabCanvas_" .. tabName
+        tabCanvas.Size = UDim2.new(1, -16, 1, -pageTopOffset - 8)
+        tabCanvas.Position = UDim2.new(0, 8, 0, pageTopOffset)
+        tabCanvas.BackgroundTransparency = 1
+        tabCanvas.BorderSizePixel = 0
+        tabCanvas.Visible = false
+        tabCanvas.Parent = contentArea
+
+        -- Tab Page Scrolling Container inside CanvasGroup
         local tabPage = Instance.new("ScrollingFrame")
         tabPage.Name = "Page_" .. tabName
-        tabPage.Size = UDim2.new(1, -16, 1, -pageTopOffset - 8)
-        tabPage.Position = UDim2.new(0, 8, 0, pageTopOffset)
+        tabPage.Size = UDim2.new(1, 0, 1, 0)
+        tabPage.Position = UDim2.new(0, 0, 0, 0)
         tabPage.BackgroundTransparency = 1
         tabPage.BorderSizePixel = 0
         tabPage.ScrollBarThickness = 3
         tabPage.ScrollBarImageColor3 = GousseUI.Theme.BorderLight
         tabPage.CanvasSize = UDim2.new(0, 0, 0, 0)
         tabPage.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        tabPage.Visible = false
-        tabPage.Parent = contentArea
+        tabPage.Visible = true
+        tabPage.Parent = tabCanvas
 
         local pageLayout = Instance.new("UIListLayout")
         pageLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -1369,20 +1426,22 @@ function GousseUI:CreateWindow(config: {
         local TabObj = {
             Name = tabName,
             Button = tabBtn,
+            Canvas = tabCanvas,
             Page = tabPage
         }
 
         local function ActivateTab()
             if WindowObj.ActiveTab == TabObj then return end
 
+            currentTransitionToken += 1
+            local transitionToken = currentTransitionToken
+
             local prevTab = WindowObj.ActiveTab
-            if prevTab then
+            WindowObj.ActiveTab = TabObj
+
+            -- 1. Deactivate Previous Tab Button
+            if prevTab and prevTab.Button then
                 Tween(prevTab.Button, { BackgroundTransparency = 1 }, 0.16)
-                Tween(prevTab.Button.ActiveBar, {
-                    Size = UDim2.new(0, 3, 0, 0),
-                    Position = UDim2.new(0, 0, 0.5, 0),
-                    BackgroundTransparency = 1
-                }, 0.16)
                 Tween(prevTab.Button.Label, {
                     TextColor3 = GousseUI.Theme.TextSecondary,
                     Position = UDim2.new(0, 28, 0, 0)
@@ -1397,24 +1456,10 @@ function GousseUI:CreateWindow(config: {
                         prevTab.Button.Icon.TextColor3 = GousseUI.Theme.TextSecondary
                     end
                 end
-
-                local oldPage = prevTab.Page
-                local slideOut = Tween(oldPage, { Position = UDim2.new(0, 2, 0, pageTopOffset) }, 0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-                slideOut.Completed:Connect(function()
-                    if WindowObj.ActiveTab ~= prevTab then
-                        oldPage.Visible = false
-                        oldPage.Position = UDim2.new(0, 8, 0, pageTopOffset)
-                    end
-                end)
             end
 
-            WindowObj.ActiveTab = TabObj
+            -- 2. Activate Current Tab Button
             Tween(tabBtn, { BackgroundTransparency = 0, BackgroundColor3 = GousseUI.Theme.Surface }, 0.18)
-            Tween(activeBar, {
-                Size = UDim2.new(0, 3, 0, 18),
-                Position = UDim2.new(0, 0, 0.5, -9),
-                BackgroundTransparency = 0
-            }, 0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
             Tween(tabTextLabel, {
                 TextColor3 = GousseUI.Theme.TextPrimary,
                 Position = UDim2.new(0, 32, 0, 0)
@@ -1429,12 +1474,62 @@ function GousseUI:CreateWindow(config: {
                 iconLabel.TextColor3 = GousseUI.Theme.Accent
             end
 
-            tabPage.Position = UDim2.new(0, 22, 0, pageTopOffset)
-            tabPage.CanvasPosition = Vector2.zero
-            tabPage.Visible = true
-            Tween(tabPage, { Position = UDim2.new(0, 8, 0, pageTopOffset) }, 0.24, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+            -- 3. Animated Active Indicator Glide (Smooth Y Tween)
+            local targetIndY = GetIndicatorTargetY(tabBtn)
+            if not activeIndicator.Visible then
+                activeIndicator.Position = UDim2.new(0, 4, 0, targetIndY)
+                activeIndicator.BackgroundTransparency = 1
+                activeIndicator.Visible = true
+                Tween(activeIndicator, { BackgroundTransparency = 0 }, 0.18)
+            else
+                Tween(activeIndicator, {
+                    Position = UDim2.new(0, 4, 0, targetIndY)
+                }, 0.24, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+            end
 
-            FilterPageItems(tabPage, searchInput.Text)
+            -- 4. Sequential Page Transition (Old Tab Fades Out -> New Tab Fades In)
+            local restingPos = UDim2.new(0, 8, 0, pageTopOffset)
+            local slideLeftPos = UDim2.new(0, 8 - 10, 0, pageTopOffset)
+            local slideRightPos = UDim2.new(0, 8 + 10, 0, pageTopOffset)
+
+            if prevTab and prevTab.Canvas then
+                local oldCanvas = prevTab.Canvas
+                -- Old Tab Fades Out (GroupTransparency = 1) and slides left (-10px)
+                local fadeOut = Tween(oldCanvas, {
+                    GroupTransparency = 1,
+                    Position = slideLeftPos
+                }, 0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+                fadeOut.Completed:Connect(function()
+                    if WindowObj.ActiveTab ~= prevTab then
+                        oldCanvas.Visible = false
+                        oldCanvas.Position = restingPos
+                    end
+                end)
+
+                -- New Tab starts slightly after old tab begins fading, ensuring zero overlap
+                task.delay(0.12, function()
+                    if transitionToken ~= currentTransitionToken then return end
+                    tabCanvas.Position = slideRightPos
+                    tabCanvas.GroupTransparency = 1
+                    tabCanvas.Visible = true
+                    tabPage.CanvasPosition = Vector2.zero
+
+                    Tween(tabCanvas, {
+                        GroupTransparency = 0,
+                        Position = restingPos
+                    }, 0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+
+                    FilterPageItems(tabPage, searchInput.Text)
+                end)
+            else
+                -- Instant show on initial UI launch
+                tabCanvas.Position = restingPos
+                tabCanvas.GroupTransparency = 0
+                tabCanvas.Visible = true
+                tabPage.CanvasPosition = Vector2.zero
+                FilterPageItems(tabPage, searchInput.Text)
+            end
         end
 
         tabBtn.MouseButton1Click:Connect(ActivateTab)
