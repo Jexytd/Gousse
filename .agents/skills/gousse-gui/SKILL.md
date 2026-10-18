@@ -13,22 +13,24 @@ GousseUI is a lightweight, authentic desktop utility UI Library engineered for R
 
 ## 1. Core Architecture & Theme System
 
-GousseUI adopts an authentic desktop utility companion aesthetic: near-black charcoal surfaces, slate borders, and a signature thin green window outline preserving the Gousse Hub identity.
+GousseUI v2.1.0 adopts an authentic modern tactical gaming aesthetic: deep obsidian slate surfaces, soft perimeter borders, refined 2px top emerald accent line, high-contrast BuilderSans typography, and fully responsive mobile architecture.
 
 | Token | RGB Value | Hex | Usage |
 | :--- | :--- | :--- | :--- |
-| `Background` | `16, 19, 24` | `#101318` | Outer window background |
-| `Sidebar` | `21, 25, 32` | `#151920` | Navigation sidebar & sub-containers |
-| `Surface` | `25, 31, 40` | `#191F28` | Compact control rows |
-| `SurfaceHover` | `34, 42, 54` | `#222A36` | Interactive hover state |
-| `Border` | `42, 50, 62` | `#2A323E` | Slate borders and dividers |
-| `WindowOutline`| `103, 216, 121` | `#67D879` | Thin green window outline |
-| `Accent` | `103, 216, 121` | `#67D879` | Restrained green accent, active toggles |
-| `Blue` | `56, 139, 253` | `#388BFD` | Retained strictly for semantic info |
-| `Danger` | `248, 81, 73` | `#F85149` | Destructive/unload actions & error toasts |
-| `TextPrimary`| `224, 229, 236` | `#E0E5EC` | Soft white titles and main labels |
-| `TextSecondary`| `137, 147, 163` | `#8993A3`| Muted gray subtitles and descriptions |
-| `TextMuted` | `90, 101, 120` | `#5A6578`| Small section headers & placeholders |
+| `Background` | `11, 14, 20` | `#0B0E14` | Deep obsidian slate outer window |
+| `Sidebar` | `15, 19, 27` | `#0F131B` | Navigation sidebar & elevated sub-containers |
+| `Surface` | `19, 25, 35` | `#131923` | Interactive control rows & cards |
+| `SurfaceHover` | `26, 35, 50` | `#1A2332` | Interactive hover & focus state |
+| `Border` | `30, 41, 59` | `#1E293B` | Soft slate perimeter border & dividers |
+| `BorderLight` | `51, 65, 85` | `#334155` | Subtle separators |
+| `WindowOutline`| `16, 185, 129` | `#10B981` | Emerald accent outline & top accent bar |
+| `Accent` | `16, 185, 129` | `#10B981` | Modern vibrant emerald for active states & FAB |
+| `Blue` | `56, 189, 248` | `#38BDF8` | Sky cyan for semantic info & numeric values |
+| `Warning` | `245, 158, 11` | `#F59E0B` | Muted amber warning toasts |
+| `Danger` | `244, 63, 94` | `#F43F5E` | Destructive/unload actions & error toasts |
+| `TextPrimary`| `248, 250, 252` | `#F8FAFC` | Crisp white titles and active labels |
+| `TextSecondary`| `148, 163, 184`| `#94A3B8`| Slate-400 high-contrast subtitles (WCAG AAA) |
+| `TextMuted` | `100, 116, 139`| `#64748B`| Small section headers & placeholders |
 
 ### Safe Parenting Invariant
 To prevent game-level detection, all GUI instances must resolve parents using:
