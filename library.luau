@@ -1206,7 +1206,7 @@ function GousseUI:CreateWindow(config: {
     local function BuildTitleRow(parentFrame: GuiObject, name: string, subTitle: string?, rightPadding: number, rowHeight: number)
         local titleContainer = Instance.new("Frame")
         titleContainer.Name = "TitleContainer"
-        titleContainer.Size = UDim2.new(1, -rightPadding, 1, 0)
+        titleContainer.Size = UDim2.new(1, -rightPadding, 0, rowHeight)
         titleContainer.Position = UDim2.new(0, 12, 0, 0)
         titleContainer.BackgroundTransparency = 1
         titleContainer.Parent = parentFrame
@@ -1866,7 +1866,7 @@ function GousseUI:CreateWindow(config: {
         end
 
         -- ====================================================================
-        -- 5. Dropdown Row: Compact Selector with Smooth Expandable List
+        -- 5. Dropdown Row: Floating Popover with Outside-Tap Overlay & Mobile Scroll Lock
         -- ====================================================================
         function TabObj:CreateDropdown(dropConfig: {
             Name: string,
@@ -1885,12 +1885,12 @@ function GousseUI:CreateWindow(config: {
             local isOpen = false
             local baseHeight = if isMobile then 42 else 38
 
+            -- Base Row Frame (Permanently locked height, never shifts title or controls)
             local dropFrame = Instance.new("Frame")
             dropFrame.Name = "DropItem_" .. dropName
             dropFrame.Size = UDim2.new(1, 0, 0, baseHeight)
             dropFrame.BackgroundColor3 = GousseUI.Theme.Surface
             dropFrame.BorderSizePixel = 0
-            dropFrame.ClipsDescendants = true
             dropFrame.Parent = tabPage
 
             local corner = Instance.new("UICorner")
@@ -1902,6 +1902,7 @@ function GousseUI:CreateWindow(config: {
             stroke.Thickness = 1
             stroke.Parent = dropFrame
 
+            -- Title & Info Button stay permanently anchored at top-left
             BuildTitleRow(dropFrame, dropName, subTitle, 140, baseHeight)
 
             local triggerBtn = Instance.new("TextButton")
@@ -1914,6 +1915,7 @@ function GousseUI:CreateWindow(config: {
             triggerBtn.TextColor3 = GousseUI.Theme.TextPrimary
             triggerBtn.TextSize = 11.5
             triggerBtn.AutoButtonColor = false
+            triggerBtn.ZIndex = 5
             triggerBtn.Parent = dropFrame
 
             local trigCorner = Instance.new("UICorner")
@@ -1925,62 +1927,179 @@ function GousseUI:CreateWindow(config: {
             trigStroke.Thickness = 1
             trigStroke.Parent = triggerBtn
 
-            local itemHeight = if isMobile then 28 else 24
-            local listFrame = Instance.new("Frame")
-            listFrame.Name = "OptionsList"
-            listFrame.Size = UDim2.new(1, -24, 0, #options * itemHeight)
-            listFrame.Position = UDim2.new(0, 12, 0, baseHeight + 4)
-            listFrame.BackgroundTransparency = 1
-            listFrame.Parent = dropFrame
+            -- Popover references
+            local popoverFrame: Frame? = nil
+            local overlayBtn: TextButton? = nil
 
-            local listLayout = Instance.new("UIListLayout")
-            listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-            listLayout.Padding = UDim.new(0, 3)
-            listLayout.Parent = listFrame
+            local function CloseDropdown()
+                if not isOpen then return end
+                isOpen = false
+                triggerBtn.Text = selected .. " ▾"
 
-            local function ToggleDropdown()
-                isOpen = not isOpen
-                local targetHeight = isOpen and (baseHeight + 8 + #options * (itemHeight + 3)) or baseHeight
-                triggerBtn.Text = selected .. (isOpen and " ▴" or " ▾")
-                Tween(dropFrame, { Size = UDim2.new(1, 0, 0, targetHeight) }, 0.14)
+                -- Restore MainContent scrolling immediately
+                tabPage.ScrollingEnabled = true
+
+                if popoverFrame then
+                    local targetRef = popoverFrame
+                    popoverFrame = nil
+                    local tw = Tween(targetRef, {
+                        Size = UDim2.new(targetRef.Size.X.Scale, targetRef.Size.X.Offset, 0, 0)
+                    }, 0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+                    tw.Completed:Connect(function()
+                        targetRef:Destroy()
+                    end)
+                end
+
+                if overlayBtn then
+                    overlayBtn:Destroy()
+                    overlayBtn = nil
+                end
             end
 
-            triggerBtn.MouseButton1Click:Connect(ToggleDropdown)
+            local function OpenDropdown()
+                if isOpen then return end
+                isOpen = true
+                triggerBtn.Text = selected .. " ▴"
 
-            local function PopulateOptions(newOptions: {string})
-                for _, child in ipairs(listFrame:GetChildren()) do
-                    if child:IsA("TextButton") then child:Destroy() end
+                -- Lock MainContent scrolling so mobile touch gestures scroll only the popover
+                tabPage.ScrollingEnabled = false
+
+                -- 1. Full ContentArea Transparent Overlay to detect taps outside
+                overlayBtn = Instance.new("TextButton")
+                overlayBtn.Name = "DropdownOverlay"
+                overlayBtn.Size = UDim2.new(1, 0, 1, 0)
+                overlayBtn.Position = UDim2.new(0, 0, 0, 0)
+                overlayBtn.BackgroundTransparency = 1
+                overlayBtn.Text = ""
+                overlayBtn.AutoButtonColor = false
+                overlayBtn.ZIndex = 50
+                overlayBtn.Parent = contentArea
+
+                overlayBtn.MouseButton1Click:Connect(CloseDropdown)
+
+                -- 2. Floating Popover Frame
+                local itemHeight = if isMobile then 30 else 26
+                local itemGap = 3
+                local totalContentHeight = #options * (itemHeight + itemGap) + 8
+                local maxPopoverHeight = 150
+                local targetHeight = math.clamp(totalContentHeight, 34, maxPopoverHeight)
+
+                -- Calculate absolute position mapped to contentArea
+                local dropAbs = dropFrame.AbsolutePosition
+                local contentAbs = contentArea.AbsolutePosition
+                local relX = dropAbs.X - contentAbs.X
+                local relY = dropAbs.Y - contentAbs.Y + baseHeight + 4
+                local popWidth = dropFrame.AbsoluteSize.X
+
+                -- Flip popover above dropFrame if it would overflow the bottom
+                if relY + targetHeight > contentArea.AbsoluteSize.Y - 8 then
+                    relY = math.max(4, dropAbs.Y - contentAbs.Y - targetHeight - 4)
                 end
-                for _, opt in ipairs(newOptions) do
+
+                popoverFrame = Instance.new("Frame")
+                popoverFrame.Name = "DropdownPopover_" .. dropName
+                popoverFrame.Size = UDim2.new(0, popWidth, 0, 0) -- Starts at height 0 for smooth opening animation
+                popoverFrame.Position = UDim2.new(0, relX, 0, relY)
+                popoverFrame.BackgroundColor3 = GousseUI.Theme.Surface
+                popoverFrame.BorderSizePixel = 0
+                popoverFrame.ClipsDescendants = true
+                popoverFrame.ZIndex = 60
+                popoverFrame.Parent = contentArea
+
+                local popCorner = Instance.new("UICorner")
+                popCorner.CornerRadius = UDim.new(0, 8)
+                popCorner.Parent = popoverFrame
+
+                local popStroke = Instance.new("UIStroke")
+                popStroke.Color = GousseUI.Theme.BorderLight
+                popStroke.Thickness = 1
+                popStroke.Parent = popoverFrame
+
+                -- ScrollingFrame for options with max height ~150px
+                local listScroll = Instance.new("ScrollingFrame")
+                listScroll.Name = "OptionsScroll"
+                listScroll.Size = UDim2.new(1, 0, 1, 0)
+                listScroll.Position = UDim2.new(0, 0, 0, 0)
+                listScroll.BackgroundTransparency = 1
+                listScroll.BorderSizePixel = 0
+                listScroll.ScrollBarThickness = if isMobile then 4 else 3
+                listScroll.ScrollBarImageColor3 = GousseUI.Theme.BorderLight
+                listScroll.CanvasSize = UDim2.new(0, 0, 0, totalContentHeight)
+                listScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+                listScroll.ClipsDescendants = true
+                listScroll.ZIndex = 61
+                listScroll.Parent = popoverFrame
+
+                local listPad = Instance.new("UIPadding")
+                listPad.PaddingTop = UDim.new(0, 4)
+                listPad.PaddingBottom = UDim.new(0, 4)
+                listPad.PaddingLeft = UDim.new(0, 4)
+                listPad.PaddingRight = UDim.new(0, 4)
+                listPad.Parent = listScroll
+
+                local listLayout = Instance.new("UIListLayout")
+                listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+                listLayout.Padding = UDim.new(0, itemGap)
+                listLayout.Parent = listScroll
+
+                -- Render Option Buttons with centered text
+                for _, opt in ipairs(options) do
                     local optBtn = Instance.new("TextButton")
+                    optBtn.Name = "Opt_" .. opt
                     optBtn.Size = UDim2.new(1, 0, 0, itemHeight)
-                    optBtn.BackgroundColor3 = GousseUI.Theme.Sidebar
+                    optBtn.BackgroundColor3 = (opt == selected) and Color3.fromRGB(24, 34, 48) or GousseUI.Theme.Sidebar
                     optBtn.Font = FontMedium
                     optBtn.Text = opt
-                    optBtn.TextColor3 = (opt == selected) and GousseUI.Theme.Accent or GousseUI.Theme.TextSecondary
+                    optBtn.TextColor3 = (opt == selected) and GousseUI.Theme.Accent or GousseUI.Theme.TextPrimary
                     optBtn.TextSize = 11.5
+                    optBtn.TextXAlignment = Enum.TextXAlignment.Center -- Centered text precision
                     optBtn.AutoButtonColor = false
-                    optBtn.Parent = listFrame
+                    optBtn.ZIndex = 62
+                    optBtn.Parent = listScroll
 
                     local optCorner = Instance.new("UICorner")
-                    optCorner.CornerRadius = UDim.new(0, 5)
+                    optCorner.CornerRadius = UDim.new(0, 6)
                     optCorner.Parent = optBtn
+
+                    optBtn.MouseEnter:Connect(function()
+                        if opt ~= selected then
+                            Tween(optBtn, { BackgroundColor3 = GousseUI.Theme.SurfaceHover }, 0.08)
+                        end
+                    end)
+                    optBtn.MouseLeave:Connect(function()
+                        if opt ~= selected then
+                            Tween(optBtn, { BackgroundColor3 = GousseUI.Theme.Sidebar }, 0.08)
+                        end
+                    end)
 
                     optBtn.MouseButton1Click:Connect(function()
                         selected = opt
                         triggerBtn.Text = selected .. " ▾"
-                        for _, c in ipairs(listFrame:GetChildren()) do
-                            if c:IsA("TextButton") then
-                                c.TextColor3 = (c.Text == selected) and GousseUI.Theme.Accent or GousseUI.Theme.TextSecondary
-                            end
-                        end
-                        ToggleDropdown()
+                        CloseDropdown()
                         pcall(callback, selected)
                     end)
                 end
+
+                -- Smooth Quart open animation
+                Tween(popoverFrame, { Size = UDim2.new(0, popWidth, 0, targetHeight) }, 0.16, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
             end
 
-            PopulateOptions(options)
+            local function ToggleDropdown()
+                if isOpen then
+                    CloseDropdown()
+                else
+                    OpenDropdown()
+                end
+            end
+
+            triggerBtn.MouseButton1Click:Connect(ToggleDropdown)
+
+            -- Automatically close dropdown if user switches tabs or window hides
+            tabPage:GetPropertyChangedSignal("Visible"):Connect(function()
+                if not tabPage.Visible then
+                    CloseDropdown()
+                end
+            end)
 
             return {
                 Set = function(val)
@@ -1992,7 +2111,9 @@ function GousseUI:CreateWindow(config: {
                     options = newOpts or {}
                     selected = newDef or options[1] or ""
                     triggerBtn.Text = selected .. " ▾"
-                    PopulateOptions(options)
+                    if isOpen then
+                        CloseDropdown()
+                    end
                 end,
                 Get = function() return selected end
             }
