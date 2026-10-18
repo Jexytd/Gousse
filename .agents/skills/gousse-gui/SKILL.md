@@ -222,6 +222,25 @@ GousseUI:Notify({
 })
 ```
 
+### 3.5 Tactical Animated Loader Modal
+Modern centered loading modal with pulsing logo, detected game badge, and real-time progress bar:
+```luau
+local Loader = GousseUI:CreateLoader({
+    Title = "Gousse Hub",
+    SubTitle = "Universal Initialization",
+    GameName = "Arsenal",
+    Status = "Verifying environment..."
+})
+
+Loader:SetStatus("Connecting to CDN...", 0.3)
+Loader:SetStatus("Compiling script...", 0.8)
+
+Loader:Finish(function()
+    -- Callback triggered when progress hits 100% and modal fades out
+    print("Loader complete!")
+end)
+```
+
 ---
 
 ## 4. 5 Development Phases (Fase Pengembangan)

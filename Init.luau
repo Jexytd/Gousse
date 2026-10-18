@@ -140,13 +140,32 @@ local function Main()
     -- Initialize GUI Library
     local GousseUI = EnsureGousseUI()
 
+    local placeName = "Roblox Game"
+    pcall(function()
+        placeName = MarketplaceService:GetProductInfo(game.PlaceId).Name
+    end)
+
+    -- Create and Display Modern Tactical Loader GUI
+    local Loader = GousseUI:CreateLoader({
+        Title = "Gousse Hub",
+        SubTitle = "Universal Initialization",
+        GameName = placeName,
+        Status = "Connecting to CDN & Resolving Environment..."
+    })
+
+    Loader:SetStatus("Verifying safe executor environment...", 0.15)
+    task.wait(0.12)
+
     -- Fetch and Parse Game Manifest
+    Loader:SetStatus("Fetching Games Manifest...", 0.40)
     local manifestRaw = FetchResource(CONFIG.Manifest)
     local manifest = HttpService:JSONDecode(manifestRaw)
+    task.wait(0.1)
 
     local universeId = tostring(game.GameId)
     local placeId = tostring(game.PlaceId)
 
+    Loader:SetStatus("Resolving target module for Universe " .. universeId .. "...", 0.65)
     local gameEntry = manifest.games and manifest.games[universeId]
     local targetPath = nil
     local targetName = "Universal Fallback"
@@ -166,19 +185,37 @@ local function Main()
     -- Fallback to universal script
     if not targetPath then
         targetPath = manifest.universal or "games/universal.luau"
-        local placeName = "Current Game"
-        pcall(function()
-            placeName = MarketplaceService:GetProductInfo(game.PlaceId).Name
-        end)
         targetName = ("Universal (%s)"):format(placeName)
-        Notify("Gousse Hub", "No game-specific script found. Loaded Universal features.", "warning", 4)
+    end
+
+    Loader:SetGame(targetName)
+    Loader:SetStatus("Compiling " .. targetName .. "...", 0.85)
+    task.wait(0.12)
+
+    local scriptSource = FetchResource(targetPath)
+    local chunk, compileErr = loadstring(scriptSource, ("=%s"):format(targetPath))
+    if not chunk then
+        Loader:SetStatus("Compile error in " .. targetName, 1)
+        Notify("Gousse Error", "Failed to compile script: " .. targetName, "error", 6)
+        error(("[Gousse Hub] Compile Error in %s:\n%s"):format(targetPath, tostring(compileErr)))
     end
 
     print(("[Gousse Hub] Running [%s] (%s)"):format(targetName, targetPath))
-    local result = ExecuteScript(targetPath, targetName, GousseUI)
+    Loader:SetStatus("Injecting " .. targetName .. "...", 0.96)
+    task.wait(0.15)
 
-    Notify("Gousse Hub", ("%s loaded successfully!"):format(targetName), "success", 4)
-    return result
+    local runResult = nil
+    Loader:Finish(function()
+        local runOk, result = pcall(chunk, GousseUI)
+        if not runOk then
+            Notify("Gousse Error", "Execution error in " .. targetName, "error", 6)
+            error(("[Gousse Hub] Runtime Error in %s:\n%s"):format(targetPath, tostring(result)))
+        end
+        runResult = result
+        Notify("Gousse Hub", ("%s loaded successfully!"):format(targetName), "success", 3)
+    end)
+
+    return runResult
 end
 
 return Main()

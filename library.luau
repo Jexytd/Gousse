@@ -330,6 +330,291 @@ function GousseUI:Notify(config: { Title: string?, Content: string, Duration: nu
 end
 
 -- ============================================================================
+-- Loader Window (Tactical Animated Loading Modal)
+-- ============================================================================
+function GousseUI:CreateLoader(config: {
+    Title: string?,
+    SubTitle: string?,
+    GameName: string?,
+    Status: string?
+})
+    config = config or {}
+    local loaderTitle = config.Title or "Gousse Hub"
+    local loaderSubtitle = config.SubTitle or "Universal Loader"
+    local gameName = config.GameName or "Roblox Game"
+    local initialStatus = config.Status or "Initializing components..."
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "GousseLoader_" .. math.random(1000, 9999)
+    screenGui.ResetOnSpawn = false
+    screenGui.DisplayOrder = 10000
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.Parent = GetSafeGuiParent()
+
+    -- Modal Container
+    local modal = Instance.new("Frame")
+    modal.Name = "LoaderModal"
+    modal.Size = UDim2.new(0, 360, 0, 185)
+    modal.Position = UDim2.new(0.5, 0, 0.5, 20)
+    modal.AnchorPoint = Vector2.new(0.5, 0.5)
+    modal.BackgroundColor3 = GousseUI.Theme.Background
+    modal.BorderSizePixel = 0
+    modal.ClipsDescendants = true
+    modal.BackgroundTransparency = 1
+    modal.Parent = screenGui
+
+    local modalCorner = Instance.new("UICorner")
+    modalCorner.CornerRadius = UDim.new(0, 10)
+    modalCorner.Parent = modal
+
+    local modalStroke = Instance.new("UIStroke")
+    modalStroke.Color = GousseUI.Theme.Border
+    modalStroke.Thickness = 1.2
+    modalStroke.Parent = modal
+
+    -- Top 2px Emerald Accent Line
+    local topAccent = Instance.new("Frame")
+    topAccent.Name = "TopAccent"
+    topAccent.Size = UDim2.new(1, 0, 0, 2)
+    topAccent.Position = UDim2.new(0, 0, 0, 0)
+    topAccent.BackgroundColor3 = GousseUI.Theme.Accent
+    topAccent.BorderSizePixel = 0
+    topAccent.Parent = modal
+
+    -- Header with Logo
+    local header = Instance.new("Frame")
+    header.Name = "Header"
+    header.Size = UDim2.new(1, 0, 0, 52)
+    header.BackgroundTransparency = 1
+    header.Parent = modal
+
+    local logoBadge = Instance.new("TextLabel")
+    logoBadge.Name = "LogoBadge"
+    logoBadge.Size = UDim2.new(0, 30, 0, 30)
+    logoBadge.Position = UDim2.new(0, 16, 0.5, -15)
+    logoBadge.BackgroundColor3 = GousseUI.Theme.Accent
+    logoBadge.Font = FontBold
+    logoBadge.Text = "G"
+    logoBadge.TextColor3 = GousseUI.Theme.Background
+    logoBadge.TextSize = 16
+    logoBadge.Parent = header
+
+    local logoCorner = Instance.new("UICorner")
+    logoCorner.CornerRadius = UDim.new(0, 6)
+    logoCorner.Parent = logoBadge
+
+    local title = Instance.new("TextLabel")
+    title.Name = "Title"
+    title.Size = UDim2.new(0.6, 0, 0, 18)
+    title.Position = UDim2.new(0, 56, 0, 10)
+    title.BackgroundTransparency = 1
+    title.Font = FontBold
+    title.Text = loaderTitle
+    title.TextColor3 = GousseUI.Theme.TextPrimary
+    title.TextSize = 15
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = header
+
+    local subtitle = Instance.new("TextLabel")
+    subtitle.Name = "Subtitle"
+    subtitle.Size = UDim2.new(0.6, 0, 0, 14)
+    subtitle.Position = UDim2.new(0, 56, 0, 28)
+    subtitle.BackgroundTransparency = 1
+    subtitle.Font = FontMedium
+    subtitle.Text = loaderSubtitle
+    subtitle.TextColor3 = GousseUI.Theme.TextSecondary
+    subtitle.TextSize = 11
+    subtitle.TextXAlignment = Enum.TextXAlignment.Left
+    subtitle.Parent = header
+
+    -- Game Badge pill
+    local gameBadge = Instance.new("Frame")
+    gameBadge.Name = "GameBadge"
+    gameBadge.Size = UDim2.new(0, 0, 0, 22)
+    gameBadge.AutomaticSize = Enum.AutomaticSize.X
+    gameBadge.Position = UDim2.new(1, -16, 0.5, -11)
+    gameBadge.AnchorPoint = Vector2.new(1, 0)
+    gameBadge.BackgroundColor3 = GousseUI.Theme.Surface
+    gameBadge.Parent = header
+
+    local gameBadgeCorner = Instance.new("UICorner")
+    gameBadgeCorner.CornerRadius = UDim.new(1, 0)
+    gameBadgeCorner.Parent = gameBadge
+
+    local gameBadgeStroke = Instance.new("UIStroke")
+    gameBadgeStroke.Color = GousseUI.Theme.Border
+    gameBadgeStroke.Thickness = 1
+    gameBadgeStroke.Parent = gameBadge
+
+    local gameBadgeLabel = Instance.new("TextLabel")
+    gameBadgeLabel.Name = "BadgeText"
+    gameBadgeLabel.Size = UDim2.new(0, 0, 1, 0)
+    gameBadgeLabel.AutomaticSize = Enum.AutomaticSize.X
+    gameBadgeLabel.Position = UDim2.new(0, 10, 0, 0)
+    gameBadgeLabel.BackgroundTransparency = 1
+    gameBadgeLabel.Font = FontMedium
+    gameBadgeLabel.Text = gameName
+    gameBadgeLabel.TextColor3 = GousseUI.Theme.Accent
+    gameBadgeLabel.TextSize = 10.5
+    gameBadgeLabel.Parent = gameBadge
+
+    local gameBadgePad = Instance.new("UIPadding")
+    gameBadgePad.PaddingRight = UDim.new(0, 10)
+    gameBadgePad.Parent = gameBadge
+
+    -- Status Card
+    local statusCard = Instance.new("Frame")
+    statusCard.Name = "StatusCard"
+    statusCard.Size = UDim2.new(1, -32, 0, 48)
+    statusCard.Position = UDim2.new(0, 16, 0, 56)
+    statusCard.BackgroundColor3 = GousseUI.Theme.Surface
+    statusCard.BorderSizePixel = 0
+    statusCard.Parent = modal
+
+    local cardCorner = Instance.new("UICorner")
+    cardCorner.CornerRadius = UDim.new(0, 8)
+    cardCorner.Parent = statusCard
+
+    local cardStroke = Instance.new("UIStroke")
+    cardStroke.Color = GousseUI.Theme.Border
+    cardStroke.Thickness = 1
+    cardStroke.Parent = statusCard
+
+    local statusIcon = Instance.new("ImageLabel")
+    statusIcon.Name = "StatusIcon"
+    statusIcon.Size = UDim2.new(0, 16, 0, 16)
+    statusIcon.Position = UDim2.new(0, 12, 0.5, -8)
+    statusIcon.BackgroundTransparency = 1
+    statusIcon.Image = GousseUI:GetIcon("activity") or "rbxassetid://10709752035"
+    statusIcon.ImageColor3 = GousseUI.Theme.Accent
+    statusIcon.Parent = statusCard
+
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Name = "StatusText"
+    statusLabel.Size = UDim2.new(1, -40, 1, 0)
+    statusLabel.Position = UDim2.new(0, 34, 0, 0)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Font = FontRegular
+    statusLabel.Text = initialStatus
+    statusLabel.TextColor3 = GousseUI.Theme.TextPrimary
+    statusLabel.TextSize = 11.5
+    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    statusLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    statusLabel.Parent = statusCard
+
+    -- Progress Bar Section
+    local progressContainer = Instance.new("Frame")
+    progressContainer.Name = "ProgressContainer"
+    progressContainer.Size = UDim2.new(1, -32, 0, 40)
+    progressContainer.Position = UDim2.new(0, 16, 0, 116)
+    progressContainer.BackgroundTransparency = 1
+    progressContainer.Parent = modal
+
+    local progressLabel = Instance.new("TextLabel")
+    progressLabel.Name = "ProgressLabel"
+    progressLabel.Size = UDim2.new(0.6, 0, 0, 16)
+    progressLabel.Position = UDim2.new(0, 0, 0, 0)
+    progressLabel.BackgroundTransparency = 1
+    progressLabel.Font = FontMedium
+    progressLabel.Text = "System Loading"
+    progressLabel.TextColor3 = GousseUI.Theme.TextSecondary
+    progressLabel.TextSize = 11
+    progressLabel.TextXAlignment = Enum.TextXAlignment.Left
+    progressLabel.Parent = progressContainer
+
+    local percentLabel = Instance.new("TextLabel")
+    percentLabel.Name = "PercentLabel"
+    percentLabel.Size = UDim2.new(0.4, 0, 0, 16)
+    percentLabel.Position = UDim2.new(0.6, 0, 0, 0)
+    percentLabel.BackgroundTransparency = 1
+    percentLabel.Font = FontCode
+    percentLabel.Text = "0%"
+    percentLabel.TextColor3 = GousseUI.Theme.Accent
+    percentLabel.TextSize = 11.5
+    percentLabel.TextXAlignment = Enum.TextXAlignment.Right
+    percentLabel.Parent = progressContainer
+
+    local track = Instance.new("Frame")
+    track.Name = "Track"
+    track.Size = UDim2.new(1, 0, 0, 6)
+    track.Position = UDim2.new(0, 0, 0, 22)
+    track.BackgroundColor3 = Color3.fromRGB(30, 41, 59)
+    track.BorderSizePixel = 0
+    track.Parent = progressContainer
+
+    local trackCorner = Instance.new("UICorner")
+    trackCorner.CornerRadius = UDim.new(1, 0)
+    trackCorner.Parent = track
+
+    local fill = Instance.new("Frame")
+    fill.Name = "Fill"
+    fill.Size = UDim2.new(0, 0, 1, 0)
+    fill.BackgroundColor3 = GousseUI.Theme.Accent
+    fill.BorderSizePixel = 0
+    fill.Parent = track
+
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(1, 0)
+    fillCorner.Parent = fill
+
+    -- Entrance Animation
+    Tween(modal, { Position = UDim2.new(0.5, 0, 0.5, 0), BackgroundTransparency = 0 }, 0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+
+    -- Pulsing Logo Animation
+    local pulseTween = TweenService:Create(logoBadge, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+        BackgroundColor3 = GousseUI.Theme.AccentDark
+    })
+    pulseTween:Play()
+
+    local currentProgress = 0
+    local LoaderObj = {}
+
+    function LoaderObj:SetStatus(message: string, progress: number?)
+        statusLabel.Text = message
+        if progress ~= nil then
+            currentProgress = math.clamp(progress, 0, 1)
+            local pct = math.floor(currentProgress * 100)
+            percentLabel.Text = tostring(pct) .. "%"
+            Tween(fill, { Size = UDim2.new(currentProgress, 0, 1, 0) }, 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        end
+    end
+
+    function LoaderObj:SetGame(name: string)
+        gameName = name
+        gameBadgeLabel.Text = name
+    end
+
+    function LoaderObj:Finish(callback: (() -> ())?)
+        LoaderObj:SetStatus("Initialization complete!", 1)
+        statusLabel.TextColor3 = GousseUI.Theme.Accent
+        statusIcon.Image = GousseUI:GetIcon("check") or "rbxassetid://10709790644"
+        pulseTween:Cancel()
+        logoBadge.BackgroundColor3 = GousseUI.Theme.Accent
+
+        task.delay(0.4, function()
+            local exitTween = Tween(modal, {
+                Position = UDim2.new(0.5, 0, 0.5, -20),
+                BackgroundTransparency = 1
+            }, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+
+            exitTween.Completed:Connect(function()
+                screenGui:Destroy()
+                if callback then
+                    pcall(callback)
+                end
+            end)
+        end)
+    end
+
+    function LoaderObj:Destroy()
+        pulseTween:Cancel()
+        screenGui:Destroy()
+    end
+
+    return LoaderObj
+end
+
+-- ============================================================================
 -- Window Creation (Adaptive Desktop & Mobile)
 -- ============================================================================
 function GousseUI:CreateWindow(config: {
@@ -661,11 +946,11 @@ function GousseUI:CreateWindow(config: {
         btnCorner.CornerRadius = UDim.new(0, 6)
         btnCorner.Parent = tabBtn
 
-        -- Active Indicator: 3px rounded emerald bar on left edge
+        -- Active Indicator: 3px rounded emerald bar on left edge (Starts collapsed)
         local activeBar = Instance.new("Frame")
         activeBar.Name = "ActiveBar"
-        activeBar.Size = UDim2.new(0, 3, 0, 18)
-        activeBar.Position = UDim2.new(0, 0, 0.5, -9)
+        activeBar.Size = UDim2.new(0, 3, 0, 0)
+        activeBar.Position = UDim2.new(0, 0, 0.5, 0)
         activeBar.BackgroundColor3 = GousseUI.Theme.Accent
         activeBar.BorderSizePixel = 0
         activeBar.BackgroundTransparency = 1
@@ -741,33 +1026,77 @@ function GousseUI:CreateWindow(config: {
         }
 
         local function ActivateTab()
-            for _, t in pairs(WindowObj.Tabs) do
-                t.Page.Visible = false
-                Tween(t.Button, { BackgroundTransparency = 1 }, 0.12)
-                t.Button.ActiveBar.BackgroundTransparency = 1
-                t.Button.Label.TextColor3 = GousseUI.Theme.TextSecondary
-                if t.Button:FindFirstChild("Icon") then
-                    if t.Button.Icon:IsA("ImageLabel") then
-                        t.Button.Icon.ImageColor3 = GousseUI.Theme.TextSecondary
+            if WindowObj.ActiveTab == TabObj then return end
+
+            local prevTab = WindowObj.ActiveTab
+            if prevTab then
+                -- Smoothly collapse and fade previous tab
+                Tween(prevTab.Button, { BackgroundTransparency = 1 }, 0.16)
+                Tween(prevTab.Button.ActiveBar, {
+                    Size = UDim2.new(0, 3, 0, 0),
+                    Position = UDim2.new(0, 0, 0.5, 0),
+                    BackgroundTransparency = 1
+                }, 0.16)
+                Tween(prevTab.Button.Label, {
+                    TextColor3 = GousseUI.Theme.TextSecondary,
+                    Position = UDim2.new(0, 28, 0, 0)
+                }, 0.16)
+                if prevTab.Button:FindFirstChild("Icon") then
+                    if prevTab.Button.Icon:IsA("ImageLabel") then
+                        Tween(prevTab.Button.Icon, {
+                            ImageColor3 = GousseUI.Theme.TextSecondary,
+                            Position = UDim2.new(0, 8, 0.5, -8)
+                        }, 0.16)
                     else
-                        t.Button.Icon.TextColor3 = GousseUI.Theme.TextSecondary
+                        prevTab.Button.Icon.TextColor3 = GousseUI.Theme.TextSecondary
                     end
                 end
+
+                -- Slide out previous page slightly
+                local oldPage = prevTab.Page
+                local slideOut = Tween(oldPage, { Position = UDim2.new(0, 2, 0, 6) }, 0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+                slideOut.Completed:Connect(function()
+                    if WindowObj.ActiveTab ~= prevTab then
+                        oldPage.Visible = false
+                        oldPage.Position = UDim2.new(0, 8, 0, 6)
+                    end
+                end)
             end
 
-            tabPage.Visible = true
-            Tween(tabBtn, { BackgroundTransparency = 0, BackgroundColor3 = GousseUI.Theme.Surface }, 0.12)
-            activeBar.BackgroundTransparency = 0
-            tabTextLabel.TextColor3 = GousseUI.Theme.TextPrimary
+            -- Animate new active tab
+            WindowObj.ActiveTab = TabObj
+            Tween(tabBtn, { BackgroundTransparency = 0, BackgroundColor3 = GousseUI.Theme.Surface }, 0.18)
+            Tween(activeBar, {
+                Size = UDim2.new(0, 3, 0, 18),
+                Position = UDim2.new(0, 0, 0.5, -9),
+                BackgroundTransparency = 0
+            }, 0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+            Tween(tabTextLabel, {
+                TextColor3 = GousseUI.Theme.TextPrimary,
+                Position = UDim2.new(0, 32, 0, 0)
+            }, 0.18)
+
             if iconLabel:IsA("ImageLabel") then
-                iconLabel.ImageColor3 = GousseUI.Theme.Accent
+                Tween(iconLabel, {
+                    ImageColor3 = GousseUI.Theme.Accent,
+                    Position = UDim2.new(0, 10, 0.5, -8)
+                }, 0.18)
             else
                 iconLabel.TextColor3 = GousseUI.Theme.Accent
             end
-            WindowObj.ActiveTab = TabObj
+
+            -- Slide in new content page with smooth glide
+            tabPage.Position = UDim2.new(0, 22, 0, 6)
+            tabPage.CanvasPosition = Vector2.zero
+            tabPage.Visible = true
+            Tween(tabPage, { Position = UDim2.new(0, 8, 0, 6) }, 0.24, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
         end
 
         tabBtn.MouseButton1Click:Connect(ActivateTab)
+
+        tabBtn.MouseButton1Down:Connect(function()
+            Tween(tabBtn, { BackgroundColor3 = GousseUI.Theme.SurfaceHover }, 0.06)
+        end)
 
         -- Hover effect for inactive items
         tabBtn.MouseEnter:Connect(function()
