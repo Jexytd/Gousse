@@ -749,7 +749,7 @@ function GousseUI:CreateWindow(config: {
     tooltipPad.Parent = tooltipFrame
 
     local tooltipConstraint = Instance.new("UISizeConstraint")
-    tooltipConstraint.MaxWidth = 240
+    tooltipConstraint.MaxSize = Vector2.new(240, 500)
     tooltipConstraint.Parent = tooltipFrame
 
     local tooltipLabel = Instance.new("TextLabel")
