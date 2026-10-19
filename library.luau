@@ -1,6 +1,6 @@
 --[[
     ========================================================================
-    GousseUI - Authentic Modern Game Utility UI Library (v2.1.0)
+    GousseUI - Authentic Modern Game Utility UI Library (v2.2.0)
     Engineered for Gousse Hub & Roblox Execution Environments
     ========================================================================
     Design Direction & Features:
@@ -8,7 +8,8 @@
       - High-contrast BuilderSans typography hierarchy (WCAG AAA readability)
       - Refined 2px emerald top accent bar preserving Gousse Hub brand identity
       - Lucide icon engine with vector assets
-      - Fully responsive layout: adaptive desktop (640x420) & mobile scaling
+      - Scaled desktop window (690x450) & responsive mobile scaling
+      - Dedicated Lucide window controls (Minimize & Exit) with tactile hover states
       - Draggable Mobile Floating Action Button (FAB) for seamless touch access
       - Fitts's Law touch targets (min 44px) & full-row interactive toggles
       - Safe parenting via gethui() -> CoreGui -> PlayerGui
@@ -90,6 +91,7 @@ local RawIcons = {
 	["log-out"] = "rbxassetid://10723434906",
 	["maximize-2"] = "rbxassetid://10734886496",
 	["minimize-2"] = "rbxassetid://10734895530",
+	["minus"] = "rbxassetid://10734896206",
 	["monitor"] = "rbxassetid://10734896881",
 	["more-horizontal"] = "rbxassetid://10734897250",
 	["move"] = "rbxassetid://10734900011",
@@ -139,7 +141,7 @@ local FontRegular = Enum.Font.BuilderSans or Enum.Font.Gotham
 local FontCode = Enum.Font.RobotoMono or Enum.Font.Code
 
 local GousseUI = {
-    Version = "2.1.0",
+    Version = "2.2.0",
     Windows = {},
     ActiveKeybind = Enum.KeyCode.RightControl,
     Theme = {
@@ -258,7 +260,7 @@ local function EnsureNotificationGui()
     NotificationContainer.BackgroundTransparency = 1
     NotificationContainer.Position = UDim2.new(1, -20, 1, -20)
     NotificationContainer.AnchorPoint = Vector2.new(1, 1)
-    NotificationContainer.Size = UDim2.new(0, 280, 1, 0)
+    NotificationContainer.Size = UDim2.new(0, 300, 1, 0)
     NotificationContainer.Parent = NotificationGui
 
     local layout = Instance.new("UIListLayout")
@@ -312,30 +314,30 @@ function GousseUI:Notify(config: { Title: string?, Content: string, Duration: nu
     local title = Instance.new("TextLabel")
     title.Name = "Title"
     title.Position = UDim2.new(0, 14, 0, 8)
-    title.Size = UDim2.new(1, -22, 0, 16)
+    title.Size = UDim2.new(1, -22, 0, 18)
     title.BackgroundTransparency = 1
     title.Font = FontBold
     title.Text = titleText
     title.TextColor3 = GousseUI.Theme.TextPrimary
-    title.TextSize = 13
+    title.TextSize = 14
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = card
 
     local body = Instance.new("TextLabel")
     body.Name = "Body"
-    body.Position = UDim2.new(0, 14, 0, 26)
-    body.Size = UDim2.new(1, -22, 0, 30)
+    body.Position = UDim2.new(0, 14, 0, 28)
+    body.Size = UDim2.new(1, -22, 0, 32)
     body.BackgroundTransparency = 1
     body.Font = FontRegular
     body.Text = contentText
     body.TextColor3 = GousseUI.Theme.TextSecondary
-    body.TextSize = 11.5
+    body.TextSize = 12.5
     body.TextWrapped = true
     body.TextXAlignment = Enum.TextXAlignment.Left
     body.TextYAlignment = Enum.TextYAlignment.Top
     body.Parent = card
 
-    Tween(card, { Size = UDim2.new(1, 0, 0, 60), BackgroundTransparency = 0 }, 0.18)
+    Tween(card, { Size = UDim2.new(1, 0, 0, 64), BackgroundTransparency = 0 }, 0.18)
     Tween(stroke, { Transparency = 0 }, 0.18)
 
     task.delay(duration, function()
@@ -373,7 +375,7 @@ function GousseUI:CreateLoader(config: {
     -- Modal Container
     local modal = Instance.new("Frame")
     modal.Name = "LoaderModal"
-    modal.Size = UDim2.new(0, 360, 0, 185)
+    modal.Size = UDim2.new(0, 380, 0, 195)
     modal.Position = UDim2.new(0.5, 0, 0.5, 20)
     modal.AnchorPoint = Vector2.new(0.5, 0.5)
     modal.BackgroundColor3 = GousseUI.Theme.Background
@@ -409,8 +411,8 @@ function GousseUI:CreateLoader(config: {
 
     local logoBadge = Instance.new("TextLabel")
     logoBadge.Name = "LogoBadge"
-    logoBadge.Size = UDim2.new(0, 30, 0, 30)
-    logoBadge.Position = UDim2.new(0, 16, 0.5, -15)
+    logoBadge.Size = UDim2.new(0, 32, 0, 32)
+    logoBadge.Position = UDim2.new(0, 16, 0.5, -16)
     logoBadge.BackgroundColor3 = GousseUI.Theme.Accent
     logoBadge.Font = FontBold
     logoBadge.Text = "G"
@@ -424,34 +426,34 @@ function GousseUI:CreateLoader(config: {
 
     local title = Instance.new("TextLabel")
     title.Name = "Title"
-    title.Size = UDim2.new(0.6, 0, 0, 18)
-    title.Position = UDim2.new(0, 56, 0, 10)
+    title.Size = UDim2.new(0.6, 0, 0, 20)
+    title.Position = UDim2.new(0, 58, 0, 10)
     title.BackgroundTransparency = 1
     title.Font = FontBold
     title.Text = loaderTitle
     title.TextColor3 = GousseUI.Theme.TextPrimary
-    title.TextSize = 15
+    title.TextSize = 16
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = header
 
     local subtitle = Instance.new("TextLabel")
     subtitle.Name = "Subtitle"
-    subtitle.Size = UDim2.new(0.6, 0, 0, 14)
-    subtitle.Position = UDim2.new(0, 56, 0, 28)
+    subtitle.Size = UDim2.new(0.6, 0, 0, 16)
+    subtitle.Position = UDim2.new(0, 58, 0, 30)
     subtitle.BackgroundTransparency = 1
     subtitle.Font = FontMedium
     subtitle.Text = loaderSubtitle
     subtitle.TextColor3 = GousseUI.Theme.TextSecondary
-    subtitle.TextSize = 11
+    subtitle.TextSize = 12
     subtitle.TextXAlignment = Enum.TextXAlignment.Left
     subtitle.Parent = header
 
     -- Game Badge pill
     local gameBadge = Instance.new("Frame")
     gameBadge.Name = "GameBadge"
-    gameBadge.Size = UDim2.new(0, 0, 0, 22)
+    gameBadge.Size = UDim2.new(0, 0, 0, 24)
     gameBadge.AutomaticSize = Enum.AutomaticSize.X
-    gameBadge.Position = UDim2.new(1, -16, 0.5, -11)
+    gameBadge.Position = UDim2.new(1, -16, 0.5, -12)
     gameBadge.AnchorPoint = Vector2.new(1, 0)
     gameBadge.BackgroundColor3 = GousseUI.Theme.Surface
     gameBadge.Parent = header
@@ -474,7 +476,7 @@ function GousseUI:CreateLoader(config: {
     gameBadgeLabel.Font = FontMedium
     gameBadgeLabel.Text = gameName
     gameBadgeLabel.TextColor3 = GousseUI.Theme.Accent
-    gameBadgeLabel.TextSize = 10.5
+    gameBadgeLabel.TextSize = 11.5
     gameBadgeLabel.Parent = gameBadge
 
     local gameBadgePad = Instance.new("UIPadding")
@@ -484,8 +486,8 @@ function GousseUI:CreateLoader(config: {
     -- Status Card
     local statusCard = Instance.new("Frame")
     statusCard.Name = "StatusCard"
-    statusCard.Size = UDim2.new(1, -32, 0, 48)
-    statusCard.Position = UDim2.new(0, 16, 0, 56)
+    statusCard.Size = UDim2.new(1, -32, 0, 50)
+    statusCard.Position = UDim2.new(0, 16, 0, 60)
     statusCard.BackgroundColor3 = GousseUI.Theme.Surface
     statusCard.BorderSizePixel = 0
     statusCard.Parent = modal
@@ -501,8 +503,8 @@ function GousseUI:CreateLoader(config: {
 
     local statusIcon = Instance.new("ImageLabel")
     statusIcon.Name = "StatusIcon"
-    statusIcon.Size = UDim2.new(0, 16, 0, 16)
-    statusIcon.Position = UDim2.new(0, 12, 0.5, -8)
+    statusIcon.Size = UDim2.new(0, 18, 0, 18)
+    statusIcon.Position = UDim2.new(0, 12, 0.5, -9)
     statusIcon.BackgroundTransparency = 1
     statusIcon.Image = GousseUI:GetIcon("activity") or "rbxassetid://10709752035"
     statusIcon.ImageColor3 = GousseUI.Theme.Accent
@@ -511,12 +513,12 @@ function GousseUI:CreateLoader(config: {
     local statusLabel = Instance.new("TextLabel")
     statusLabel.Name = "StatusText"
     statusLabel.Size = UDim2.new(1, -40, 1, 0)
-    statusLabel.Position = UDim2.new(0, 34, 0, 0)
+    statusLabel.Position = UDim2.new(0, 36, 0, 0)
     statusLabel.BackgroundTransparency = 1
     statusLabel.Font = FontRegular
     statusLabel.Text = initialStatus
     statusLabel.TextColor3 = GousseUI.Theme.TextPrimary
-    statusLabel.TextSize = 11.5
+    statusLabel.TextSize = 12.5
     statusLabel.TextXAlignment = Enum.TextXAlignment.Left
     statusLabel.TextTruncate = Enum.TextTruncate.AtEnd
     statusLabel.Parent = statusCard
@@ -524,8 +526,8 @@ function GousseUI:CreateLoader(config: {
     -- Progress Bar Section
     local progressContainer = Instance.new("Frame")
     progressContainer.Name = "ProgressContainer"
-    progressContainer.Size = UDim2.new(1, -32, 0, 40)
-    progressContainer.Position = UDim2.new(0, 16, 0, 116)
+    progressContainer.Size = UDim2.new(1, -32, 0, 42)
+    progressContainer.Position = UDim2.new(0, 16, 0, 122)
     progressContainer.BackgroundTransparency = 1
     progressContainer.Parent = modal
 
@@ -537,7 +539,7 @@ function GousseUI:CreateLoader(config: {
     progressLabel.Font = FontMedium
     progressLabel.Text = "System Loading"
     progressLabel.TextColor3 = GousseUI.Theme.TextSecondary
-    progressLabel.TextSize = 11
+    progressLabel.TextSize = 12
     progressLabel.TextXAlignment = Enum.TextXAlignment.Left
     progressLabel.Parent = progressContainer
 
@@ -549,7 +551,7 @@ function GousseUI:CreateLoader(config: {
     percentLabel.Font = FontCode
     percentLabel.Text = "0%"
     percentLabel.TextColor3 = GousseUI.Theme.Accent
-    percentLabel.TextSize = 11.5
+    percentLabel.TextSize = 12.5
     percentLabel.TextXAlignment = Enum.TextXAlignment.Right
     percentLabel.Parent = progressContainer
 
@@ -685,7 +687,7 @@ function GousseUI:CreateWindow(config: {
     elseif isMobile then
         mainFrame.Size = UDim2.new(0.92, 0, 0.84, 0)
     else
-        mainFrame.Size = UDim2.new(0, 640, 0, 420)
+        mainFrame.Size = UDim2.new(0, 690, 0, 450)
     end
     mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     mainFrame.BackgroundColor3 = GousseUI.Theme.Background
@@ -695,8 +697,8 @@ function GousseUI:CreateWindow(config: {
 
     -- Responsive Size Constraint for ultra-wide or compact mobile screens
     local sizeConstraint = Instance.new("UISizeConstraint")
-    sizeConstraint.MinSize = Vector2.new(310, 260)
-    sizeConstraint.MaxSize = Vector2.new(720, 500)
+    sizeConstraint.MinSize = Vector2.new(320, 280)
+    sizeConstraint.MaxSize = Vector2.new(820, 560)
     sizeConstraint.Parent = mainFrame
 
     local mainCorner = Instance.new("UICorner")
@@ -742,10 +744,10 @@ function GousseUI:CreateWindow(config: {
     tooltipStroke.Parent = tooltipFrame
 
     local tooltipPad = Instance.new("UIPadding")
-    tooltipPad.PaddingTop = UDim.new(0, 6)
-    tooltipPad.PaddingBottom = UDim.new(0, 6)
-    tooltipPad.PaddingLeft = UDim.new(0, 10)
-    tooltipPad.PaddingRight = UDim.new(0, 10)
+    tooltipPad.PaddingTop = UDim.new(0, 7)
+    tooltipPad.PaddingBottom = UDim.new(0, 7)
+    tooltipPad.PaddingLeft = UDim.new(0, 11)
+    tooltipPad.PaddingRight = UDim.new(0, 11)
     tooltipPad.Parent = tooltipFrame
 
     local tooltipConstraint = Instance.new("UISizeConstraint")
@@ -757,7 +759,7 @@ function GousseUI:CreateWindow(config: {
     tooltipLabel.BackgroundTransparency = 1
     tooltipLabel.Font = FontRegular
     tooltipLabel.TextColor3 = GousseUI.Theme.TextPrimary
-    tooltipLabel.TextSize = 11
+    tooltipLabel.TextSize = 12
     tooltipLabel.TextWrapped = true
     tooltipLabel.AutomaticSize = Enum.AutomaticSize.XY
     tooltipLabel.ZIndex = 10001
@@ -822,8 +824,8 @@ function GousseUI:CreateWindow(config: {
         end
     end)
 
-    -- Header / Title Bar (Compact: 38px on desktop, 44px on mobile)
-    local headerHeight = if isMobile then 44 else 38
+    -- Header / Title Bar (Slightly larger: 42px on desktop, 46px on mobile)
+    local headerHeight = if isMobile then 46 else 42
     local header = Instance.new("Frame")
     header.Name = "Header"
     header.Size = UDim2.new(1, 0, 0, headerHeight)
@@ -839,7 +841,7 @@ function GousseUI:CreateWindow(config: {
     headerBottomBorder.Parent = header
 
     -- Left: Collapse / Expand Sidebar Button
-    local collapseBtnSize = if isMobile then 32 else 26
+    local collapseBtnSize = if isMobile then 34 else 28
     local collapseBtn = Instance.new("TextButton")
     collapseBtn.Name = "CollapseBtn"
     collapseBtn.Size = UDim2.new(0, collapseBtnSize, 0, collapseBtnSize)
@@ -860,71 +862,127 @@ function GousseUI:CreateWindow(config: {
 
     local collapseIcon = Instance.new("ImageLabel")
     collapseIcon.Name = "Icon"
-    collapseIcon.Size = UDim2.new(0, 14, 0, 14)
-    collapseIcon.Position = UDim2.new(0.5, -7, 0.5, -7)
+    collapseIcon.Size = UDim2.new(0, 16, 0, 16)
+    collapseIcon.Position = UDim2.new(0.5, -8, 0.5, -8)
     collapseIcon.BackgroundTransparency = 1
     collapseIcon.Image = RawIcons["layout"] or "rbxassetid://10723425376"
     collapseIcon.ImageColor3 = GousseUI.Theme.TextSecondary
     collapseIcon.Parent = collapseBtn
 
-    -- Title Label: Clean Game/Script Name (No "Gousse Hub")
-    local titleOffsetLeft = 8 + collapseBtnSize + 10
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Name = "TitleLabel"
-    titleLabel.Size = UDim2.new(1, -titleOffsetLeft - 100, 1, 0)
-    titleLabel.Position = UDim2.new(0, titleOffsetLeft, 0, 0)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Font = FontMedium
-    titleLabel.Text = displayTitle
-    titleLabel.TextColor3 = GousseUI.Theme.TextPrimary
-    titleLabel.TextSize = if isMobile then 13.5 else 13
-    titleLabel.TextTruncate = Enum.TextTruncate.AtEnd
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.TextYAlignment = Enum.TextYAlignment.Center
-    titleLabel.Parent = header
+    collapseBtn.MouseEnter:Connect(function()
+        Tween(collapseBtn, { BackgroundColor3 = GousseUI.Theme.SurfaceHover }, 0.1)
+        Tween(collapseIcon, { ImageColor3 = GousseUI.Theme.TextPrimary }, 0.1)
+    end)
+    collapseBtn.MouseLeave:Connect(function()
+        Tween(collapseBtn, { BackgroundColor3 = GousseUI.Theme.Surface }, 0.1)
+        Tween(collapseIcon, {
+            ImageColor3 = isSidebarCollapsed and GousseUI.Theme.Accent or GousseUI.Theme.TextSecondary
+        }, 0.1)
+    end)
 
     -- Window Controls (Minimize & Close)
     local controlsFrame = Instance.new("Frame")
     controlsFrame.Name = "Controls"
-    local ctrlBtnSize = if isMobile then 30 else 22
-    local ctrlGap = if isMobile then 6 else 4
+    local ctrlBtnSize = if isMobile then 34 else 28
+    local ctrlIconSize = if isMobile then 16 else 14
+    local ctrlGap = if isMobile then 6 else 5
     local ctrlWidth = (ctrlBtnSize * 2) + ctrlGap
     controlsFrame.Size = UDim2.new(0, ctrlWidth, 1, 0)
     controlsFrame.Position = UDim2.new(1, -ctrlWidth - 8, 0, 0)
     controlsFrame.BackgroundTransparency = 1
     controlsFrame.Parent = header
 
+    -- Title Label: Clean Game/Script Name (No "Gousse Hub")
+    local titleOffsetLeft = 8 + collapseBtnSize + 10
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Name = "TitleLabel"
+    titleLabel.Size = UDim2.new(1, -titleOffsetLeft - ctrlWidth - 14, 1, 0)
+    titleLabel.Position = UDim2.new(0, titleOffsetLeft, 0, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Font = FontMedium
+    titleLabel.Text = displayTitle
+    titleLabel.TextColor3 = GousseUI.Theme.TextPrimary
+    titleLabel.TextSize = if isMobile then 15 else 14
+    titleLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.TextYAlignment = Enum.TextYAlignment.Center
+    titleLabel.Parent = header
+
     local btnMinimize = Instance.new("TextButton")
     btnMinimize.Name = "BtnMinimize"
     btnMinimize.Size = UDim2.new(0, ctrlBtnSize, 0, ctrlBtnSize)
     btnMinimize.Position = UDim2.new(0, 0, 0.5, -ctrlBtnSize / 2)
     btnMinimize.BackgroundColor3 = GousseUI.Theme.Surface
-    btnMinimize.Font = FontMedium
-    btnMinimize.Text = "—"
-    btnMinimize.TextColor3 = GousseUI.Theme.TextSecondary
-    btnMinimize.TextSize = 11
+    btnMinimize.Text = ""
     btnMinimize.AutoButtonColor = false
     btnMinimize.Parent = controlsFrame
 
     local minCorner = Instance.new("UICorner")
-    minCorner.CornerRadius = UDim.new(0, 5)
+    minCorner.CornerRadius = UDim.new(0, 6)
     minCorner.Parent = btnMinimize
+
+    local minStroke = Instance.new("UIStroke")
+    minStroke.Color = GousseUI.Theme.Border
+    minStroke.Thickness = 1
+    minStroke.Parent = btnMinimize
+
+    local minIcon = Instance.new("ImageLabel")
+    minIcon.Name = "Icon"
+    minIcon.Size = UDim2.new(0, ctrlIconSize, 0, ctrlIconSize)
+    minIcon.Position = UDim2.new(0.5, -ctrlIconSize / 2, 0.5, -ctrlIconSize / 2)
+    minIcon.BackgroundTransparency = 1
+    minIcon.Image = RawIcons["minus"] or "rbxassetid://10734896206"
+    minIcon.ImageColor3 = GousseUI.Theme.TextSecondary
+    minIcon.Parent = btnMinimize
 
     local btnClose = Instance.new("TextButton")
     btnClose.Name = "BtnClose"
     btnClose.Size = UDim2.new(0, ctrlBtnSize, 0, ctrlBtnSize)
     btnClose.Position = UDim2.new(0, ctrlBtnSize + ctrlGap, 0.5, -ctrlBtnSize / 2)
     btnClose.BackgroundColor3 = GousseUI.Theme.Surface
-    btnClose.Font = FontMedium
-    btnClose.Text = "✕"
-    btnClose.TextColor3 = GousseUI.Theme.TextSecondary
-    btnClose.TextSize = 11
+    btnClose.Text = ""
     btnClose.AutoButtonColor = false
     btnClose.Parent = controlsFrame
 
     local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(0, 5)
+    closeCorner.CornerRadius = UDim.new(0, 6)
     closeCorner.Parent = btnClose
+
+    local closeStroke = Instance.new("UIStroke")
+    closeStroke.Color = GousseUI.Theme.Border
+    closeStroke.Thickness = 1
+    closeStroke.Parent = btnClose
+
+    local closeIcon = Instance.new("ImageLabel")
+    closeIcon.Name = "Icon"
+    closeIcon.Size = UDim2.new(0, ctrlIconSize, 0, ctrlIconSize)
+    closeIcon.Position = UDim2.new(0.5, -ctrlIconSize / 2, 0.5, -ctrlIconSize / 2)
+    closeIcon.BackgroundTransparency = 1
+    closeIcon.Image = RawIcons["x"] or "rbxassetid://10747384394"
+    closeIcon.ImageColor3 = GousseUI.Theme.TextSecondary
+    closeIcon.Parent = btnClose
+
+    btnMinimize.MouseEnter:Connect(function()
+        Tween(btnMinimize, { BackgroundColor3 = GousseUI.Theme.SurfaceHover }, 0.1)
+        Tween(minIcon, { ImageColor3 = GousseUI.Theme.TextPrimary }, 0.1)
+    end)
+    btnMinimize.MouseLeave:Connect(function()
+        Tween(btnMinimize, { BackgroundColor3 = GousseUI.Theme.Surface }, 0.1)
+        Tween(minIcon, { ImageColor3 = GousseUI.Theme.TextSecondary }, 0.1)
+    end)
+
+    btnClose.MouseEnter:Connect(function()
+        Tween(btnClose, { BackgroundColor3 = Color3.fromRGB(225, 29, 72) }, 0.1)
+        Tween(closeIcon, { ImageColor3 = Color3.fromRGB(255, 255, 255) }, 0.1)
+    end)
+    btnClose.MouseLeave:Connect(function()
+        Tween(btnClose, { BackgroundColor3 = GousseUI.Theme.Surface }, 0.1)
+        Tween(closeIcon, { ImageColor3 = GousseUI.Theme.TextSecondary }, 0.1)
+    end)
+
+    AttachTooltip(btnMinimize, "Minimize Window")
+    AttachTooltip(btnClose, "Close Window")
+    AttachTooltip(collapseBtn, "Toggle Sidebar")
 
     MakeDraggable(header, mainFrame)
 
@@ -1019,7 +1077,7 @@ function GousseUI:CreateWindow(config: {
     bodyFrame.Parent = mainFrame
 
     -- Left Navigation Sidebar (Collapsible with smooth animation)
-    local defaultSidebarWidth = if isMobile then 125 else 140
+    local defaultSidebarWidth = if isMobile then 135 else 150
     local isSidebarCollapsed = false
 
     local sidebar = Instance.new("Frame")
@@ -1057,7 +1115,7 @@ function GousseUI:CreateWindow(config: {
     -- Single animated emerald active indicator bar for sidebar (Glides smoothly between tabs)
     local activeIndicator = Instance.new("Frame")
     activeIndicator.Name = "ActiveIndicator"
-    activeIndicator.Size = UDim2.new(0, 3, 0, 18)
+    activeIndicator.Size = UDim2.new(0, 3, 0, 20)
     activeIndicator.Position = UDim2.new(0, 4, 0, 6)
     activeIndicator.BackgroundColor3 = GousseUI.Theme.Accent
     activeIndicator.BorderSizePixel = 0
@@ -1124,7 +1182,7 @@ function GousseUI:CreateWindow(config: {
     end
 
     -- Real-time Search Filter Bar in ContentArea
-    local searchBarHeight = if isMobile then 32 else 26
+    local searchBarHeight = if isMobile then 34 else 30
     local searchContainer = Instance.new("Frame")
     searchContainer.Name = "SearchContainer"
     searchContainer.Size = UDim2.new(1, -16, 0, searchBarHeight)
@@ -1144,8 +1202,8 @@ function GousseUI:CreateWindow(config: {
 
     local searchIcon = Instance.new("ImageLabel")
     searchIcon.Name = "SearchIcon"
-    searchIcon.Size = UDim2.new(0, 14, 0, 14)
-    searchIcon.Position = UDim2.new(0, 8, 0.5, -7)
+    searchIcon.Size = UDim2.new(0, 16, 0, 16)
+    searchIcon.Position = UDim2.new(0, 8, 0.5, -8)
     searchIcon.BackgroundTransparency = 1
     searchIcon.Image = RawIcons["search"] or "rbxassetid://10734943674"
     searchIcon.ImageColor3 = GousseUI.Theme.TextMuted
@@ -1153,28 +1211,28 @@ function GousseUI:CreateWindow(config: {
 
     local searchInput = Instance.new("TextBox")
     searchInput.Name = "SearchInput"
-    searchInput.Size = UDim2.new(1, -54, 1, 0)
-    searchInput.Position = UDim2.new(0, 28, 0, 0)
+    searchInput.Size = UDim2.new(1, -58, 1, 0)
+    searchInput.Position = UDim2.new(0, 30, 0, 0)
     searchInput.BackgroundTransparency = 1
     searchInput.Font = FontRegular
     searchInput.PlaceholderText = "Search features..."
     searchInput.PlaceholderColor3 = GousseUI.Theme.TextMuted
     searchInput.Text = ""
     searchInput.TextColor3 = GousseUI.Theme.TextPrimary
-    searchInput.TextSize = 11.5
+    searchInput.TextSize = 12.5
     searchInput.ClearTextOnFocus = false
     searchInput.TextXAlignment = Enum.TextXAlignment.Left
     searchInput.Parent = searchContainer
 
     local clearSearchBtn = Instance.new("TextButton")
     clearSearchBtn.Name = "ClearSearchBtn"
-    clearSearchBtn.Size = UDim2.new(0, 18, 0, 18)
-    clearSearchBtn.Position = UDim2.new(1, -24, 0.5, -9)
+    clearSearchBtn.Size = UDim2.new(0, 20, 0, 20)
+    clearSearchBtn.Position = UDim2.new(1, -26, 0.5, -10)
     clearSearchBtn.BackgroundTransparency = 1
     clearSearchBtn.Font = FontMedium
     clearSearchBtn.Text = "✕"
     clearSearchBtn.TextColor3 = GousseUI.Theme.TextMuted
-    clearSearchBtn.TextSize = 10
+    clearSearchBtn.TextSize = 11
     clearSearchBtn.Visible = false
     clearSearchBtn.Parent = searchContainer
 
@@ -1245,7 +1303,7 @@ function GousseUI:CreateWindow(config: {
         label.Font = FontMedium
         label.Text = name
         label.TextColor3 = GousseUI.Theme.TextPrimary
-        label.TextSize = 12.5
+        label.TextSize = 13.5
         label.TextXAlignment = Enum.TextXAlignment.Left
         label.LayoutOrder = 1
         label.Parent = titleContainer
@@ -1254,12 +1312,12 @@ function GousseUI:CreateWindow(config: {
         if subTitle and subTitle ~= "" then
             infoBtn = Instance.new("TextButton")
             infoBtn.Name = "InfoBtn"
-            infoBtn.Size = UDim2.new(0, 16, 0, 16)
+            infoBtn.Size = UDim2.new(0, 18, 0, 18)
             infoBtn.BackgroundColor3 = Color3.fromRGB(30, 41, 59)
             infoBtn.Font = FontBold
             infoBtn.Text = "?"
             infoBtn.TextColor3 = GousseUI.Theme.TextSecondary
-            infoBtn.TextSize = 10.5
+            infoBtn.TextSize = 11
             infoBtn.AutoButtonColor = false
             infoBtn.LayoutOrder = 2
             infoBtn.Parent = titleContainer
@@ -1296,13 +1354,13 @@ function GousseUI:CreateWindow(config: {
                     break
                 end
             end
-            local h = if isMobile then 38 else 32
-            return 6 + (tabIndex - 1) * (h + 4) + (h - 18) / 2
+            local h = if isMobile then 40 else 36
+            return 6 + (tabIndex - 1) * (h + 4) + (h - 20) / 2
         end
         local relY = btnAbsY - sideAbsY
         local btnHeight = btn.AbsoluteSize.Y
-        if btnHeight == 0 then btnHeight = if isMobile then 38 else 32 end
-        return relY + (btnHeight - 18) / 2
+        if btnHeight == 0 then btnHeight = if isMobile then 40 else 36 end
+        return relY + (btnHeight - 20) / 2
     end
 
     tabListContainer:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
@@ -1318,7 +1376,7 @@ function GousseUI:CreateWindow(config: {
         local tabIconKey = tabConfig.Icon or "folder"
 
         -- Tab Button in Sidebar
-        local tabHeight = if isMobile then 38 else 32
+        local tabHeight = if isMobile then 40 else 36
         local tabBtn = Instance.new("TextButton")
         tabBtn.Name = "TabBtn_" .. tabName
         tabBtn.Size = UDim2.new(1, 0, 0, tabHeight)
@@ -1340,8 +1398,8 @@ function GousseUI:CreateWindow(config: {
         if iconAsset then
             local iconImg = Instance.new("ImageLabel")
             iconImg.Name = "Icon"
-            iconImg.Size = UDim2.new(0, 16, 0, 16)
-            iconImg.Position = UDim2.new(0, 8, 0.5, -8)
+            iconImg.Size = UDim2.new(0, 18, 0, 18)
+            iconImg.Position = UDim2.new(0, 9, 0.5, -9)
             iconImg.BackgroundTransparency = 1
             iconImg.Image = iconAsset
             iconImg.ImageColor3 = GousseUI.Theme.TextSecondary
@@ -1350,26 +1408,26 @@ function GousseUI:CreateWindow(config: {
         else
             local fallbackText = Instance.new("TextLabel")
             fallbackText.Name = "Icon"
-            fallbackText.Size = UDim2.new(0, 16, 1, 0)
-            fallbackText.Position = UDim2.new(0, 8, 0, 0)
+            fallbackText.Size = UDim2.new(0, 18, 1, 0)
+            fallbackText.Position = UDim2.new(0, 9, 0, 0)
             fallbackText.BackgroundTransparency = 1
             fallbackText.Font = FontRegular
             fallbackText.Text = tabIconKey
             fallbackText.TextColor3 = GousseUI.Theme.TextSecondary
-            fallbackText.TextSize = 12
+            fallbackText.TextSize = 13
             fallbackText.Parent = tabBtn
             iconLabel = fallbackText
         end
 
         local tabTextLabel = Instance.new("TextLabel")
         tabTextLabel.Name = "Label"
-        tabTextLabel.Size = UDim2.new(1, -30, 1, 0)
-        tabTextLabel.Position = UDim2.new(0, 28, 0, 0)
+        tabTextLabel.Size = UDim2.new(1, -38, 1, 0)
+        tabTextLabel.Position = UDim2.new(0, 32, 0, 0)
         tabTextLabel.BackgroundTransparency = 1
         tabTextLabel.Font = FontMedium
         tabTextLabel.Text = tabName
         tabTextLabel.TextColor3 = GousseUI.Theme.TextSecondary
-        tabTextLabel.TextSize = 12
+        tabTextLabel.TextSize = 13
         tabTextLabel.TextXAlignment = Enum.TextXAlignment.Left
         tabTextLabel.Parent = tabBtn
 
@@ -1444,13 +1502,13 @@ function GousseUI:CreateWindow(config: {
                 Tween(prevTab.Button, { BackgroundTransparency = 1 }, 0.16)
                 Tween(prevTab.Button.Label, {
                     TextColor3 = GousseUI.Theme.TextSecondary,
-                    Position = UDim2.new(0, 28, 0, 0)
+                    Position = UDim2.new(0, 32, 0, 0)
                 }, 0.16)
                 if prevTab.Button:FindFirstChild("Icon") then
                     if prevTab.Button.Icon:IsA("ImageLabel") then
                         Tween(prevTab.Button.Icon, {
                             ImageColor3 = GousseUI.Theme.TextSecondary,
-                            Position = UDim2.new(0, 8, 0.5, -8)
+                            Position = UDim2.new(0, 9, 0.5, -9)
                         }, 0.16)
                     else
                         prevTab.Button.Icon.TextColor3 = GousseUI.Theme.TextSecondary
@@ -1462,13 +1520,13 @@ function GousseUI:CreateWindow(config: {
             Tween(tabBtn, { BackgroundTransparency = 0, BackgroundColor3 = GousseUI.Theme.Surface }, 0.18)
             Tween(tabTextLabel, {
                 TextColor3 = GousseUI.Theme.TextPrimary,
-                Position = UDim2.new(0, 32, 0, 0)
+                Position = UDim2.new(0, 36, 0, 0)
             }, 0.18)
 
             if iconLabel:IsA("ImageLabel") then
                 Tween(iconLabel, {
                     ImageColor3 = GousseUI.Theme.Accent,
-                    Position = UDim2.new(0, 10, 0.5, -8)
+                    Position = UDim2.new(0, 11, 0.5, -9)
                 }, 0.18)
             else
                 iconLabel.TextColor3 = GousseUI.Theme.Accent
@@ -1563,7 +1621,7 @@ function GousseUI:CreateWindow(config: {
         function TabObj:CreateSection(name: string)
             local sectionHeader = Instance.new("Frame")
             sectionHeader.Name = "Section_" .. name
-            sectionHeader.Size = UDim2.new(1, 0, 0, 22)
+            sectionHeader.Size = UDim2.new(1, 0, 0, 24)
             sectionHeader.BackgroundTransparency = 1
             sectionHeader.Parent = tabPage
 
@@ -1576,7 +1634,7 @@ function GousseUI:CreateWindow(config: {
             label.Font = FontBold
             label.Text = name:upper()
             label.TextColor3 = GousseUI.Theme.TextMuted
-            label.TextSize = 10.5
+            label.TextSize = 11.5
             label.TextXAlignment = Enum.TextXAlignment.Left
             label.Parent = sectionHeader
 
@@ -1612,7 +1670,7 @@ function GousseUI:CreateWindow(config: {
             local variant = btnConfig.Variant or "secondary"
             local callback = btnConfig.Callback or function() end
 
-            local rowHeight = if isMobile then 42 else 38
+            local rowHeight = if isMobile then 46 else 42
             local btnFrame = Instance.new("Frame")
             btnFrame.Name = "BtnItem_" .. btnName
             btnFrame.Size = UDim2.new(1, 0, 0, rowHeight)
@@ -1629,18 +1687,18 @@ function GousseUI:CreateWindow(config: {
             stroke.Thickness = 1
             stroke.Parent = btnFrame
 
-            local btnWidth = if isMobile then 80 else 72
-            local rightPadding = btnWidth + 16
+            local btnWidth = if isMobile then 86 else 78
+            local rightPadding = btnWidth + 18
 
             BuildTitleRow(btnFrame, btnName, subTitle, rightPadding, rowHeight)
 
             local actionBtn = Instance.new("TextButton")
-            local actHeight = if isMobile then 28 else 24
+            local actHeight = if isMobile then 30 else 26
             actionBtn.Size = UDim2.new(0, btnWidth, 0, actHeight)
             actionBtn.Position = UDim2.new(1, -btnWidth - 10, 0.5, -actHeight / 2)
             actionBtn.Font = FontMedium
             actionBtn.Text = btnText
-            actionBtn.TextSize = 11.5
+            actionBtn.TextSize = 12.5
             actionBtn.AutoButtonColor = false
             actionBtn.Parent = btnFrame
 
@@ -1692,7 +1750,7 @@ function GousseUI:CreateWindow(config: {
             local state = toggleConfig.Default or false
             local callback = toggleConfig.Callback or function() end
 
-            local rowHeight = if isMobile then 42 else 38
+            local rowHeight = if isMobile then 46 else 42
             local toggleBtn = Instance.new("TextButton")
             toggleBtn.Name = "ToggleItem_" .. toggleName
             toggleBtn.Size = UDim2.new(1, 0, 0, rowHeight)
@@ -1711,12 +1769,12 @@ function GousseUI:CreateWindow(config: {
             stroke.Thickness = 1
             stroke.Parent = toggleBtn
 
-            local _, infoBtn = BuildTitleRow(toggleBtn, toggleName, subTitle, 65, rowHeight)
+            local _, infoBtn = BuildTitleRow(toggleBtn, toggleName, subTitle, 70, rowHeight)
 
-            -- Switch Track (38x20)
+            -- Switch Track (42x22)
             local switchTrack = Instance.new("Frame")
-            switchTrack.Size = UDim2.new(0, 38, 0, 20)
-            switchTrack.Position = UDim2.new(1, -48, 0.5, -10)
+            switchTrack.Size = UDim2.new(0, 42, 0, 22)
+            switchTrack.Position = UDim2.new(1, -52, 0.5, -11)
             switchTrack.BackgroundColor3 = state and GousseUI.Theme.Accent or GousseUI.Theme.Border
             switchTrack.BorderSizePixel = 0
             switchTrack.Parent = toggleBtn
@@ -1725,10 +1783,10 @@ function GousseUI:CreateWindow(config: {
             trackCorner.CornerRadius = UDim.new(1, 0)
             trackCorner.Parent = switchTrack
 
-            -- Switch Knob (14x14)
+            -- Switch Knob (16x16)
             local switchKnob = Instance.new("Frame")
-            switchKnob.Size = UDim2.new(0, 14, 0, 14)
-            switchKnob.Position = state and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
+            switchKnob.Size = UDim2.new(0, 16, 0, 16)
+            switchKnob.Position = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
             switchKnob.BackgroundColor3 = state and GousseUI.Theme.Background or GousseUI.Theme.TextSecondary
             switchKnob.BorderSizePixel = 0
             switchKnob.Parent = switchTrack
@@ -1739,7 +1797,7 @@ function GousseUI:CreateWindow(config: {
 
             local function SetState(newState: boolean)
                 state = newState
-                local targetPos = state and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
+                local targetPos = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
                 local targetColor = state and GousseUI.Theme.Accent or GousseUI.Theme.Border
                 local knobColor = state and GousseUI.Theme.Background or GousseUI.Theme.TextSecondary
 
@@ -1803,7 +1861,7 @@ function GousseUI:CreateWindow(config: {
 
             local currentVal = defaultVal
 
-            local rowHeight = if isMobile then 48 else 42
+            local rowHeight = if isMobile then 52 else 46
             local sliderFrame = Instance.new("Frame")
             sliderFrame.Name = "SliderItem_" .. sliderName
             sliderFrame.Size = UDim2.new(1, 0, 0, rowHeight)
@@ -1821,11 +1879,11 @@ function GousseUI:CreateWindow(config: {
             stroke.Parent = sliderFrame
 
             -- Title with info button on top line
-            local topRowHeight = 20
+            local topRowHeight = 22
             local titleContainer = Instance.new("Frame")
             titleContainer.Name = "TitleContainer"
             titleContainer.Size = UDim2.new(0.65, 0, 0, topRowHeight)
-            titleContainer.Position = UDim2.new(0, 12, 0, 4)
+            titleContainer.Position = UDim2.new(0, 12, 0, 5)
             titleContainer.BackgroundTransparency = 1
             titleContainer.Parent = sliderFrame
 
@@ -1844,7 +1902,7 @@ function GousseUI:CreateWindow(config: {
             label.Font = FontMedium
             label.Text = sliderName
             label.TextColor3 = GousseUI.Theme.TextPrimary
-            label.TextSize = 12.5
+            label.TextSize = 13.5
             label.TextXAlignment = Enum.TextXAlignment.Left
             label.LayoutOrder = 1
             label.Parent = titleContainer
@@ -1852,12 +1910,12 @@ function GousseUI:CreateWindow(config: {
             if subTitle and subTitle ~= "" then
                 local infoBtn = Instance.new("TextButton")
                 infoBtn.Name = "InfoBtn"
-                infoBtn.Size = UDim2.new(0, 15, 0, 15)
+                infoBtn.Size = UDim2.new(0, 18, 0, 18)
                 infoBtn.BackgroundColor3 = Color3.fromRGB(30, 41, 59)
                 infoBtn.Font = FontBold
                 infoBtn.Text = "?"
                 infoBtn.TextColor3 = GousseUI.Theme.TextSecondary
-                infoBtn.TextSize = 10
+                infoBtn.TextSize = 11
                 infoBtn.AutoButtonColor = false
                 infoBtn.LayoutOrder = 2
                 infoBtn.Parent = titleContainer
@@ -1877,20 +1935,20 @@ function GousseUI:CreateWindow(config: {
 
             local valueLabel = Instance.new("TextLabel")
             valueLabel.Size = UDim2.new(0.35, -20, 0, topRowHeight)
-            valueLabel.Position = UDim2.new(0.65, 8, 0, 4)
+            valueLabel.Position = UDim2.new(0.65, 8, 0, 5)
             valueLabel.BackgroundTransparency = 1
             valueLabel.Font = FontCode
             valueLabel.Text = tostring(currentVal) .. suffix
             valueLabel.TextColor3 = GousseUI.Theme.Accent
-            valueLabel.TextSize = 12
+            valueLabel.TextSize = 13
             valueLabel.TextXAlignment = Enum.TextXAlignment.Right
             valueLabel.Parent = sliderFrame
 
             -- Slider Track
             local track = Instance.new("TextButton")
             track.Name = "Track"
-            track.Size = UDim2.new(1, -24, 0, 5)
-            track.Position = UDim2.new(0, 12, 0, if isMobile then 30 else 26)
+            track.Size = UDim2.new(1, -24, 0, 6)
+            track.Position = UDim2.new(0, 12, 0, if isMobile then 33 else 29)
             track.BackgroundColor3 = Color3.fromRGB(30, 41, 59)
             track.Text = ""
             track.AutoButtonColor = false
@@ -1978,7 +2036,7 @@ function GousseUI:CreateWindow(config: {
             local callback = dropConfig.Callback or function() end
 
             local isOpen = false
-            local baseHeight = if isMobile then 42 else 38
+            local baseHeight = if isMobile then 46 else 42
 
             -- Base Row Frame (Permanently locked height, never shifts title or controls)
             local dropFrame = Instance.new("Frame")
@@ -1998,17 +2056,17 @@ function GousseUI:CreateWindow(config: {
             stroke.Parent = dropFrame
 
             -- Title & Info Button stay permanently anchored at top-left
-            BuildTitleRow(dropFrame, dropName, subTitle, 140, baseHeight)
+            BuildTitleRow(dropFrame, dropName, subTitle, 150, baseHeight)
 
             local triggerBtn = Instance.new("TextButton")
-            local trigHeight = if isMobile then 28 else 24
-            triggerBtn.Size = UDim2.new(0, 120, 0, trigHeight)
-            triggerBtn.Position = UDim2.new(1, -130, 0, (baseHeight - trigHeight) / 2)
+            local trigHeight = if isMobile then 30 else 26
+            triggerBtn.Size = UDim2.new(0, 130, 0, trigHeight)
+            triggerBtn.Position = UDim2.new(1, -140, 0, (baseHeight - trigHeight) / 2)
             triggerBtn.BackgroundColor3 = GousseUI.Theme.Sidebar
             triggerBtn.Font = FontMedium
             triggerBtn.Text = selected .. " ▾"
             triggerBtn.TextColor3 = GousseUI.Theme.TextPrimary
-            triggerBtn.TextSize = 11.5
+            triggerBtn.TextSize = 12.5
             triggerBtn.AutoButtonColor = false
             triggerBtn.ZIndex = 5
             triggerBtn.Parent = dropFrame
@@ -2073,11 +2131,11 @@ function GousseUI:CreateWindow(config: {
                 overlayBtn.MouseButton1Click:Connect(CloseDropdown)
 
                 -- 2. Floating Popover Frame
-                local itemHeight = if isMobile then 30 else 26
+                local itemHeight = if isMobile then 32 else 28
                 local itemGap = 3
                 local totalContentHeight = #options * (itemHeight + itemGap) + 8
-                local maxPopoverHeight = 150
-                local targetHeight = math.clamp(totalContentHeight, 34, maxPopoverHeight)
+                local maxPopoverHeight = 160
+                local targetHeight = math.clamp(totalContentHeight, 36, maxPopoverHeight)
 
                 -- Calculate absolute position mapped to contentArea
                 local dropAbs = dropFrame.AbsolutePosition
@@ -2110,7 +2168,7 @@ function GousseUI:CreateWindow(config: {
                 popStroke.Thickness = 1
                 popStroke.Parent = popoverFrame
 
-                -- ScrollingFrame for options with max height ~150px
+                -- ScrollingFrame for options with max height ~160px
                 local listScroll = Instance.new("ScrollingFrame")
                 listScroll.Name = "OptionsScroll"
                 listScroll.Size = UDim2.new(1, 0, 1, 0)
@@ -2146,7 +2204,7 @@ function GousseUI:CreateWindow(config: {
                     optBtn.Font = FontMedium
                     optBtn.Text = opt
                     optBtn.TextColor3 = (opt == selected) and GousseUI.Theme.Accent or GousseUI.Theme.TextPrimary
-                    optBtn.TextSize = 11.5
+                    optBtn.TextSize = 12.5
                     optBtn.TextXAlignment = Enum.TextXAlignment.Center -- Centered text precision
                     optBtn.AutoButtonColor = false
                     optBtn.ZIndex = 62
@@ -2229,7 +2287,7 @@ function GousseUI:CreateWindow(config: {
             local placeholder = inputConfig.Placeholder or "Enter value..."
             local callback = inputConfig.Callback or function() end
 
-            local rowHeight = if isMobile then 42 else 38
+            local rowHeight = if isMobile then 46 else 42
             local inputFrame = Instance.new("Frame")
             inputFrame.Name = "InputItem_" .. inputName
             inputFrame.Size = UDim2.new(1, 0, 0, rowHeight)
@@ -2246,19 +2304,19 @@ function GousseUI:CreateWindow(config: {
             stroke.Thickness = 1
             stroke.Parent = inputFrame
 
-            BuildTitleRow(inputFrame, inputName, subTitle, 140, rowHeight)
+            BuildTitleRow(inputFrame, inputName, subTitle, 150, rowHeight)
 
-            local boxHeight = if isMobile then 28 else 24
+            local boxHeight = if isMobile then 30 else 26
             local textBox = Instance.new("TextBox")
-            textBox.Size = UDim2.new(0, 120, 0, boxHeight)
-            textBox.Position = UDim2.new(1, -130, 0.5, -boxHeight / 2)
+            textBox.Size = UDim2.new(0, 130, 0, boxHeight)
+            textBox.Position = UDim2.new(1, -140, 0.5, -boxHeight / 2)
             textBox.BackgroundColor3 = GousseUI.Theme.Sidebar
             textBox.Font = FontCode
             textBox.PlaceholderText = placeholder
             textBox.PlaceholderColor3 = GousseUI.Theme.TextMuted
             textBox.Text = ""
             textBox.TextColor3 = GousseUI.Theme.TextPrimary
-            textBox.TextSize = 11.5
+            textBox.TextSize = 12.5
             textBox.ClearTextOnFocus = false
             textBox.Parent = inputFrame
 
@@ -2291,7 +2349,7 @@ function GousseUI:CreateWindow(config: {
 
             local card = Instance.new("Frame")
             card.Name = "Paragraph_" .. titleText
-            card.Size = UDim2.new(1, 0, 0, 52)
+            card.Size = UDim2.new(1, 0, 0, 56)
             card.AutomaticSize = Enum.AutomaticSize.Y
             card.BackgroundColor3 = GousseUI.Theme.Surface
             card.BorderSizePixel = 0
@@ -2308,25 +2366,25 @@ function GousseUI:CreateWindow(config: {
 
             local title = Instance.new("TextLabel")
             title.Name = "ItemTitle"
-            title.Size = UDim2.new(1, -24, 0, 18)
+            title.Size = UDim2.new(1, -24, 0, 20)
             title.Position = UDim2.new(0, 12, 0, 8)
             title.BackgroundTransparency = 1
             title.Font = FontMedium
             title.Text = titleText
             title.TextColor3 = GousseUI.Theme.TextPrimary
-            title.TextSize = 12.5
+            title.TextSize = 13.5
             title.TextXAlignment = Enum.TextXAlignment.Left
             title.Parent = card
 
             local content = Instance.new("TextLabel")
             content.Size = UDim2.new(1, -24, 0, 0)
             content.AutomaticSize = Enum.AutomaticSize.Y
-            content.Position = UDim2.new(0, 12, 0, 28)
+            content.Position = UDim2.new(0, 12, 0, 30)
             content.BackgroundTransparency = 1
             content.Font = FontRegular
             content.Text = bodyText
             content.TextColor3 = GousseUI.Theme.TextSecondary
-            content.TextSize = 11
+            content.TextSize = 12
             content.TextWrapped = true
             content.TextXAlignment = Enum.TextXAlignment.Left
             content.TextYAlignment = Enum.TextYAlignment.Top

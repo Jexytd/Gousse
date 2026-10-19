@@ -13,7 +13,7 @@ GousseUI is a lightweight, authentic desktop utility UI Library engineered for R
 
 ## 1. Core Architecture & Theme System
 
-GousseUI v2.1.0 adopts an authentic modern tactical gaming aesthetic: deep obsidian slate surfaces, soft perimeter borders, refined 2px top emerald accent line, high-contrast BuilderSans typography, and fully responsive mobile architecture.
+GousseUI v2.2.0 adopts an authentic modern tactical gaming aesthetic: deep obsidian slate surfaces, soft perimeter borders, refined 2px top emerald accent line, high-contrast BuilderSans typography scaled for enhanced legibility, and fully responsive mobile architecture.
 
 | Token | RGB Value | Hex | Usage |
 | :--- | :--- | :--- | :--- |
@@ -59,6 +59,7 @@ end
 - **Combat**: `"crosshair"`, `"target"`, `"flame"`, `"shield"`
 - **Utility**: `"wrench"`, `"sliders"`, `"terminal"`, `"server"`, `"refresh-cw"`, `"copy"`
 - **Player**: `"user"`, `"users"`, `"user-check"`
+- **Window Controls**: `"minus"` (minimize), `"x"` (close/exit), `"chevron-left"`, `"chevron-right"`
 - **General / Settings**: `"settings"`, `"info"`, `"power"`, `"trash-2"`
 
 ### Icon Resolution Example
@@ -78,13 +79,19 @@ local AboutTab = Window:CreateTab({ Name = "About", Icon = "info" })
 
 ## 3. API Reference & Component Cheatsheet
 
-### 3.1 Window Creation
+### 3.1 Window Creation & Dimensions
+In v2.2.0, the window dimensions, fonts, and controls are scaled up for enhanced readability and touch/click ergonomics:
+- **Default Window Size**: `690 x 450 px` (desktop) / `90% x 80%` (mobile).
+- **Size Constraints**: Min `320 x 280 px`, Max `820 x 560 px`.
+- **Header Height**: `42 px` (desktop) / `46 px` (mobile).
+- **Window Controls**: Dedicated 28x28px (desktop) / 34x34px (mobile) buttons with Lucide vector icons (`minus` for Minimize, `x` for Close), smooth hover feedback, and hover tooltips.
+
 ```luau
 local Window = GousseUI:CreateWindow({
     Title = "Gousse Hub",
     SubTitle = "Universal • Authentic Desktop Edition",
     Keybind = Enum.KeyCode.RightControl,
-    Size = UDim2.new(0, 650, 0, 420)
+    Size = UDim2.new(0, 690, 0, 450)
 })
 ```
 - **Methods**:
