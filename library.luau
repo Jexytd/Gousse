@@ -141,7 +141,7 @@ local FontRegular = Enum.Font.BuilderSans or Enum.Font.Gotham
 local FontCode = Enum.Font.RobotoMono or Enum.Font.Code
 
 local GousseUI = {
-    Version = "2.2.0",
+    Version = "2.2.1",
     Windows = {},
     ActiveKeybind = Enum.KeyCode.RightControl,
     Theme = {
@@ -644,7 +644,12 @@ function GousseUI:CreateWindow(config: {
     Keybind: Enum.KeyCode?,
     Size: UDim2?,
     Mobile: boolean?,
-    ShowMobileToggle: boolean?
+    ShowMobileToggle: boolean?,
+    OnUnload: (() -> ())?,
+    UnloadPrompt: {
+        Title: string?,
+        Message: string?
+    }?
 })
     config = config or {}
     local toggleKey = config.Keybind or GousseUI.ActiveKeybind
@@ -981,7 +986,7 @@ function GousseUI:CreateWindow(config: {
     end)
 
     AttachTooltip(btnMinimize, "Minimize Window")
-    AttachTooltip(btnClose, "Close Window")
+    AttachTooltip(btnClose, "Unload Script")
     AttachTooltip(collapseBtn, "Toggle Sidebar")
 
     MakeDraggable(header, mainFrame)
@@ -1052,6 +1057,262 @@ function GousseUI:CreateWindow(config: {
         end)
     end
 
+    -- Unload & Confirmation Modal System
+    local isUnloaded = false
+    local unloadCallbacks = {}
+    local confirmModalInstance = nil
+
+    local function UnloadNow()
+        if isUnloaded then return end
+        isUnloaded = true
+        if WindowObj then
+            WindowObj.IsUnloaded = true
+        end
+
+        HideTooltip()
+
+        for _, cb in ipairs(unloadCallbacks) do
+            if type(cb) == "function" then
+                pcall(cb)
+            end
+        end
+
+        if type(config.OnUnload) == "function" then
+            pcall(config.OnUnload)
+        end
+
+        if confirmModalInstance and confirmModalInstance.Parent then
+            confirmModalInstance:Destroy()
+            confirmModalInstance = nil
+        end
+
+        screenGui:Destroy()
+
+        GousseUI:Notify({
+            Title = displayTitle,
+            Content = "Script berhasil di-unload secara bersih.",
+            Type = "info",
+            Duration = 3.5
+        })
+    end
+
+    local function ShowUnloadConfirmation(promptConfig: { Title: string?, Message: string? }?)
+        if isUnloaded then return end
+        HideTooltip()
+
+        if confirmModalInstance and confirmModalInstance.Parent then
+            return
+        end
+
+        promptConfig = promptConfig or config.UnloadPrompt or {}
+        local modalTitle = (promptConfig and promptConfig.Title) or "Konfirmasi Unload"
+        local modalMessage = (promptConfig and promptConfig.Message) or "Apakah Anda yakin ingin mematikan script? Semua thread latar belakang, loop, dan antarmuka akan dibersihkan."
+
+        local overlay = Instance.new("TextButton")
+        overlay.Name = "UnloadModalOverlay"
+        overlay.Size = UDim2.new(1, 0, 1, 0)
+        overlay.Position = UDim2.new(0, 0, 0, 0)
+        overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        overlay.BackgroundTransparency = 1
+        overlay.Text = ""
+        overlay.AutoButtonColor = false
+        overlay.ZIndex = 8000
+        overlay.Parent = screenGui
+        confirmModalInstance = overlay
+
+        local modalWidth = if isMobile then 320 else 380
+        local modalHeight = if isMobile then 205 else 190
+
+        local modalCard = Instance.new("Frame")
+        modalCard.Name = "ModalCard"
+        modalCard.Size = UDim2.new(0, modalWidth, 0, modalHeight)
+        modalCard.Position = UDim2.new(0.5, 0, 0.47, 0)
+        modalCard.AnchorPoint = Vector2.new(0.5, 0.5)
+        modalCard.BackgroundColor3 = GousseUI.Theme.Background
+        modalCard.BorderSizePixel = 0
+        modalCard.ClipsDescendants = true
+        modalCard.ZIndex = 8001
+        modalCard.Parent = overlay
+
+        local cardCorner = Instance.new("UICorner")
+        cardCorner.CornerRadius = UDim.new(0, 10)
+        cardCorner.Parent = modalCard
+
+        local cardStroke = Instance.new("UIStroke")
+        cardStroke.Color = GousseUI.Theme.Border
+        cardStroke.Thickness = 1.2
+        cardStroke.Parent = modalCard
+
+        local topDangerBar = Instance.new("Frame")
+        topDangerBar.Name = "TopDangerBar"
+        topDangerBar.Size = UDim2.new(1, 0, 0, 2)
+        topDangerBar.Position = UDim2.new(0, 0, 0, 0)
+        topDangerBar.BackgroundColor3 = GousseUI.Theme.Danger
+        topDangerBar.BorderSizePixel = 0
+        topDangerBar.ZIndex = 8002
+        topDangerBar.Parent = modalCard
+
+        local iconBadge = Instance.new("Frame")
+        iconBadge.Name = "IconBadge"
+        iconBadge.Size = UDim2.new(0, 36, 0, 36)
+        iconBadge.Position = UDim2.new(0, 18, 0, 16)
+        iconBadge.BackgroundColor3 = Color3.fromRGB(36, 18, 24)
+        iconBadge.BorderSizePixel = 0
+        iconBadge.ZIndex = 8002
+        iconBadge.Parent = modalCard
+
+        local badgeCorner = Instance.new("UICorner")
+        badgeCorner.CornerRadius = UDim.new(0, 8)
+        badgeCorner.Parent = iconBadge
+
+        local badgeStroke = Instance.new("UIStroke")
+        badgeStroke.Color = Color3.fromRGB(76, 25, 38)
+        badgeStroke.Thickness = 1
+        badgeStroke.Parent = iconBadge
+
+        local iconImg = Instance.new("ImageLabel")
+        iconImg.Name = "Icon"
+        iconImg.Size = UDim2.new(0, 18, 0, 18)
+        iconImg.Position = UDim2.new(0.5, -9, 0.5, -9)
+        iconImg.BackgroundTransparency = 1
+        iconImg.Image = RawIcons["alert-triangle"] or "rbxassetid://10709753149"
+        iconImg.ImageColor3 = GousseUI.Theme.Danger
+        iconImg.ZIndex = 8003
+        iconImg.Parent = iconBadge
+
+        local titleLbl = Instance.new("TextLabel")
+        titleLbl.Name = "Title"
+        titleLbl.Size = UDim2.new(1, -74, 0, 20)
+        titleLbl.Position = UDim2.new(0, 62, 0, 16)
+        titleLbl.BackgroundTransparency = 1
+        titleLbl.Font = FontBold
+        titleLbl.Text = modalTitle
+        titleLbl.TextColor3 = GousseUI.Theme.TextPrimary
+        titleLbl.TextSize = 14.5
+        titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+        titleLbl.ZIndex = 8002
+        titleLbl.Parent = modalCard
+
+        local subLbl = Instance.new("TextLabel")
+        subLbl.Name = "SubTitle"
+        subLbl.Size = UDim2.new(1, -74, 0, 16)
+        subLbl.Position = UDim2.new(0, 62, 0, 36)
+        subLbl.BackgroundTransparency = 1
+        subLbl.Font = FontMedium
+        subLbl.Text = displayTitle .. " • Lifecycle"
+        subLbl.TextColor3 = GousseUI.Theme.TextMuted
+        subLbl.TextSize = 11.5
+        subLbl.TextXAlignment = Enum.TextXAlignment.Left
+        subLbl.TextTruncate = Enum.TextTruncate.AtEnd
+        subLbl.ZIndex = 8002
+        subLbl.Parent = modalCard
+
+        local descLbl = Instance.new("TextLabel")
+        descLbl.Name = "Description"
+        descLbl.Size = UDim2.new(1, -36, 0, 48)
+        descLbl.Position = UDim2.new(0, 18, 0, 64)
+        descLbl.BackgroundTransparency = 1
+        descLbl.Font = FontRegular
+        descLbl.Text = modalMessage
+        descLbl.TextColor3 = GousseUI.Theme.TextSecondary
+        descLbl.TextSize = 12
+        descLbl.TextWrapped = true
+        descLbl.TextXAlignment = Enum.TextXAlignment.Left
+        descLbl.TextYAlignment = Enum.TextYAlignment.Top
+        descLbl.ZIndex = 8002
+        descLbl.Parent = modalCard
+
+        local btnRow = Instance.new("Frame")
+        btnRow.Name = "ActionButtons"
+        btnRow.Size = UDim2.new(1, -36, 0, 34)
+        btnRow.Position = UDim2.new(0, 18, 1, -48)
+        btnRow.BackgroundTransparency = 1
+        btnRow.ZIndex = 8002
+        btnRow.Parent = modalCard
+
+        local btnCancel = Instance.new("TextButton")
+        btnCancel.Name = "BtnCancel"
+        btnCancel.Size = UDim2.new(0.5, -6, 1, 0)
+        btnCancel.Position = UDim2.new(0, 0, 0, 0)
+        btnCancel.BackgroundColor3 = GousseUI.Theme.Surface
+        btnCancel.Text = "Batal"
+        btnCancel.Font = FontMedium
+        btnCancel.TextColor3 = GousseUI.Theme.TextSecondary
+        btnCancel.TextSize = 12.5
+        btnCancel.AutoButtonColor = false
+        btnCancel.ZIndex = 8003
+        btnCancel.Parent = btnRow
+
+        local cancelCorner = Instance.new("UICorner")
+        cancelCorner.CornerRadius = UDim.new(0, 6)
+        cancelCorner.Parent = btnCancel
+
+        local cancelStroke = Instance.new("UIStroke")
+        cancelStroke.Color = GousseUI.Theme.Border
+        cancelStroke.Thickness = 1
+        cancelStroke.Parent = btnCancel
+
+        local btnConfirm = Instance.new("TextButton")
+        btnConfirm.Name = "BtnConfirm"
+        btnConfirm.Size = UDim2.new(0.5, -6, 1, 0)
+        btnConfirm.Position = UDim2.new(0.5, 6, 0, 0)
+        btnConfirm.BackgroundColor3 = Color3.fromRGB(225, 29, 72)
+        btnConfirm.Text = "Unload Script"
+        btnConfirm.Font = FontBold
+        btnConfirm.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btnConfirm.TextSize = 12.5
+        btnConfirm.AutoButtonColor = false
+        btnConfirm.ZIndex = 8003
+        btnConfirm.Parent = btnRow
+
+        local confirmCorner = Instance.new("UICorner")
+        confirmCorner.CornerRadius = UDim.new(0, 6)
+        confirmCorner.Parent = btnConfirm
+
+        local confirmStroke = Instance.new("UIStroke")
+        confirmStroke.Color = Color3.fromRGB(244, 63, 94)
+        confirmStroke.Thickness = 1
+        confirmStroke.Parent = btnConfirm
+
+        btnCancel.MouseEnter:Connect(function()
+            Tween(btnCancel, { BackgroundColor3 = GousseUI.Theme.SurfaceHover, TextColor3 = GousseUI.Theme.TextPrimary }, 0.12)
+        end)
+        btnCancel.MouseLeave:Connect(function()
+            Tween(btnCancel, { BackgroundColor3 = GousseUI.Theme.Surface, TextColor3 = GousseUI.Theme.TextSecondary }, 0.12)
+        end)
+
+        btnConfirm.MouseEnter:Connect(function()
+            Tween(btnConfirm, { BackgroundColor3 = Color3.fromRGB(244, 63, 94) }, 0.12)
+        end)
+        btnConfirm.MouseLeave:Connect(function()
+            Tween(btnConfirm, { BackgroundColor3 = Color3.fromRGB(225, 29, 72) }, 0.12)
+        end)
+
+        local isDismissing = false
+        local function DismissModal()
+            if isDismissing then return end
+            isDismissing = true
+            Tween(overlay, { BackgroundTransparency = 1 }, 0.15)
+            local tw = Tween(modalCard, { Position = UDim2.new(0.5, 0, 0.52, 0) }, 0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+            tw.Completed:Connect(function()
+                if confirmModalInstance == overlay then
+                    confirmModalInstance = nil
+                end
+                overlay:Destroy()
+            end)
+        end
+
+        btnCancel.MouseButton1Click:Connect(DismissModal)
+
+        btnConfirm.MouseButton1Click:Connect(function()
+            DismissModal()
+            UnloadNow()
+        end)
+
+        Tween(overlay, { BackgroundTransparency = 0.55 }, 0.2)
+        Tween(modalCard, { Position = UDim2.new(0.5, 0, 0.5, 0) }, 0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+    end
+
     btnMinimize.MouseButton1Click:Connect(function()
         ToggleWindow(false)
         local tip = if isMobile then "Ketuk tombol 'G' di layar untuk membuka kembali." else ("Tekan " .. toggleKey.Name .. " untuk membuka kembali.")
@@ -1059,7 +1320,7 @@ function GousseUI:CreateWindow(config: {
     end)
 
     btnClose.MouseButton1Click:Connect(function()
-        ToggleWindow(false)
+        ShowUnloadConfirmation()
     end)
 
     UserInputService.InputBegan:Connect(function(input, processed)
@@ -1170,7 +1431,9 @@ function GousseUI:CreateWindow(config: {
         MainFrame = mainFrame,
         FAB = fabBtn,
         Tabs = {},
-        ActiveTab = nil
+        ActiveTab = nil,
+        UnloadCallbacks = unloadCallbacks,
+        IsUnloaded = false
     }
 
     function WindowObj:Toggle(state: boolean?)
@@ -1178,7 +1441,21 @@ function GousseUI:CreateWindow(config: {
     end
 
     function WindowObj:Destroy()
-        screenGui:Destroy()
+        UnloadNow()
+    end
+
+    function WindowObj:OnUnload(callback: () -> ())
+        if type(callback) == "function" then
+            table.insert(unloadCallbacks, callback)
+        end
+    end
+
+    function WindowObj:ConfirmUnload(customPrompt: { Title: string?, Message: string? }?)
+        ShowUnloadConfirmation(customPrompt)
+    end
+
+    function WindowObj:Unload()
+        UnloadNow()
     end
 
     -- Real-time Search Filter Bar in ContentArea

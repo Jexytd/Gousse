@@ -257,6 +257,15 @@ SettingsTab:CreateParagraph({
     Content = "Version 2.0.0 • Gousse Hub\nTeam awareness is hooked to Player.Team to prevent friendly targeting."
 })
 
+local function CleanupArsenal()
+    hitboxEnabled = false
+    UpdateHitboxes()
+    ClearArsenalESP()
+    ToggleBHop(false)
+end
+
+Window:OnUnload(CleanupArsenal)
+
 SettingsTab:CreateSection("Lifecycle Management")
 SettingsTab:CreateButton({
     Name = "Unload Arsenal Module",
@@ -264,12 +273,7 @@ SettingsTab:CreateButton({
     ButtonText = "Unload",
     Variant = "danger",
     Callback = function()
-        hitboxEnabled = false
-        UpdateHitboxes()
-        ClearArsenalESP()
-        ToggleBHop(false)
-        Window:Destroy()
-        GousseUI:Notify({ Title = "Arsenal Hub", Content = "Module unloaded cleanly.", Duration = 3 })
+        Window:ConfirmUnload()
     end
 })
 

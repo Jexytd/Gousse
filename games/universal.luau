@@ -583,6 +583,16 @@ AboutTab:CreateParagraph({
     Content = "Press RightControl to hide or restore this window.\nDrag the top titlebar to reposition across the viewport."
 })
 
+local function CleanupUniversal()
+    SetNoclip(false)
+    ToggleFly(false)
+    SetFullbright(false)
+    ToggleESP(false)
+    SetAntiAfk(false)
+end
+
+Window:OnUnload(CleanupUniversal)
+
 AboutTab:CreateSection("Lifecycle Management")
 AboutTab:CreateButton({
     Name = "Unload Gousse Hub",
@@ -590,13 +600,7 @@ AboutTab:CreateButton({
     ButtonText = "Unload",
     Variant = "danger",
     Callback = function()
-        SetNoclip(false)
-        ToggleFly(false)
-        SetFullbright(false)
-        ToggleESP(false)
-        SetAntiAfk(false)
-        Window:Destroy()
-        GousseUI:Notify({ Title = "Gousse Hub", Content = "Cleanly unloaded.", Duration = 3 })
+        Window:ConfirmUnload()
     end
 })
 

@@ -13,7 +13,7 @@ GousseUI is a lightweight, authentic desktop utility UI Library engineered for R
 
 ## 1. Core Architecture & Theme System
 
-GousseUI v2.2.0 adopts an authentic modern tactical gaming aesthetic: deep obsidian slate surfaces, soft perimeter borders, refined 2px top emerald accent line, high-contrast BuilderSans typography scaled for enhanced legibility, and fully responsive mobile architecture.
+GousseUI v2.2.1 adopts an authentic modern tactical gaming aesthetic: deep obsidian slate surfaces, soft perimeter borders, refined 2px top emerald accent line, high-contrast BuilderSans typography scaled for enhanced legibility, and fully responsive mobile architecture.
 
 | Token | RGB Value | Hex | Usage |
 | :--- | :--- | :--- | :--- |
@@ -59,8 +59,8 @@ end
 - **Combat**: `"crosshair"`, `"target"`, `"flame"`, `"shield"`
 - **Utility**: `"wrench"`, `"sliders"`, `"terminal"`, `"server"`, `"refresh-cw"`, `"copy"`
 - **Player**: `"user"`, `"users"`, `"user-check"`
-- **Window Controls**: `"minus"` (minimize), `"x"` (close/exit), `"chevron-left"`, `"chevron-right"`
-- **General / Settings**: `"settings"`, `"info"`, `"power"`, `"trash-2"`
+- **Window Controls**: `"minus"` (minimize), `"x"` (exit/unload), `"chevron-left"`, `"chevron-right"`
+- **General / Settings**: `"settings"`, `"info"`, `"power"`, `"trash-2"`, `"alert-triangle"`
 
 ### Icon Resolution Example
 ```luau
@@ -80,23 +80,35 @@ local AboutTab = Window:CreateTab({ Name = "About", Icon = "info" })
 ## 3. API Reference & Component Cheatsheet
 
 ### 3.1 Window Creation & Dimensions
-In v2.2.0, the window dimensions, fonts, and controls are scaled up for enhanced readability and touch/click ergonomics:
-- **Default Window Size**: `690 x 450 px` (desktop) / `90% x 80%` (mobile).
+In v2.2.1, the window dimensions, fonts, and controls are scaled up for enhanced readability and touch/click ergonomics:
+- **Default Window Size**: `690 x 450 px` (desktop) / `92% x 84%` (mobile).
 - **Size Constraints**: Min `320 x 280 px`, Max `820 x 560 px`.
 - **Header Height**: `42 px` (desktop) / `46 px` (mobile).
-- **Window Controls**: Dedicated 28x28px (desktop) / 34x34px (mobile) buttons with Lucide vector icons (`minus` for Minimize, `x` for Close), smooth hover feedback, and hover tooltips.
+- **Window Controls**: Dedicated 28x28px (desktop) / 34x34px (mobile) buttons:
+  - **Minimize (`minus`)**: Hides window to mobile FAB / hotkey with toast notification.
+  - **Exit / Unload (`x`)**: Prompts an authentic Confirmation Modal before safely unloading the script and destroying the UI.
 
 ```luau
 local Window = GousseUI:CreateWindow({
     Title = "Gousse Hub",
     SubTitle = "Universal • Authentic Desktop Edition",
     Keybind = Enum.KeyCode.RightControl,
-    Size = UDim2.new(0, 690, 0, 450)
+    Size = UDim2.new(0, 690, 0, 450),
+    OnUnload = function()
+        -- optional cleanup callback
+    end,
+    UnloadPrompt = {
+        Title = "Konfirmasi Unload",
+        Message = "Apakah Anda yakin ingin mematikan script?"
+    }
 })
 ```
 - **Methods**:
   - `Window:Toggle(state: boolean?)`: Toggle or set visibility.
-  - `Window:Destroy()`: Safely unloads the ScreenGui.
+  - `Window:Destroy()`: Safely unloads the script, fires cleanup callbacks, and destroys the ScreenGui.
+  - `Window:OnUnload(callback: () -> ())`: Registers an unload handler for game-specific cleanup.
+  - `Window:ConfirmUnload(customPrompt?)`: Opens the tactical confirmation modal dialog.
+  - `Window:Unload()`: Directly executes the clean unload sequence.
   - `Window:CreateTab({ Name: string, Icon: string? })`: Instantiates a navigation tab.
 
 ### 3.2 Section Divider
@@ -301,24 +313,29 @@ local SettingsTab = Window:CreateTab({ Name = "Settings", Icon = "settings" })
 - Use event throttling (`RunService.RenderStepped` or `Stepped`) rather than busy `while true do` loops.
 
 ### Phase 5: Unload Lifecycle & Cleanup
-Always provide an Unload button with `Variant = "danger"`:
+Register cleanup logic with `Window:OnUnload(...)` so both the header Exit (`x`) button and UI unload controls trigger safe teardown:
 ```luau
+local function CleanupSession()
+    if noclipConn then noclipConn:Disconnect(); noclipConn = nil end
+    if bHopConn then bHopConn:Disconnect(); bHopConn = nil end
+    for _, hl in pairs(highlights) do hl:Destroy() end
+    local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if hum then hum.WalkSpeed = 16 end
+end
+
+Window:OnUnload(CleanupSession)
+
 SettingsTab:CreateButton({
     Name = "Unload Script",
     SubTitle = "Disconnect loops, remove highlights & reset physics",
     ButtonText = "Unload",
     Variant = "danger",
     Callback = function()
-        if noclipConn then noclipConn:Disconnect(); noclipConn = nil end
-        if bHopConn then bHopConn:Disconnect(); bHopConn = nil end
-        for _, hl in pairs(highlights) do hl:Destroy() end
-        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if hum then hum.WalkSpeed = 16 end
-        Window:Destroy()
-        GousseUI:Notify({ Title = "Gousse Hub", Content = "Cleanly unloaded.", Duration = 3 })
+        Window:ConfirmUnload()
     end
 })
 ```
+When clicked (or when the user clicks the header Exit button `x`), an authentic tactical **Confirmation Modal** is displayed with **Batal (Cancel)** and **Unload Script (Confirm)** options. Confirming safely executes all registered callbacks, closes the GUI, and shows a clean unload toast.
 
 ---
 
