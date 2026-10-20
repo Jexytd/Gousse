@@ -1191,11 +1191,18 @@ function switchView(view) {
     btnTopAction.style.display = 'none';
     refreshGitStatus();
   } else if (view === 'potassium') {
-    viewHeading.textContent = 'Potassium Engine | Client Explorer';
-    viewSubheading.textContent = 'Connected client processes, live Luau execution stream & Roblox Instance Explorer';
+    viewHeading.textContent = 'Client Explorer | Roblox Instance Tree';
+    viewSubheading.textContent = 'Live DataModel hierarchy, property inspector, attributes & script reader';
     pipelineViewSwitch.style.display = 'none';
     btnTopAction.style.display = 'none';
     refreshPotassiumStatus();
+  } else if (view === 'console') {
+    viewHeading.textContent = 'Potassium MCP | Live Console & Luau REPL';
+    viewSubheading.textContent = 'Real-time client log stream, REPL command dispatch & editor tabs';
+    pipelineViewSwitch.style.display = 'none';
+    btnTopAction.style.display = 'none';
+    refreshPotassiumStatus();
+    pollPotassiumConsole();
   }
 }
 
@@ -1831,9 +1838,9 @@ async function refreshPotassiumStatus() {
     }
 
     potassiumClients = data.clients || [];
-    const count = data.count || potassiumClients.length;
-
-    if (navPotassiumCount) navPotassiumCount.textContent = count;
+    if (navPotassiumCount) navPotassiumCount.textContent = liveRootChildren.length || count;
+    const navConsoleCount = document.getElementById('nav-console-count');
+    if (navConsoleCount) navConsoleCount.textContent = count;
     if (kClientCountBadge) kClientCountBadge.textContent = count;
 
     renderPotassiumClients();
@@ -1973,58 +1980,9 @@ let dockedPropFilterText = '';
 let fullPropFilterText = '';
 
 function getInstanceIcon(className) {
-  const c = className || '';
-  if (c === 'Workspace') {
-    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`;
-  }
-  if (c === 'Players') {
-    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`;
-  }
-  if (c === 'Player') {
-    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
-  }
-  if (c === 'Lighting') {
-    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#facc15" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
-  }
-  if (c === 'ReplicatedFirst' || c === 'ReplicatedStorage' || c === 'ServerStorage') {
-    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>`;
-  }
-  if (c === 'ServerScriptService' || c === 'RunService') {
-    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`;
-  }
-  if (c.includes('Script') || c === 'LocalScript' || c === 'ModuleScript') {
-    const stroke = c === 'LocalScript' ? '#38bdf8' : (c === 'ModuleScript' ? '#c084fc' : '#fb923c');
-    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${stroke}" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>`;
-  }
-  if (c.includes('Remote') || c.includes('Bindable')) {
-    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`;
-  }
-  if (c.includes('Gui') || c === 'Frame' || c.includes('Text') || c.includes('Image')) {
-    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>`;
-  }
-  if (c.includes('Part') || c === 'SpawnLocation' || c === 'WedgePart' || c === 'TrussPart') {
-    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>`;
-  }
-  if (c === 'Model') {
-    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>`;
-  }
-  if (c === 'Humanoid') {
-    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`;
-  }
-  if (c === 'Camera') {
-    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>`;
-  }
-  if (c === 'Sound' || c === 'SoundService') {
-    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
-  }
-  if (c === 'Folder') {
-    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
-  }
-  if (c === 'DataModel') {
-    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="8" cy="12" r="1.5" fill="#38bdf8"></circle><circle cx="16" cy="12" r="1.5" fill="#38bdf8"></circle></svg>`;
-  }
-  // Default clean component icon
-  return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><circle cx="12" cy="12" r="3"></circle></svg>`;
+  const c = className || 'Instance';
+  const iconName = c === 'DataModel' ? 'DataModel' : c;
+  return `<img class="roblox-class-icon" src="/RobloxCustom/instance/16x/100/${encodeURIComponent(iconName)}.png" width="16" height="16" alt="${escapeHtml(c)}" onerror="if(!this.dataset.fallback){this.dataset.fallback='1';this.src='/RobloxCustom/instance/16x/100/Instance.png';}">`;
 }
 
 function renderDefaultInstanceTree(info = null) {
@@ -2208,6 +2166,19 @@ function createInstanceTreeNode(inst, depth = 1) {
     row.appendChild(badge);
   }
 
+  // Quick [Read] action button for ModuleScript / LocalScript / Script
+  if (inst.className === 'ModuleScript' || inst.className === 'LocalScript' || inst.className === 'Script') {
+    const readBtn = document.createElement('button');
+    readBtn.className = 'k-tree-quick-read';
+    readBtn.textContent = 'Read';
+    readBtn.title = `Decompile & Read ${inst.className}`;
+    readBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openScriptReader(inst);
+    });
+    row.appendChild(readBtn);
+  }
+
   wrap.appendChild(row);
 
   let subContainer = null;
@@ -2310,13 +2281,39 @@ function selectInstanceNode(inst, rowEl) {
   if (dexFullPath) dexFullPath.textContent = inst.path || `game.${inst.name}`;
   if (dexFullIcon) dexFullIcon.innerHTML = getInstanceIcon(inst.className);
 
-  // 3. Update REPL placeholder
+  // 3. Update Attributes Tab Header
+  const dexAttrName = document.getElementById('dex-attr-name');
+  const dexAttrClass = document.getElementById('dex-attr-class');
+  const dexAttrPath = document.getElementById('dex-attr-path');
+  const dexAttrIcon = document.getElementById('dex-attr-icon');
+  if (dexAttrName) dexAttrName.textContent = inst.name;
+  if (dexAttrClass) dexAttrClass.textContent = inst.className;
+  if (dexAttrPath) dexAttrPath.textContent = inst.path || `game.${inst.name}`;
+  if (dexAttrIcon) dexAttrIcon.innerHTML = getInstanceIcon(inst.className);
+
+  // 4. Update REPL placeholder
   if (kReplInput) {
     const safeRef = inst.path && inst.path.startsWith('game') ? inst.path : `game.${inst.name}`;
     kReplInput.placeholder = `Inspect ${inst.name} (e.g. print(${safeRef}.Name))`;
   }
 
-  // 4. Automatically Fetch Properties from live client
+  // 5. Toggle Read Script Buttons in Docked & Full Properties Headers
+  const isScript = inst.className === 'ModuleScript' || inst.className === 'LocalScript' || inst.className === 'Script';
+  const btnDockedReader = document.getElementById('btn-docked-open-reader');
+  const btnFullReader = document.getElementById('btn-full-open-reader');
+  const tabReaderBadge = document.getElementById('dex-reader-script-badge');
+  if (btnDockedReader) btnDockedReader.style.display = isScript ? 'inline-flex' : 'none';
+  if (btnFullReader) btnFullReader.style.display = isScript ? 'inline-flex' : 'none';
+  if (tabReaderBadge) {
+    if (isScript) {
+      tabReaderBadge.textContent = inst.className === 'ModuleScript' ? 'Module' : (inst.className === 'LocalScript' ? 'Local' : 'Script');
+      tabReaderBadge.style.display = 'inline-block';
+    } else {
+      tabReaderBadge.style.display = 'none';
+    }
+  }
+
+  // 6. Automatically Fetch Properties and Attributes from live client
   fetchAndRenderProperties(inst);
 }
 
@@ -2341,12 +2338,14 @@ async function fetchAndRenderProperties(inst) {
       currentSelectedGroups = data.groups;
       renderDexProperties(data.groups, dockedContainer, dockedPropFilterText);
       renderDexProperties(data.groups, fullContainer, fullPropFilterText);
+      renderDexAttributes(inst);
     } else if (data.success && data.properties) {
       // Legacy fallback
       const groups = [{ category: 'PROPERTIES', properties: Object.entries(data.properties).map(([k, v]) => ({ name: k, type: typeof v, value: v })) }];
       currentSelectedGroups = groups;
       renderDexProperties(groups, dockedContainer, dockedPropFilterText);
       renderDexProperties(groups, fullContainer, fullPropFilterText);
+      renderDexAttributes(inst);
     } else {
       const errHtml = `<div class="empty-hint" style="color: #f85149; padding: 12px;">${escapeHtml(data.error || 'Failed to inspect properties')}</div>`;
       if (dockedContainer) dockedContainer.innerHTML = errHtml;
@@ -2447,6 +2446,220 @@ function renderDexProperties(groups, container, filter = '') {
   }
 }
 
+let currentInstanceAttributes = [];
+let attrFilterText = '';
+
+function toggleAddAttrCard(show = null) {
+  const card = document.getElementById('dex-add-attr-card');
+  if (!card) return;
+  const isHidden = card.style.display === 'none';
+  const shouldShow = show !== null ? show : isHidden;
+  card.style.display = shouldShow ? 'flex' : 'none';
+  if (shouldShow) {
+    const inputName = document.getElementById('new-attr-name');
+    if (inputName) inputName.focus();
+  }
+}
+
+async function saveInstanceAttribute(inst, name, type, value) {
+  const target = inst || selectedInstance;
+  if (!target || !name || !name.trim()) {
+    showToast('Please enter an attribute name');
+    return;
+  }
+  const cleanName = name.trim();
+  const queryPath = target.path || `game.${target.name}`;
+
+  try {
+    const res = await fetch('/api/potassium/set-attribute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: queryPath,
+        pid: activeTargetPid,
+        name: cleanName,
+        type: type || 'string',
+        value: value,
+        action: 'set'
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`Set attribute "${cleanName}"`);
+      toggleAddAttrCard(false);
+      const nameInp = document.getElementById('new-attr-name');
+      const valInp = document.getElementById('new-attr-val');
+      if (nameInp) nameInp.value = '';
+      if (valInp) valInp.value = '';
+      setTimeout(() => fetchAndRenderProperties(target), 300);
+    } else {
+      showToast(`Error: ${data.error || 'Failed to set attribute'}`);
+    }
+  } catch (err) {
+    showToast(`Error: ${err.message}`);
+  }
+}
+
+async function deleteInstanceAttribute(inst, name) {
+  const target = inst || selectedInstance;
+  if (!target || !name) return;
+  const queryPath = target.path || `game.${target.name}`;
+
+  try {
+    const res = await fetch('/api/potassium/set-attribute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: queryPath,
+        pid: activeTargetPid,
+        name: name,
+        action: 'delete'
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`Deleted attribute "${name}"`);
+      setTimeout(() => fetchAndRenderProperties(target), 300);
+    } else {
+      showToast(`Error: ${data.error || 'Failed to delete attribute'}`);
+    }
+  } catch (err) {
+    showToast(`Error: ${err.message}`);
+  }
+}
+
+function renderDexAttributes(inst, filter = '') {
+  const container = document.getElementById('dex-attributes-list');
+  const countBadge = document.getElementById('dex-attributes-count-badge');
+  if (!container) return;
+
+  const targetInst = inst || selectedInstance;
+  if (!targetInst) {
+    container.innerHTML = '<div class="empty-hint" style="padding: 16px; font-size: 11px;">Select an instance in Explorer to view attributes</div>';
+    if (countBadge) countBadge.style.display = 'none';
+    return;
+  }
+
+  let attrs = [];
+  if (currentSelectedGroups) {
+    const attrGroup = currentSelectedGroups.find(g => g.category === 'ATTRIBUTES');
+    if (attrGroup && attrGroup.properties) {
+      attrs = attrGroup.properties;
+    }
+  }
+
+  currentInstanceAttributes = attrs;
+  if (countBadge) {
+    countBadge.textContent = attrs.length;
+    countBadge.style.display = attrs.length > 0 ? 'inline-block' : 'none';
+  }
+
+  const query = (filter || attrFilterText || '').trim().toLowerCase();
+  const matching = attrs.filter(a => {
+    if (!query) return true;
+    return (a.name || '').toLowerCase().includes(query) || String(a.value || '').toLowerCase().includes(query);
+  });
+
+  container.innerHTML = '';
+
+  if (matching.length === 0) {
+    container.innerHTML = `
+      <div class="empty-hint" style="padding: 24px 16px; text-align: center;">
+        <div style="color: #8b949e; margin-bottom: 8px;">No custom attributes defined on <b>${escapeHtml(targetInst.name)}</b>.</div>
+        <button class="btn btn-secondary btn-xs" onclick="toggleAddAttrCard(true)">+ Add Attribute</button>
+      </div>
+    `;
+    return;
+  }
+
+  const groupEl = document.createElement('div');
+  groupEl.className = 'dex-prop-group';
+
+  const titleEl = document.createElement('div');
+  titleEl.className = 'dex-prop-group-title';
+  titleEl.style.display = 'flex';
+  titleEl.style.justifyContent = 'space-between';
+  titleEl.style.alignItems = 'center';
+  titleEl.innerHTML = `
+    <span>ATTRIBUTES (${matching.length})</span>
+    <button class="link-btn-xs" onclick="toggleAddAttrCard(true)" style="font-size: 9px; text-transform: none;">+ Add</button>
+  `;
+  groupEl.appendChild(titleEl);
+
+  matching.forEach(attr => {
+    const row = document.createElement('div');
+    row.className = 'dex-prop-grid-row';
+
+    const keyWrap = document.createElement('div');
+    keyWrap.style.display = 'flex';
+    keyWrap.style.alignItems = 'center';
+    keyWrap.style.gap = '6px';
+
+    const typeBadge = document.createElement('span');
+    typeBadge.className = 'dex-attr-type-badge';
+    typeBadge.textContent = attr.type || typeof attr.value;
+    keyWrap.appendChild(typeBadge);
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'dex-prop-grid-key';
+    nameSpan.textContent = attr.name;
+    keyWrap.appendChild(nameSpan);
+
+    const valWrap = document.createElement('div');
+    valWrap.className = 'dex-prop-grid-val';
+    valWrap.style.display = 'flex';
+    valWrap.style.alignItems = 'center';
+    valWrap.style.gap = '8px';
+
+    const valStr = String(attr.value);
+    const attrType = attr.type || typeof attr.value;
+
+    if (attrType === 'boolean' || attr.value === true || attr.value === false) {
+      const isTrue = attr.value === true || valStr === 'true';
+      const pill = document.createElement('span');
+      pill.className = `dex-val-boolean ${isTrue ? 'is-true' : 'is-false'}`;
+      pill.textContent = isTrue ? 'true' : 'false';
+      pill.title = 'Click to toggle attribute on client';
+      pill.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await saveInstanceAttribute(targetInst, attr.name, 'boolean', !isTrue);
+      });
+      valWrap.appendChild(pill);
+    } else {
+      const valSpan = document.createElement('span');
+      if (attrType === 'number') valSpan.className = 'dex-val-number';
+      else valSpan.className = 'dex-val-string';
+      valSpan.textContent = valStr;
+      valSpan.title = 'Double click to edit value';
+      valSpan.addEventListener('dblclick', async () => {
+        const newVal = prompt(`Edit value for attribute "${attr.name}":`, valStr);
+        if (newVal !== null && newVal !== valStr) {
+          await saveInstanceAttribute(targetInst, attr.name, attrType, newVal);
+        }
+      });
+      valWrap.appendChild(valSpan);
+    }
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'dex-attr-del-btn';
+    delBtn.title = `Delete attribute "${attr.name}"`;
+    delBtn.innerHTML = '✕';
+    delBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (confirm(`Delete attribute "${attr.name}" from ${targetInst.name}?`)) {
+        await deleteInstanceAttribute(targetInst, attr.name);
+      }
+    });
+    valWrap.appendChild(delBtn);
+
+    row.appendChild(keyWrap);
+    row.appendChild(valWrap);
+    groupEl.appendChild(row);
+  });
+
+  container.appendChild(groupEl);
+}
+
 function filterTreeNodes(container, query) {
   if (!container) return;
   const nodes = container.querySelectorAll('.k-tree-node-wrap');
@@ -2490,7 +2703,7 @@ async function executeLuauOnPotassium(source, targetPid = null, origin = 'repl')
   // Auto-navigate to external console if enabled (especially when running from Script Studio)
   const shouldAutoNav = chkAutoNavConsole ? chkAutoNavConsole.checked : true;
   if (origin === 'studio' && shouldAutoNav) {
-    switchView('potassium');
+    switchView('console');
     showToast(`Navigated to External Console Stream`);
   } else if (origin === 'studio') {
     switchStudioBottomPanel('output');
@@ -2688,6 +2901,7 @@ if (btnKSendRepl) {
     if (selectedInstance && kReplInput) {
       const p = selectedInstance.path || `game.${selectedInstance.name}`;
       kReplInput.value = `print(${p}:GetFullName())`;
+      switchView('console');
       kReplInput.focus();
     }
   });
@@ -2775,15 +2989,168 @@ window.addEventListener('keydown', e => {
 setInterval(() => {
   const activeNav = document.querySelector('.nav-item.active');
   const view = activeNav ? activeNav.dataset.view : '';
-  if (view === 'potassium' || view === 'studio') {
+  if (view === 'potassium' || view === 'console' || view === 'studio') {
     refreshPotassiumStatus();
     pollPotassiumConsole();
   }
 }, 4000);
 
 // Dex Sidebar Tab Switching & Controls
+let currentReaderScript = null;
+let readerSearchQuery = '';
+
+function highlightLuauSyntax(line) {
+  if (!line) return '&nbsp;';
+  
+  // Separate comment if any
+  const commentIdx = line.indexOf('--');
+  let codePart = commentIdx !== -1 ? line.slice(0, commentIdx) : line;
+  const commentPart = commentIdx !== -1 ? line.slice(commentIdx) : '';
+
+  // Escape HTML on code part
+  let escaped = escapeHtml(codePart);
+
+  // Strings ("..." or '...')
+  escaped = escaped.replace(/(["'])(?:(?=(\\?))\2.)*?\1/g, '<span class="dex-code-str">$&</span>');
+
+  // Luau Keywords
+  const keywords = ['local', 'function', 'return', 'end', 'if', 'then', 'else', 'elseif', 'for', 'in', 'do', 'while', 'repeat', 'until', 'not', 'and', 'or'];
+  const kwRegex = new RegExp(`\\b(${keywords.join('|')})\\b`, 'g');
+  escaped = escaped.replace(kwRegex, '<span class="dex-code-kw">$1</span>');
+
+  // Booleans and nil
+  escaped = escaped.replace(/\b(true|false|nil)\b/g, '<span class="dex-code-bool">$1</span>');
+
+  // Numbers
+  escaped = escaped.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="dex-code-num">$1</span>');
+
+  // Builtin globals
+  const builtins = ['game', 'script', 'workspace', 'task', 'string', 'table', 'math', 'pcall', 'setmetatable', 'type', 'print', 'warn', 'error', 'Instance', 'Vector3', 'CFrame', 'Color3', 'UDim2'];
+  const biRegex = new RegExp(`\\b(${builtins.join('|')})\\b`, 'g');
+  escaped = escaped.replace(biRegex, '<span class="dex-code-builtin">$1</span>');
+
+  if (commentPart) {
+    return escaped + `<span class="dex-code-comment">${escapeHtml(commentPart)}</span>`;
+  }
+  return escaped;
+}
+
+function renderReaderSourceCode(source, filter = '') {
+  const container = document.getElementById('dex-reader-code-area');
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (!source) {
+    container.innerHTML = '<div class="empty-hint" style="padding: 24px; text-align: center;">No source code available.</div>';
+    return;
+  }
+
+  const lines = source.split('\n');
+  const table = document.createElement('table');
+  table.className = 'dex-reader-code-table';
+
+  const filterLower = (filter || '').trim().toLowerCase();
+
+  lines.forEach((lineText, idx) => {
+    const lineNum = idx + 1;
+    const tr = document.createElement('tr');
+
+    const tdNum = document.createElement('td');
+    tdNum.className = 'dex-reader-line-num';
+    tdNum.textContent = lineNum;
+
+    const tdCode = document.createElement('td');
+    tdCode.className = 'dex-reader-line-code';
+
+    if (filterLower && lineText.toLowerCase().includes(filterLower)) {
+      tdCode.classList.add('highlight-match');
+    }
+
+    tdCode.innerHTML = highlightLuauSyntax(lineText);
+
+    tr.appendChild(tdNum);
+    tr.appendChild(tdCode);
+    table.appendChild(tr);
+  });
+
+  container.appendChild(table);
+}
+
+async function openScriptReader(inst) {
+  const target = inst || selectedInstance;
+  if (!target) return;
+
+  selectedInstance = target;
+
+  // 1. Update Header Information
+  const dexReaderIcon = document.getElementById('dex-reader-icon');
+  const dexReaderName = document.getElementById('dex-reader-name');
+  const dexReaderClass = document.getElementById('dex-reader-class');
+  const dexReaderPath = document.getElementById('dex-reader-path');
+  const statNotice = document.getElementById('dex-reader-stat-notice');
+  const statLines = document.getElementById('dex-reader-stat-lines');
+  const statMode = document.getElementById('dex-reader-stat-mode');
+
+  if (dexReaderIcon) dexReaderIcon.innerHTML = getInstanceIcon(target.className);
+  if (dexReaderName) dexReaderName.textContent = target.name;
+  if (dexReaderClass) dexReaderClass.textContent = target.className;
+  if (dexReaderPath) dexReaderPath.textContent = target.path || `game.${target.name}`;
+
+  // 2. Switch to Reader Tab
+  switchDexTab('reader');
+
+  // 3. Show Loading
+  const container = document.getElementById('dex-reader-code-area');
+  if (container) {
+    container.innerHTML = `
+      <div class="k-tree-loading" style="padding: 32px 16px; text-align: center;">
+        <span class="k-dot-pulse">●</span> Decompiling <b>${escapeHtml(target.name)}</b> from client...
+      </div>
+    `;
+  }
+
+  try {
+    const queryPath = target.path || target.name;
+    const res = await fetch(`/api/potassium/read-script?path=${encodeURIComponent(queryPath)}&pid=${encodeURIComponent(activeTargetPid)}`);
+    const data = await res.json();
+
+    const src = data.source || '';
+    const lineCount = data.lineCount || (src ? src.split('\n').length : 0);
+
+    currentReaderScript = {
+      inst: target,
+      source: src,
+      lineCount: lineCount,
+      decompiled: !!data.decompiled,
+      name: data.name || target.name,
+      className: data.className || target.className
+    };
+
+    if (statLines) statLines.textContent = `${lineCount} lines`;
+    if (statMode) {
+      statMode.textContent = data.decompiled ? 'Decompiled' : (data.fallback ? 'Template' : 'Source');
+      statMode.style.background = data.decompiled ? '#238636' : '#1f6feb';
+    }
+    if (statNotice) {
+      statNotice.textContent = data.clientNotice || (data.fallback ? 'Decompiled preview' : 'Extracted via Potassium');
+      statNotice.title = statNotice.textContent;
+    }
+
+    renderReaderSourceCode(src, readerSearchQuery);
+    showToast(`Loaded ${target.name} (${lineCount} lines)`);
+  } catch (err) {
+    if (container) {
+      container.innerHTML = `
+        <div style="padding: 24px; text-align: center; color: #f85149;">
+          Failed to read script: ${escapeHtml(err.message)}
+        </div>
+      `;
+    }
+  }
+}
+
 function switchDexTab(tabId) {
-  const tabs = ['explorer', 'properties', 'clients'];
+  const tabs = ['properties', 'attributes', 'reader'];
   tabs.forEach(t => {
     const btn = document.getElementById(`tab-dex-${t}`);
     const panel = document.getElementById(`dex-tab-content-${t}`);
@@ -2802,18 +3169,119 @@ function switchDexTab(tabId) {
     } else {
       fetchAndRenderProperties(selectedInstance);
     }
+  } else if (tabId === 'attributes' && selectedInstance) {
+    renderDexAttributes(selectedInstance);
+  } else if (tabId === 'reader') {
+    if (selectedInstance && (!currentReaderScript || currentReaderScript.inst.path !== selectedInstance.path)) {
+      openScriptReader(selectedInstance);
+    }
   }
 }
 
-const tabDexExplorer = document.getElementById('tab-dex-explorer');
 const tabDexProperties = document.getElementById('tab-dex-properties');
-const tabDexClients = document.getElementById('tab-dex-clients');
-const btnDexExpandProps = document.getElementById('btn-dex-expand-props');
+const tabDexAttributes = document.getElementById('tab-dex-attributes');
+const tabDexReader = document.getElementById('tab-dex-reader');
+const btnFullOpenReader = document.getElementById('btn-full-open-reader');
+const btnDexOpenConsole = document.getElementById('btn-dex-open-console');
+const btnConsoleOpenExplorer = document.getElementById('btn-console-open-explorer');
+const btnReaderOpenStudio = document.getElementById('btn-reader-open-studio');
+const btnReaderCopySrc = document.getElementById('btn-reader-copy-src');
+const btnReaderRefresh = document.getElementById('btn-reader-refresh');
+const dexReaderSearchInput = document.getElementById('dex-reader-search-input');
 
-if (tabDexExplorer) tabDexExplorer.addEventListener('click', () => switchDexTab('explorer'));
 if (tabDexProperties) tabDexProperties.addEventListener('click', () => switchDexTab('properties'));
-if (tabDexClients) tabDexClients.addEventListener('click', () => switchDexTab('clients'));
-if (btnDexExpandProps) btnDexExpandProps.addEventListener('click', () => switchDexTab('properties'));
+if (tabDexAttributes) tabDexAttributes.addEventListener('click', () => switchDexTab('attributes'));
+if (tabDexReader) tabDexReader.addEventListener('click', () => switchDexTab('reader'));
+if (btnDexOpenConsole) btnDexOpenConsole.addEventListener('click', () => switchView('console'));
+if (btnConsoleOpenExplorer) btnConsoleOpenExplorer.addEventListener('click', () => switchView('potassium'));
+
+if (btnFullOpenReader) {
+  btnFullOpenReader.addEventListener('click', () => {
+    if (selectedInstance) openScriptReader(selectedInstance);
+  });
+}
+
+if (btnReaderOpenStudio) {
+  btnReaderOpenStudio.addEventListener('click', () => {
+    if (currentReaderScript && currentReaderScript.source) {
+      const fileName = `${currentReaderScript.inst.name || 'script'}.luau`;
+      const relPath = `decompiled/${fileName}`;
+      switchView('studio');
+      currentOpenFile = relPath;
+      if (activeTabName) activeTabName.textContent = fileName;
+      if (activeTabIcon) activeTabIcon.innerHTML = getFileIconHtml(fileName, false, false);
+      if (editorFilePathHint) editorFilePathHint.textContent = relPath;
+      if (fileDirtyDot) fileDirtyDot.style.display = 'none';
+      if (btnSaveCode) btnSaveCode.disabled = true;
+      setMonacoContent(currentReaderScript.source, relPath);
+      showToast(`Loaded ${currentReaderScript.inst.name} in Script Studio`);
+    } else {
+      showToast('No script source loaded in reader');
+    }
+  });
+}
+
+if (btnReaderCopySrc) {
+  btnReaderCopySrc.addEventListener('click', () => {
+    if (currentReaderScript && currentReaderScript.source) {
+      navigator.clipboard.writeText(currentReaderScript.source);
+      showToast('Copied script source to clipboard');
+    } else {
+      showToast('No script source to copy');
+    }
+  });
+}
+
+if (btnReaderRefresh) {
+  btnReaderRefresh.addEventListener('click', () => {
+    if (currentReaderScript && currentReaderScript.inst) {
+      openScriptReader(currentReaderScript.inst);
+    } else if (selectedInstance) {
+      openScriptReader(selectedInstance);
+    }
+  });
+}
+
+if (dexReaderSearchInput) {
+  dexReaderSearchInput.addEventListener('input', () => {
+    readerSearchQuery = dexReaderSearchInput.value;
+    if (currentReaderScript && currentReaderScript.source) {
+      renderReaderSourceCode(currentReaderScript.source, readerSearchQuery);
+    }
+  });
+}
+
+// Attributes Event Listeners
+const btnAttrAddToggle = document.getElementById('btn-attr-add-toggle');
+if (btnAttrAddToggle) btnAttrAddToggle.addEventListener('click', () => toggleAddAttrCard());
+
+const btnSaveAttribute = document.getElementById('btn-save-attribute');
+if (btnSaveAttribute) {
+  btnSaveAttribute.addEventListener('click', () => {
+    const name = (document.getElementById('new-attr-name') || {}).value;
+    const type = (document.getElementById('new-attr-type') || {}).value;
+    const val = (document.getElementById('new-attr-val') || {}).value;
+    saveInstanceAttribute(selectedInstance, name, type, val);
+  });
+}
+
+const btnCancelAttribute = document.getElementById('btn-cancel-attribute');
+if (btnCancelAttribute) btnCancelAttribute.addEventListener('click', () => toggleAddAttrCard(false));
+
+const btnAttrRefresh = document.getElementById('btn-attr-refresh');
+if (btnAttrRefresh) {
+  btnAttrRefresh.addEventListener('click', () => {
+    if (selectedInstance) fetchAndRenderProperties(selectedInstance);
+  });
+}
+
+const dexAttrSearch = document.getElementById('dex-attr-search');
+if (dexAttrSearch) {
+  dexAttrSearch.addEventListener('input', () => {
+    attrFilterText = dexAttrSearch.value;
+    renderDexAttributes(selectedInstance, attrFilterText);
+  });
+}
 
 // Filter Chips and Search
 const btnDexFilters = document.getElementById('btn-dex-filters');

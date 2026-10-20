@@ -77,6 +77,15 @@
           <span class="nav-counter" id="nav-potassium-count">0</span>
         </button>
 
+        <button class="nav-item" data-view="console">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="4 17 10 11 4 5"></polyline>
+            <line x1="12" y1="19" x2="20" y2="19"></line>
+          </svg>
+          <span>MCP Console</span>
+          <span class="nav-counter" id="nav-console-count">0</span>
+        </button>
+
         <div class="nav-section-label" style="margin-top: 1.25rem;">TEAM FILTERS</div>
         <button class="nav-filter active" data-assignee-filter="all">
           <span class="filter-dot"></span>
@@ -472,163 +481,219 @@
         </div>
       </section>
 
-      <!-- VIEW 5: POTASSIUM CLIENT INSTANCES & DEVELOPER CONSOLE -->
+      <!-- VIEW 5: CLIENT INSTANCE EXPLORER -->
       <section id="view-potassium" class="view-panel">
-        <div class="potassium-layout">
-          <!-- Left Column: Client & Instance Explorer with Dex Tabs & Properties -->
-          <aside class="potassium-sidebar">
-            <!-- Sidebar Tab Switcher -->
-            <div class="dex-sidebar-tabs">
-              <button class="dex-tab-btn active" data-dex-tab="explorer" id="tab-dex-explorer">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+        <div class="dex-explorer-layout">
+          <!-- Left Column: Instance Hierarchy Tree -->
+          <div class="dex-tree-column">
+            <!-- Search Instances Bar -->
+            <div class="dex-search-row">
+              <div class="dex-search-input-wrap">
+                <svg class="dex-search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                 </svg>
-                <span>Explorer</span>
-              </button>
-              <button class="dex-tab-btn" data-dex-tab="properties" id="tab-dex-properties">
+                <input type="text" id="k-tree-search" class="dex-search-input" placeholder="Search instances...">
+                <button id="btn-dex-clear-search" class="dex-search-clear" style="display:none;" title="Clear Search">✕</button>
+              </div>
+              <button id="btn-dex-filters" class="dex-btn-filters" title="Toggle Quick Category Filters">FILTERS</button>
+            </div>
+
+            <!-- Quick Filter Chips Tray -->
+            <div id="dex-filter-chips" class="dex-filter-chips" style="display: none;">
+              <button class="dex-chip active" data-filter="all">All</button>
+              <button class="dex-chip" data-filter="workspace">Workspace</button>
+              <button class="dex-chip" data-filter="players">Players</button>
+              <button class="dex-chip" data-filter="remote">Remotes</button>
+              <button class="dex-chip" data-filter="script">Scripts</button>
+              <button class="dex-chip" data-filter="gui">GUIs</button>
+            </div>
+
+            <!-- Live Tree Subheader -->
+            <div class="dex-tree-meta-row">
+              <div class="dex-meta-left">
+                <span class="k-status-dot online" id="mcp-server-dot">●</span>
+                <span id="dex-tree-root-name">DataModel</span>
+                <span id="dex-tree-count-badge" class="badge-mini">0</span>
+              </div>
+              <div class="dex-meta-actions">
+                <button id="btn-inspect-datamodel" class="link-btn-xs" title="Retrieve Live Instance Tree from Client">Retrieve Tree</button>
+              </div>
+            </div>
+
+            <!-- Scrollable Instance Tree (Full Vertical Height) -->
+            <div id="potassium-instance-tree" class="k-instance-tree dex-tree-scroll">
+              <!-- Dynamically populated hierarchy -->
+            </div>
+          </div>
+
+          <!-- Right Column: Dedicated Instance Inspector (Properties, Attributes, Script Reader) -->
+          <div class="dex-inspector-column">
+            <!-- Selected Instance Topbar -->
+            <div class="dex-inspector-topbar">
+              <div class="dex-full-inst-badge">
+                <span id="dex-full-icon" class="dex-full-icon"></span>
+                <div class="dex-full-titles">
+                  <div class="dex-full-name" id="dex-full-name">DataModel</div>
+                  <div class="dex-full-class" id="dex-full-class">DataModel</div>
+                </div>
+              </div>
+              <div class="dex-full-actions">
+                <button id="btn-full-open-reader" class="btn btn-primary btn-xs" style="display:none;" title="Read script source / decompile">Read Script</button>
+                <button id="btn-k-copy-path" class="btn btn-secondary btn-xs" title="Copy full Luau path">Copy Path</button>
+                <button id="btn-k-send-repl" class="btn btn-secondary btn-xs" title="Send instance reference to REPL (MCP Console)">To REPL</button>
+                <button id="btn-k-delete-inst" class="btn btn-danger btn-xs" title="Destroy instance on client">Destroy</button>
+                <button id="btn-dex-open-console" class="btn btn-secondary btn-xs" title="Switch to MCP Console">Console &gt;</button>
+              </div>
+            </div>
+            <div id="dex-full-path" class="k-card-path">game</div>
+
+            <!-- Inspector Tab Switcher: Properties, Attributes, Script Reader -->
+            <div class="dex-inspector-tabs">
+              <button class="dex-tab-btn active" data-dex-tab="properties" id="tab-dex-properties">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="3"></circle>
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                 </svg>
                 <span>Properties</span>
               </button>
-              <button class="dex-tab-btn" data-dex-tab="clients" id="tab-dex-clients">
+              <button class="dex-tab-btn" data-dex-tab="attributes" id="tab-dex-attributes">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="9" cy="7" r="4"></circle>
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                  <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                  <line x1="7" y1="7" x2="7.01" y2="7"></line>
                 </svg>
-                <span>Clients</span>
-                <span class="badge-mini" id="k-client-count-badge">0</span>
+                <span>Attributes</span>
+                <span class="badge-mini" id="dex-attributes-count-badge" style="display:none;">0</span>
+              </button>
+              <button class="dex-tab-btn" data-dex-tab="reader" id="tab-dex-reader">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                  <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                <span>Script Reader</span>
+                <span class="badge-mini" id="dex-reader-script-badge" style="display:none; background:#238636; color:#fff;">Luau</span>
               </button>
             </div>
 
-            <!-- TAB 1: EXPLORER TREE & DOCKED PROPERTIES -->
-            <div id="dex-tab-content-explorer" class="dex-tab-panel active">
-              <!-- Dark Dex Search Instances Bar -->
-              <div class="dex-search-row">
-                <div class="dex-search-input-wrap">
-                  <svg class="dex-search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <!-- Tab 1: Dedicated Properties Panel -->
+            <div id="dex-tab-content-properties" class="dex-tab-panel active">
+              <div class="dex-props-search-wrap" style="padding: 6px 10px;">
+                <input type="text" id="dex-full-prop-search" class="dex-prop-search-input" placeholder="Filter properties...">
+              </div>
+              <div id="dex-full-props-content" class="dex-props-groups-container dex-full-scroll">
+                <div class="empty-hint" style="padding: 16px; font-size: 11px;">Select an instance in the Explorer tab to inspect its full properties</div>
+              </div>
+            </div>
+
+            <!-- Tab 2: Dedicated Attributes Panel -->
+            <div id="dex-tab-content-attributes" class="dex-tab-panel" style="display: none;">
+              <div class="dex-attr-topbar">
+                <button id="btn-attr-add-toggle" class="btn btn-secondary btn-xs" title="Add a custom attribute to this instance">+ Add Attribute</button>
+                <button id="btn-attr-refresh" class="btn btn-secondary btn-xs" title="Refresh attributes">Refresh</button>
+              </div>
+
+              <!-- Add Attribute Form Card -->
+              <div id="dex-add-attr-card" class="dex-add-attr-card" style="display: none;">
+                <div class="dex-add-attr-title">Add Attribute</div>
+                <div class="dex-add-attr-grid">
+                  <div class="form-group-sm">
+                    <label class="form-label-mini">Name</label>
+                    <input type="text" id="new-attr-name" class="dex-prop-search-input" placeholder="e.g. MaxHealth, Level">
+                  </div>
+                  <div class="form-group-sm">
+                    <label class="form-label-mini">Type</label>
+                    <select id="new-attr-type" class="dex-prop-search-input" style="height: 25px; padding: 2px 4px;">
+                      <option value="string">string</option>
+                      <option value="number">number</option>
+                      <option value="boolean">boolean</option>
+                      <option value="Color3">Color3</option>
+                      <option value="Vector3">Vector3</option>
+                    </select>
+                  </div>
+                  <div class="form-group-sm" style="grid-column: span 2;">
+                    <label class="form-label-mini">Value</label>
+                    <input type="text" id="new-attr-val" class="dex-prop-search-input" placeholder="e.g. 100, true, or [255, 0, 0]">
+                  </div>
+                </div>
+                <div class="dex-add-attr-actions">
+                  <button id="btn-save-attribute" class="btn btn-success btn-xs">Save Attribute</button>
+                  <button id="btn-cancel-attribute" class="btn btn-secondary btn-xs">Cancel</button>
+                </div>
+              </div>
+
+              <div class="dex-props-search-wrap" style="padding: 6px 10px;">
+                <input type="text" id="dex-attr-search" class="dex-prop-search-input" placeholder="Filter attributes...">
+              </div>
+
+              <div id="dex-attributes-list" class="dex-props-groups-container dex-full-scroll">
+                <div class="empty-hint" style="padding: 16px; font-size: 11px;">Select an instance in Explorer to view or add attributes</div>
+              </div>
+            </div>
+
+            <!-- Tab 3: Dedicated Script Reader Panel -->
+            <div id="dex-tab-content-reader" class="dex-tab-panel" style="display: none;">
+              <!-- Stats and Search Subbar -->
+              <div class="dex-reader-subbar">
+                <div class="dex-reader-stats">
+                  <span id="dex-reader-stat-lines" class="badge-mini">0 lines</span>
+                  <span id="dex-reader-stat-mode" class="badge-mini" style="background:#238636;color:#fff;">Ready</span>
+                  <span id="dex-reader-stat-notice" style="font-size:10.5px;color:#8b949e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px;"></span>
+                </div>
+                <div class="dex-reader-actions-mini">
+                  <button id="btn-reader-open-studio" class="btn btn-primary btn-xs" title="Open decompiled script in Script Studio (Monaco Editor)">Open in Studio</button>
+                  <button id="btn-reader-copy-src" class="btn btn-secondary btn-xs" title="Copy source code to clipboard">Copy</button>
+                  <button id="btn-reader-refresh" class="btn btn-secondary btn-xs" title="Re-decompile script from client">Decompile</button>
+                </div>
+                <div class="dex-reader-search-wrap">
+                  <input type="text" id="dex-reader-search-input" class="dex-prop-search-input" placeholder="Search in source...">
+                </div>
+              </div>
+
+              <!-- Source Code Viewer Container with Line Numbers -->
+              <div id="dex-reader-code-area" class="dex-reader-code-container dex-full-scroll">
+                <div class="empty-hint" style="padding: 24px 16px; text-align: center;">
+                  <div style="color: #8b949e; margin-bottom: 8px;">Select any <b>ModuleScript</b> or <b>LocalScript</b> in the Explorer tree, then click <b>Read Script</b>.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 6: POTASSIUM MCP CONSOLE & LUAU REPL -->
+      <section id="view-console" class="view-panel">
+        <div class="potassium-console-layout">
+          <!-- Left Column: Attached Clients & Editor Tabs -->
+          <aside class="potassium-clients-sidebar">
+            <div class="k-panel-header" style="padding: 8px 10px;">
+              <div class="k-header-title">
+                <span>ATTACHED CLIENTS</span>
+                <span class="badge-mini" id="k-client-count-badge">0</span>
+              </div>
+              <div class="k-header-actions">
+                <button id="btn-refresh-potassium" class="tree-act-btn" title="Refresh Clients & MCP">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
+                    <path d="M13.65 2.35A8 8 0 1 0 16 8h-2a6 6 0 1 1-1.76-4.24l-2.48 2.48H16V2.35z"/>
                   </svg>
-                  <input type="text" id="k-tree-search" class="dex-search-input" placeholder="Search instances...">
-                  <button id="btn-dex-clear-search" class="dex-search-clear" style="display:none;" title="Clear Search">✕</button>
-                </div>
-                <button id="btn-dex-filters" class="dex-btn-filters" title="Toggle Quick Category Filters">FILTERS</button>
-              </div>
-
-              <!-- Quick Filter Chips Tray -->
-              <div id="dex-filter-chips" class="dex-filter-chips" style="display: none;">
-                <button class="dex-chip active" data-filter="all">All</button>
-                <button class="dex-chip" data-filter="workspace">Workspace</button>
-                <button class="dex-chip" data-filter="players">Players</button>
-                <button class="dex-chip" data-filter="remote">Remotes</button>
-                <button class="dex-chip" data-filter="script">Scripts</button>
-                <button class="dex-chip" data-filter="gui">GUIs</button>
-              </div>
-
-              <!-- Live Tree Subheader -->
-              <div class="dex-tree-meta-row">
-                <div class="dex-meta-left">
-                  <span class="k-status-dot online" id="mcp-server-dot">●</span>
-                  <span id="dex-tree-root-name">DataModel</span>
-                  <span id="dex-tree-count-badge" class="badge-mini">0</span>
-                </div>
-                <div class="dex-meta-actions">
-                  <button id="btn-inspect-datamodel" class="link-btn-xs" title="Retrieve Live Instance Tree from Client">Retrieve Tree</button>
-                </div>
-              </div>
-
-              <!-- Scrollable Instance Tree -->
-              <div id="potassium-instance-tree" class="k-instance-tree dex-tree-scroll">
-                <!-- Dynamically populated hierarchy -->
-              </div>
-
-              <!-- Docked Dex Properties Pane -->
-              <div id="dex-docked-properties" class="dex-docked-props-panel">
-                <div class="dex-props-header">
-                  <span class="dex-props-title">PROPERTIES</span>
-                  <button id="btn-dex-expand-props" class="dex-head-btn" title="Open in Dedicated Properties Tab">
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <polyline points="15 3 21 3 21 9"></polyline>
-                      <polyline points="9 21 3 21 3 15"></polyline>
-                      <line x1="21" y1="3" x2="14" y2="10"></line>
-                      <line x1="3" y1="21" x2="10" y2="14"></line>
-                    </svg>
-                    <span>Tab</span>
-                  </button>
-                </div>
-                <div class="dex-props-subheader">
-                  <span id="dex-selected-class" class="dex-sub-class">DataModel</span>
-                  <span class="dex-sub-sep">-</span>
-                  <span id="dex-selected-name" class="dex-sub-name">game</span>
-                </div>
-                <div class="dex-props-search-wrap">
-                  <input type="text" id="dex-docked-prop-search" class="dex-prop-search-input" placeholder="Filter properties...">
-                </div>
-                <div id="dex-docked-props-content" class="dex-props-groups-container">
-                  <div class="empty-hint" style="padding: 12px; font-size: 11px;">Select an instance above to view properties</div>
-                </div>
+                </button>
               </div>
             </div>
 
-            <!-- TAB 2: DEDICATED INDIVIDUAL PROPERTIES TAB -->
-            <div id="dex-tab-content-properties" class="dex-tab-panel" style="display: none;">
-              <div class="dex-full-props-view">
-                <div class="dex-full-props-header">
-                  <div class="dex-full-inst-badge">
-                    <span id="dex-full-icon" class="dex-full-icon"></span>
-                    <div class="dex-full-titles">
-                      <div class="dex-full-name" id="dex-full-name">DataModel</div>
-                      <div class="dex-full-class" id="dex-full-class">DataModel</div>
-                    </div>
-                  </div>
-                  <div class="dex-full-actions">
-                    <button id="btn-k-copy-path" class="btn btn-secondary btn-xs" title="Copy full Luau path">Copy Path</button>
-                    <button id="btn-k-send-repl" class="btn btn-secondary btn-xs" title="Send instance reference to REPL">To REPL</button>
-                    <button id="btn-k-delete-inst" class="btn btn-danger btn-xs" title="Destroy instance on client">Destroy</button>
-                  </div>
-                </div>
-                <div id="dex-full-path" class="k-card-path">game</div>
-                <div class="dex-props-search-wrap" style="padding: 6px 10px;">
-                  <input type="text" id="dex-full-prop-search" class="dex-prop-search-input" placeholder="Filter properties...">
-                </div>
-                <div id="dex-full-props-content" class="dex-props-groups-container dex-full-scroll">
-                  <div class="empty-hint" style="padding: 16px; font-size: 11px;">Select an instance in the Explorer tab to inspect its full properties</div>
-                </div>
-              </div>
+            <!-- Client Processes List -->
+            <div id="potassium-client-list" class="k-client-list">
+              <!-- Dynamically populated client cards -->
             </div>
 
-            <!-- TAB 3: ATTACHED CLIENTS & POTASSIUM TABS -->
-            <div id="dex-tab-content-clients" class="dex-tab-panel" style="display: none;">
-              <div class="k-panel-header" style="padding: 8px 10px;">
-                <div class="k-header-title">
-                  <span>ATTACHED CLIENTS</span>
-                </div>
-                <div class="k-header-actions">
-                  <button id="btn-refresh-potassium" class="tree-act-btn" title="Refresh Clients & MCP">
-                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
-                      <path d="M13.65 2.35A8 8 0 1 0 16 8h-2a6 6 0 1 1-1.76-4.24l-2.48 2.48H16V2.35z"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              <!-- Client Processes Section -->
-              <div id="potassium-client-list" class="k-client-list">
-                <!-- Dynamically populated client cards -->
-              </div>
-
-              <!-- Potassium Tabs -->
-              <div class="k-section-title" style="margin-top: 12px;">
-                <span>POTASSIUM EDITOR TABS</span>
-                <span id="k-tabs-count-badge" class="badge-mini">0</span>
-              </div>
-              <div id="potassium-tabs-list" class="k-tabs-list">
-                <!-- Dynamically populated tabs -->
-              </div>
+            <!-- Potassium Tabs -->
+            <div class="k-section-title" style="margin-top: 12px; padding: 0 10px;">
+              <span>POTASSIUM EDITOR TABS</span>
+              <span id="k-tabs-count-badge" class="badge-mini">0</span>
+            </div>
+            <div id="potassium-tabs-list" class="k-tabs-list" style="padding: 0 10px;">
+              <!-- Dynamically populated tabs -->
             </div>
           </aside>
 
@@ -646,6 +711,7 @@
                 </label>
                 <button id="btn-k-clear-console" class="btn btn-secondary btn-xs">Clear</button>
                 <button id="btn-k-poll-console" class="btn btn-secondary btn-xs">Poll Output</button>
+                <button id="btn-console-open-explorer" class="btn btn-secondary btn-xs" title="Switch to Client Explorer">&lt; Explorer</button>
               </div>
             </div>
 

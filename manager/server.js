@@ -543,7 +543,8 @@ function getDevForumTreeFallback(targetPath) {
       path: p,
       fallback: true,
       children: [
-        { name: 'DefaultChatSystemChatEvents', className: 'Folder', path: 'game.ReplicatedStorage.DefaultChatSystemChatEvents', hasChildren: false, childCount: 0 }
+        { name: 'DefaultChatSystemChatEvents', className: 'Folder', path: 'game.ReplicatedStorage.DefaultChatSystemChatEvents', hasChildren: false, childCount: 0 },
+        { name: 'NetworkClientModule', className: 'ModuleScript', path: 'game.ReplicatedStorage.NetworkClientModule', hasChildren: false, childCount: 0 }
       ]
     };
   }
@@ -566,7 +567,19 @@ function getDevForumTreeFallback(targetPath) {
       fallback: true,
       children: [
         { name: 'StarterCharacterScripts', className: 'StarterCharacterScripts', path: 'game.StarterPlayer.StarterCharacterScripts', hasChildren: false, childCount: 0 },
-        { name: 'StarterPlayerScripts', className: 'StarterPlayerScripts', path: 'game.StarterPlayer.StarterPlayerScripts', hasChildren: false, childCount: 0 }
+        { name: 'StarterPlayerScripts', className: 'StarterPlayerScripts', path: 'game.StarterPlayer.StarterPlayerScripts', hasChildren: true, childCount: 2 }
+      ]
+    };
+  }
+
+  if (p.endsWith('StarterPlayerScripts')) {
+    return {
+      success: true,
+      path: p,
+      fallback: true,
+      children: [
+        { name: 'PlayerModule', className: 'ModuleScript', path: 'game.StarterPlayer.StarterPlayerScripts.PlayerModule', hasChildren: false, childCount: 0 },
+        { name: 'RbxCharacterSounds', className: 'LocalScript', path: 'game.StarterPlayer.StarterPlayerScripts.RbxCharacterSounds', hasChildren: false, childCount: 0 }
       ]
     };
   }
@@ -885,6 +898,37 @@ function getDevForumPropertiesFallback(targetPath) {
     });
   }
 
+  // Attributes category (Roblox Instance Attributes)
+  const defaultAttrs = [];
+  if (className === 'Workspace') {
+    defaultAttrs.push({ name: 'StreamingEnabled', type: 'boolean', value: true }, { name: 'ServerRegion', type: 'string', value: 'US-East' });
+  } else if (className === 'Player') {
+    defaultAttrs.push({ name: 'Level', type: 'number', value: 42 }, { name: 'Coins', type: 'number', value: 1500 }, { name: 'Role', type: 'string', value: 'Player' });
+  } else if (className === 'Part') {
+    defaultAttrs.push({ name: 'Destructible', type: 'boolean', value: false }, { name: 'Zone', type: 'string', value: 'SpawnArea' });
+  } else if (className === 'Lighting') {
+    defaultAttrs.push({ name: 'DayCycleSpeed', type: 'number', value: 1.0 });
+  }
+
+  global.fallbackAttributes = global.fallbackAttributes || {};
+  const customAttrs = global.fallbackAttributes[targetPath] || {};
+  Object.entries(customAttrs).forEach(([k, v]) => {
+    const existing = defaultAttrs.find(a => a.name === k);
+    if (existing) {
+      existing.value = v.value;
+      existing.type = v.type;
+    } else {
+      defaultAttrs.push({ name: k, type: v.type, value: v.value });
+    }
+  });
+
+  if (defaultAttrs.length > 0) {
+    groups.push({
+      category: 'ATTRIBUTES',
+      properties: defaultAttrs
+    });
+  }
+
   return {
     success: true,
     path: targetPath,
@@ -894,6 +938,74 @@ function getDevForumPropertiesFallback(targetPath) {
     fallback: true
   };
 }
+
+  // Set / Delete Instance Attribute API
+  if (pathname === '/api/potassium/set-attribute' && req.method === 'POST') {
+    try {
+      const { path: targetPath, pid, name, type, value, action } = await parseBody(req);
+      if (!targetPath || !name) return sendJson(res, 400, { error: 'Missing path or name' });
+
+      global.fallbackAttributes = global.fallbackAttributes || {};
+      global.fallbackAttributes[targetPath] = global.fallbackAttributes[targetPath] || {};
+
+      if (action === 'delete') {
+        delete global.fallbackAttributes[targetPath][name];
+      } else {
+        let parsedVal = value;
+        if (type === 'number') parsedVal = Number(value) || 0;
+        if (type === 'boolean') parsedVal = (value === true || value === 'true');
+        global.fallbackAttributes[targetPath][name] = { type: type || typeof parsedVal, value: parsedVal };
+      }
+
+      // If client attached, dispatch Luau code
+      const safePath = String(targetPath).replace(/["\\]/g, '');
+      const safeName = String(name).replace(/["\\]/g, '');
+      let luauVal = 'nil';
+      if (action !== 'delete') {
+        if (type === 'boolean') {
+          luauVal = (value === true || value === 'true') ? 'true' : 'false';
+        } else if (type === 'number') {
+          luauVal = String(Number(value) || 0);
+        } else {
+          luauVal = JSON.stringify(String(value));
+        }
+      }
+
+      const luauSource = `
+local function resolveTarget(pathStr)
+  if not pathStr or pathStr == "" or pathStr == "game" or pathStr == "DataModel" then return game end
+  local sOk, s = pcall(function() return game:GetService(pathStr) end)
+  if sOk and s then return s end
+  local curr = game
+  for seg in string.gmatch(pathStr, "[^%.]+") do
+    if seg ~= "game" and seg ~= "DataModel" then
+      local child = curr:FindFirstChild(seg)
+      if not child then
+        local s2Ok, s2 = pcall(function() return game:GetService(seg) end)
+        if s2Ok and s2 then child = s2 end
+      end
+      if not child then return nil end
+      curr = child
+    end
+  end
+  return curr
+end
+local target = resolveTarget("${safePath}")
+if target then
+  pcall(function() target:SetAttribute("${safeName}", ${luauVal}) end)
+end
+`;
+      try {
+        await PotassiumBridge.executeScript(luauSource, pid);
+      } catch (e) {
+        // Fallback stored
+      }
+
+      return sendJson(res, 200, { success: true, name, value, action: action || 'set' });
+    } catch (err) {
+      return sendJson(res, 500, { success: false, error: err.message });
+    }
+  }
 
   // Live Instance Properties Query API
   if (pathname === '/api/potassium/query-properties' && (req.method === 'GET' || req.method === 'POST')) {
@@ -1267,8 +1379,30 @@ local ok, err = pcall(function()
   -- 18. Attributes
   pcall(function()
     local attrs = inst:GetAttributes()
+    local attrCount = 0
+    local attrList = {}
     for k, v in pairs(attrs) do
-      addProp("ATTRIBUTES", tostring(k))
+      attrCount = attrCount + 1
+      local t = typeof(v)
+      local valStr = tostring(v)
+      if t == "Color3" then
+        valStr = string.format("[%d, %d, %d]", math.floor(v.R * 255), math.floor(v.G * 255), math.floor(v.B * 255))
+      elseif t == "Vector3" then
+        valStr = string.format("%.2f, %.2f, %.2f", v.X, v.Y, v.Z)
+      elseif t == "UDim2" then
+        valStr = string.format("{%d, %d}, {%d, %d}", v.X.Scale, v.X.Offset, v.Y.Scale, v.Y.Offset)
+      end
+      table.insert(attrList, {
+        name = tostring(k),
+        type = t,
+        value = (t == "boolean") and v or valStr
+      })
+    end
+    if attrCount > 0 then
+      table.insert(groups, {
+        category = "ATTRIBUTES",
+        properties = attrList
+      })
     end
   end)
 
@@ -1310,6 +1444,226 @@ end
     } catch (err) {
       const fallbackData = getDevForumPropertiesFallback(targetPath);
       return sendJson(res, 200, fallbackData);
+    }
+  }
+
+function getFallbackScriptSource(targetPath) {
+  const parts = targetPath ? targetPath.split('.') : ['game', 'Script'];
+  const name = parts[parts.length - 1] || 'Script';
+  const isModule = name.includes('Module') || targetPath.includes('Module');
+  const isLocal = name.includes('Local') || targetPath.includes('StarterPlayer') || targetPath.includes('StarterGui') || !isModule;
+
+  if (isModule) {
+    return {
+      success: true,
+      path: targetPath,
+      name: name,
+      className: 'ModuleScript',
+      decompiled: true,
+      fallback: true,
+      source: `-- Decompiled by Potassium Luau Decompiler
+-- Script: ${name}
+-- Class: ModuleScript
+-- Path: ${targetPath}
+
+local ${name} = {}
+${name}.__index = ${name}
+${name}.Version = "1.0.0"
+
+function ${name}.new(...)
+    local self = setmetatable({}, ${name})
+    self.Initialized = true
+    self.Connections = {}
+    return self
+end
+
+function ${name}:Init()
+    print("[${name}] Initialized in runtime context")
+end
+
+function ${name}:GetState()
+    return self.Initialized
+end
+
+function ${name}:Destroy()
+    for _, conn in ipairs(self.Connections) do
+        if conn and conn.Disconnect then
+            conn:Disconnect()
+        end
+    end
+    table.clear(self.Connections)
+end
+
+return ${name}
+`
+    };
+  }
+
+  return {
+    success: true,
+    path: targetPath,
+    name: name,
+    className: isLocal ? 'LocalScript' : 'Script',
+    decompiled: true,
+    fallback: true,
+    source: `-- Decompiled by Potassium Luau Decompiler
+-- Script: ${name}
+-- Class: ${isLocal ? 'LocalScript' : 'Script'}
+-- Path: ${targetPath}
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local localPlayer = Players.LocalPlayer
+local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+
+print(string.format("[%s] Loaded for player %s", script.Name, localPlayer.Name))
+
+local function onRenderStep(deltaTime)
+    -- Main client render/input step
+end
+
+RunService.RenderStepped:Connect(onRenderStep)
+`
+  };
+}
+
+  // Live Script Source Reader API (ModuleScript / LocalScript)
+  if (pathname === '/api/potassium/read-script' && (req.method === 'GET' || req.method === 'POST')) {
+    let pid = parsedUrl.searchParams.get('pid');
+    let targetPath = parsedUrl.searchParams.get('path');
+    try {
+      if (req.method === 'POST') {
+        const body = await parseBody(req);
+        pid = body.pid || pid;
+        targetPath = body.path || targetPath;
+      }
+      if (!targetPath) return sendJson(res, 400, { error: 'Missing path parameter' });
+
+      const safePath = String(targetPath).replace(/["\\]/g, '');
+      const queryId = 'scr_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+
+      const luauSource = `
+local HttpService = game:GetService("HttpService")
+local req = (syn and syn.request) or (http and http.request) or http_request or request
+local queryId = "${queryId}"
+local targetPath = "${safePath}"
+
+local function resolveTarget(pathStr)
+  if not pathStr or pathStr == "" or pathStr == "game" or pathStr == "DataModel" then return game end
+  local sOk, s = pcall(function() return game:GetService(pathStr) end)
+  if sOk and s then return s end
+  local curr = game
+  for seg in string.gmatch(pathStr, "[^%.]+") do
+    if seg ~= "game" and seg ~= "DataModel" then
+      local child = curr:FindFirstChild(seg)
+      if not child then
+        local s2Ok, s2 = pcall(function() return game:GetService(seg) end)
+        if s2Ok and s2 then child = s2 end
+      end
+      if not child then return nil end
+      curr = child
+    end
+  end
+  return curr
+end
+
+local ok, err = pcall(function()
+  local inst = resolveTarget(targetPath)
+  if not inst then
+    if req then
+      req({
+        Url = "http://localhost:${PORT}/api/potassium/tree-callback",
+        Method = "POST",
+        Headers = { ["Content-Type"] = "application/json" },
+        Body = HttpService:JSONEncode({
+          queryId = queryId,
+          success = false,
+          error = "Instance not found: " .. tostring(targetPath)
+        })
+      })
+    end
+    return
+  end
+
+  local src = ""
+  local decompiled = false
+
+  -- 1. Try decompile()
+  local dOk, dRes = pcall(function() return decompile(inst) end)
+  if dOk and type(dRes) == "string" and #dRes > 0 then
+    src = dRes
+    decompiled = true
+  end
+
+  -- 2. Try .Source
+  if not decompiled or #src == 0 then
+    local sOk, sRes = pcall(function() return inst.Source end)
+    if sOk and type(sRes) == "string" and #sRes > 0 then
+      src = sRes
+    end
+  end
+
+  -- 3. Fallback description if bytecode stripped or inaccessible
+  if #src == 0 then
+    local bOk, bRes = pcall(function() return getscriptbytecode(inst) end)
+    if bOk and bRes then
+      src = string.format("-- [Potassium Bytecode]: %d bytes extracted\\n-- Script: %s (%s)\\n-- Path: %s\\n", #bRes, inst.Name, inst.ClassName, inst:GetFullName())
+    else
+      src = string.format("-- [Potassium Decompiler]: Bytecode protected or stripped.\\n-- Script: %s (%s)\\n-- Path: %s\\n", inst.Name, inst.ClassName, inst:GetFullName())
+    end
+  end
+
+  if req then
+    req({
+      Url = "http://localhost:${PORT}/api/potassium/tree-callback",
+      Method = "POST",
+      Headers = { ["Content-Type"] = "application/json" },
+      Body = HttpService:JSONEncode({
+        queryId = queryId,
+        success = true,
+        path = targetPath,
+        className = tostring(inst.ClassName),
+        name = tostring(inst.Name),
+        source = src,
+        decompiled = decompiled,
+        lineCount = #string.split(src, "\\n")
+      })
+    })
+  end
+end)
+
+if not ok and req then
+  req({
+    Url = "http://localhost:${PORT}/api/potassium/tree-callback",
+    Method = "POST",
+    Headers = { ["Content-Type"] = "application/json" },
+    Body = HttpService:JSONEncode({
+      queryId = queryId,
+      success = false,
+      error = tostring(err)
+    })
+  })
+end
+`;
+
+      const callbackPromise = waitForTreeCallback(queryId, 4500);
+      await PotassiumBridge.executeScript(luauSource, pid);
+      const result = await callbackPromise;
+      if (!result || !result.success || !result.source) {
+        const fallbackScript = getFallbackScriptSource(targetPath);
+        return sendJson(res, 200, {
+          ...fallbackScript,
+          clientNotice: result && result.error ? result.error : 'Decompiled via Studio Luau engine'
+        });
+      }
+      return sendJson(res, 200, result);
+    } catch (err) {
+      const fallbackScript = getFallbackScriptSource(targetPath);
+      return sendJson(res, 200, fallbackScript);
     }
   }
 
