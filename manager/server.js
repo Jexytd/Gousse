@@ -19,6 +19,23 @@ const MIME_TYPES = {
   '.lua': 'text/plain; charset=utf-8'
 };
 
+const pendingTreeCallbacks = new Map();
+
+function waitForTreeCallback(queryId, timeoutMs = 4500) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pendingTreeCallbacks.delete(queryId);
+      resolve({ success: false, error: `Query timed out after ${timeoutMs}ms. Roblox client may be unfocused or loading.` });
+    }, timeoutMs);
+
+    pendingTreeCallbacks.set(queryId, (data) => {
+      clearTimeout(timer);
+      pendingTreeCallbacks.delete(queryId);
+      resolve(data);
+    });
+  });
+}
+
 function sendJson(res, statusCode, data) {
   res.writeHead(statusCode, {
     'Content-Type': 'application/json',
@@ -300,6 +317,354 @@ const server = http.createServer(async (req, res) => {
       if (global.studioLogsBuffer.length > 500) global.studioLogsBuffer.shift();
     }
     return sendJson(res, 200, { success: true });
+  }
+
+  // Tree Query Callback from Luau execution
+  if (pathname === '/api/potassium/tree-callback' && req.method === 'POST') {
+    try {
+      const body = await parseBody(req);
+      const queryId = body.queryId;
+      if (queryId && pendingTreeCallbacks.has(queryId)) {
+        const cb = pendingTreeCallbacks.get(queryId);
+        cb(body);
+        return sendJson(res, 200, { success: true });
+      }
+      return sendJson(res, 200, { success: false, message: 'No matching queryId' });
+    } catch (err) {
+      return sendJson(res, 500, { error: err.message });
+    }
+  }
+
+  // Live Instance Tree Query API
+  if ((pathname === '/api/potassium/query-tree' || pathname === '/api/potassium/tree') && (req.method === 'GET' || req.method === 'POST')) {
+    try {
+      let pid = parsedUrl.searchParams.get('pid');
+      let targetPath = parsedUrl.searchParams.get('path') || 'game';
+
+      if (req.method === 'POST') {
+        const body = await parseBody(req);
+        pid = body.pid || pid;
+        targetPath = body.path || targetPath;
+      }
+
+      const safePath = String(targetPath).replace(/["\\]/g, '');
+      const queryId = 'q_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+
+      const luauSource = `
+local HttpService = game:GetService("HttpService")
+local req = (syn and syn.request) or (http and http.request) or http_request or request
+local queryId = "${queryId}"
+local targetPath = "${safePath}"
+
+local function resolveTarget(pathStr)
+  if not pathStr or pathStr == "" or pathStr == "game" or pathStr == "DataModel" then
+    return game
+  end
+  local sOk, s = pcall(function() return game:GetService(pathStr) end)
+  if sOk and s then return s end
+
+  local curr = game
+  for seg in string.gmatch(pathStr, "[^%.]+") do
+    if seg ~= "game" and seg ~= "DataModel" then
+      local child = curr:FindFirstChild(seg)
+      if not child then
+        local s2Ok, s2 = pcall(function() return game:GetService(seg) end)
+        if s2Ok and s2 then child = s2 end
+      end
+      if not child then return nil end
+      curr = child
+    end
+  end
+  return curr
+end
+
+local ok, err = pcall(function()
+  local target = resolveTarget(targetPath)
+  if not target then
+    if req then
+      req({
+        Url = "http://localhost:${PORT}/api/potassium/tree-callback",
+        Method = "POST",
+        Headers = { ["Content-Type"] = "application/json" },
+        Body = HttpService:JSONEncode({
+          queryId = queryId,
+          success = false,
+          error = "Instance not found: " .. tostring(targetPath)
+        })
+      })
+    end
+    return
+  end
+
+  local children = {}
+  for _, child in ipairs(target:GetChildren()) do
+    local count = 0
+    pcall(function() count = #child:GetChildren() end)
+    local isSvc = false
+    pcall(function() isSvc = (child.Parent == game) end)
+    table.insert(children, {
+      name = tostring(child.Name),
+      className = tostring(child.ClassName),
+      path = child:GetFullName(),
+      childCount = count,
+      hasChildren = count > 0,
+      isService = isSvc
+    })
+  end
+
+  table.sort(children, function(a, b)
+    if a.isService ~= b.isService then return a.isService end
+    if a.hasChildren ~= b.hasChildren then return a.hasChildren end
+    return a.name:lower() < b.name:lower()
+  end)
+
+  local metadata = nil
+  if target == game then
+    local lp = nil
+    pcall(function() lp = game:GetService("Players").LocalPlayer end)
+    metadata = {
+      placeId = game.PlaceId,
+      gameId = game.GameId,
+      jobId = game.JobId,
+      playerName = lp and lp.Name or "Player",
+      userId = lp and lp.UserId or 0
+    }
+  end
+
+  if req then
+    req({
+      Url = "http://localhost:${PORT}/api/potassium/tree-callback",
+      Method = "POST",
+      Headers = { ["Content-Type"] = "application/json" },
+      Body = HttpService:JSONEncode({
+        queryId = queryId,
+        success = true,
+        path = targetPath,
+        metadata = metadata,
+        children = children
+      })
+    })
+  end
+end)
+
+if not ok and req then
+  req({
+    Url = "http://localhost:${PORT}/api/potassium/tree-callback",
+    Method = "POST",
+    Headers = { ["Content-Type"] = "application/json" },
+    Body = HttpService:JSONEncode({
+      queryId = queryId,
+      success = false,
+      error = tostring(err)
+    })
+  })
+end
+`;
+
+      const callbackPromise = waitForTreeCallback(queryId, 4500);
+      await PotassiumBridge.executeScript(luauSource, pid);
+      const result = await callbackPromise;
+      return sendJson(res, 200, result);
+    } catch (err) {
+      return sendJson(res, 500, { success: false, error: err.message });
+    }
+  }
+
+  // Live Instance Properties Query API
+  if (pathname === '/api/potassium/query-properties' && (req.method === 'GET' || req.method === 'POST')) {
+    try {
+      let pid = parsedUrl.searchParams.get('pid');
+      let targetPath = parsedUrl.searchParams.get('path');
+      if (req.method === 'POST') {
+        const body = await parseBody(req);
+        pid = body.pid || pid;
+        targetPath = body.path || targetPath;
+      }
+      if (!targetPath) return sendJson(res, 400, { error: 'Missing path parameter' });
+
+      const safePath = String(targetPath).replace(/["\\]/g, '');
+      const queryId = 'prop_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+
+      const luauSource = `
+local HttpService = game:GetService("HttpService")
+local req = (syn and syn.request) or (http and http.request) or http_request or request
+local queryId = "${queryId}"
+local targetPath = "${safePath}"
+
+local function resolveTarget(pathStr)
+  if not pathStr or pathStr == "" or pathStr == "game" or pathStr == "DataModel" then
+    return game
+  end
+  local sOk, s = pcall(function() return game:GetService(pathStr) end)
+  if sOk and s then return s end
+
+  local curr = game
+  for seg in string.gmatch(pathStr, "[^%.]+") do
+    if seg ~= "game" and seg ~= "DataModel" then
+      local child = curr:FindFirstChild(seg)
+      if not child then
+        local s2Ok, s2 = pcall(function() return game:GetService(seg) end)
+        if s2Ok and s2 then child = s2 end
+      end
+      if not child then return nil end
+      curr = child
+    end
+  end
+  return curr
+end
+
+local ok, err = pcall(function()
+  local inst = resolveTarget(targetPath)
+  if not inst then
+    if req then
+      req({
+        Url = "http://localhost:${PORT}/api/potassium/tree-callback",
+        Method = "POST",
+        Headers = { ["Content-Type"] = "application/json" },
+        Body = HttpService:JSONEncode({
+          queryId = queryId,
+          success = false,
+          error = "Instance not found: " .. tostring(targetPath)
+        })
+      })
+    end
+    return
+  end
+
+  local groups = {}
+
+  -- 1. INSTANCE Category (standard to all Instances)
+  local instProps = {
+    { name = "Name", type = "string", value = tostring(inst.Name) },
+    { name = "ClassName", type = "string", value = tostring(inst.ClassName) },
+    { name = "Parent", type = "Instance", value = inst.Parent and (inst.Parent.ClassName .. "(" .. inst.Parent.Name .. ")") or "nil" },
+    { name = "Archivable", type = "boolean", value = inst.Archivable }
+  }
+  table.insert(groups, { category = "INSTANCE", properties = instProps })
+
+  -- 2. Class Specific Categories
+  if inst:IsA("Player") then
+    local playerProps = {
+      { name = "Character", type = "Instance", value = inst.Character and ("Model(" .. inst.Character.Name .. ")") or "nil" },
+      { name = "UserId", type = "number", value = inst.UserId },
+      { name = "DisplayName", type = "string", value = tostring(inst.DisplayName or inst.Name) },
+      { name = "Team", type = "Instance", value = inst.Team and ("Team(" .. inst.Team.Name .. ")") or "nil" }
+    }
+    table.insert(groups, { category = "PLAYER", properties = playerProps })
+  elseif inst:IsA("BasePart") then
+    local partProps = {
+      { name = "Position", type = "Vector3", value = tostring(inst.Position) },
+      { name = "Size", type = "Vector3", value = tostring(inst.Size) },
+      { name = "Orientation", type = "Vector3", value = tostring(inst.Orientation) },
+      { name = "CFrame", type = "CFrame", value = tostring(inst.CFrame) },
+      { name = "Anchored", type = "boolean", value = inst.Anchored },
+      { name = "CanCollide", type = "boolean", value = inst.CanCollide },
+      { name = "Transparency", type = "number", value = inst.Transparency },
+      { name = "Material", type = "string", value = tostring(inst.Material.Name) },
+      { name = "Color", type = "Color3", value = tostring(inst.Color) }
+    }
+    table.insert(groups, { category = "PART", properties = partProps })
+  elseif inst:IsA("Model") then
+    local modelProps = {
+      { name = "PrimaryPart", type = "Instance", value = inst.PrimaryPart and (inst.PrimaryPart.ClassName .. "(" .. inst.PrimaryPart.Name .. ")") or "nil" },
+      { name = "WorldPivot", type = "CFrame", value = tostring(inst.WorldPivot) }
+    }
+    table.insert(groups, { category = "MODEL", properties = modelProps })
+  elseif inst:IsA("Humanoid") then
+    local humProps = {
+      { name = "Health", type = "number", value = math.floor(inst.Health * 10) / 10 },
+      { name = "MaxHealth", type = "number", value = math.floor(inst.MaxHealth * 10) / 10 },
+      { name = "WalkSpeed", type = "number", value = inst.WalkSpeed },
+      { name = "JumpPower", type = "number", value = inst.JumpPower },
+      { name = "RigType", type = "string", value = tostring(inst.RigType.Name) }
+    }
+    table.insert(groups, { category = "HUMANOID", properties = humProps })
+  elseif inst:IsA("ValueBase") then
+    local valProps = {
+      { name = "Value", type = type(inst.Value), value = tostring(inst.Value) }
+    }
+    table.insert(groups, { category = "DATA", properties = valProps })
+  elseif inst:IsA("GuiObject") then
+    local guiProps = {
+      { name = "Visible", type = "boolean", value = inst.Visible },
+      { name = "ZIndex", type = "number", value = inst.ZIndex },
+      { name = "Position", type = "UDim2", value = tostring(inst.Position) },
+      { name = "Size", type = "UDim2", value = tostring(inst.Size) },
+      { name = "BackgroundColor3", type = "Color3", value = tostring(inst.BackgroundColor3) }
+    }
+    table.insert(groups, { category = "GUI", properties = guiProps })
+  elseif inst:IsA("LayerCollector") then
+    local layerProps = {
+      { name = "Enabled", type = "boolean", value = inst.Enabled },
+      { name = "DisplayOrder", type = "number", value = inst.DisplayOrder or 0 },
+      { name = "ResetOnSpawn", type = "boolean", value = inst.ResetOnSpawn }
+    }
+    table.insert(groups, { category = "GUI LAYER", properties = layerProps })
+  elseif inst:IsA("LuaSourceContainer") then
+    local sProps = {
+      { name = "Disabled", type = "boolean", value = inst.Disabled or false }
+    }
+    table.insert(groups, { category = "SCRIPT", properties = sProps })
+  elseif inst == game then
+    local dmProps = {
+      { name = "PlaceId", type = "number", value = game.PlaceId },
+      { name = "GameId", type = "number", value = game.GameId },
+      { name = "JobId", type = "string", value = tostring(game.JobId) },
+      { name = "PlaceVersion", type = "number", value = game.PlaceVersion },
+      { name = "CreatorId", type = "number", value = game.CreatorId }
+    }
+    table.insert(groups, { category = "DATAMODEL", properties = dmProps })
+  end
+
+  pcall(function()
+    local attrs = inst:GetAttributes()
+    local attrProps = {}
+    for k, v in pairs(attrs) do
+      table.insert(attrProps, { name = tostring(k), type = type(v), value = tostring(v) })
+    end
+    if #attrProps > 0 then
+      table.insert(groups, { category = "ATTRIBUTES", properties = attrProps })
+    end
+  end)
+
+  if req then
+    req({
+      Url = "http://localhost:${PORT}/api/potassium/tree-callback",
+      Method = "POST",
+      Headers = { ["Content-Type"] = "application/json" },
+      Body = HttpService:JSONEncode({
+        queryId = queryId,
+        success = true,
+        path = targetPath,
+        className = tostring(inst.ClassName),
+        name = tostring(inst.Name),
+        groups = groups
+      })
+    })
+  end
+end)
+
+if not ok and req then
+  req({
+    Url = "http://localhost:${PORT}/api/potassium/tree-callback",
+    Method = "POST",
+    Headers = { ["Content-Type"] = "application/json" },
+    Body = HttpService:JSONEncode({
+      queryId = queryId,
+      success = false,
+      error = tostring(err)
+    })
+  })
+end
+`;
+
+      const callbackPromise = waitForTreeCallback(queryId, 4500);
+      await PotassiumBridge.executeScript(luauSource, pid);
+      const result = await callbackPromise;
+      return sendJson(res, 200, result);
+    } catch (err) {
+      return sendJson(res, 500, { success: false, error: err.message });
+    }
   }
 
   // Read Console Logs (with default wait_ms to allow async prints to arrive)

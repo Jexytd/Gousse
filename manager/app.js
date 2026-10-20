@@ -1753,6 +1753,24 @@ const btnClearStudioOutput = document.getElementById('btn-clear-studio-output');
 const studioOutputList = document.getElementById('studio-output-list');
 const btnToggleOutput = document.getElementById('btn-toggle-output');
 const studioMcpDot = document.getElementById('studio-mcp-dot');
+const chkAutoNavConsole = document.getElementById('chk-auto-nav-console');
+
+// Live Instance Explorer Elements & State
+const kTreeSearch = document.getElementById('k-tree-search');
+const kSelectedInstanceCard = document.getElementById('k-selected-instance-card');
+const kCardInstName = document.getElementById('k-card-inst-name');
+const kCardInstClass = document.getElementById('k-card-inst-class');
+const kCardInstPath = document.getElementById('k-card-inst-path');
+const btnKCopyPath = document.getElementById('btn-k-copy-path');
+const btnKInspectProps = document.getElementById('btn-k-inspect-props');
+const btnKSendRepl = document.getElementById('btn-k-send-repl');
+const btnKDeleteInst = document.getElementById('btn-k-delete-inst');
+const kPropsDisplay = document.getElementById('k-props-display');
+
+let liveTreeLoaded = false;
+let selectedInstance = null;
+let currentTreeMetadata = null;
+let liveRootChildren = [];
 
 function formatTimestamp(ts) {
   const d = ts ? new Date(ts) : new Date();
@@ -1821,7 +1839,11 @@ async function refreshPotassiumStatus() {
     renderPotassiumTabs(data.tabs || []);
 
     if (potassiumInstanceTree && (!potassiumInstanceTree.children.length || potassiumInstanceTree.querySelector('.empty-hint'))) {
-      renderDefaultInstanceTree();
+      if (potassiumClients.length > 0 && !liveTreeLoaded) {
+        retrieveLiveInstanceTree(activeTargetPid);
+      } else if (!potassiumClients.length) {
+        renderDefaultInstanceTree();
+      }
     }
   } catch (err) {
     isMcpOnline = false;
@@ -1856,6 +1878,9 @@ function selectTargetClient(pid) {
   document.querySelectorAll('.k-client-card').forEach(el => {
     el.classList.toggle('active', el.dataset.pid === pid);
   });
+  if (pid && pid !== 'all') {
+    retrieveLiveInstanceTree(pid);
+  }
 }
 
 function renderPotassiumClients() {
@@ -1941,130 +1966,521 @@ function renderPotassiumTabs(tabs = []) {
   });
 }
 
+let currentSelectedGroups = [];
+let dockedPropFilterText = '';
+let fullPropFilterText = '';
+
+function getInstanceIcon(className) {
+  const map = {
+    Workspace: '🌍',
+    Players: '👥',
+    Player: '👤',
+    Lighting: '💡',
+    ReplicatedFirst: '🎁',
+    ReplicatedStorage: '📦',
+    ServerScriptService: '⚙️',
+    ServerStorage: '🗄️',
+    StarterGui: '🖥️',
+    StarterPack: '🎒',
+    StarterPlayer: '🏃',
+    SoundService: '🔊',
+    HttpService: '🔗',
+    Chat: '💬',
+    TextChatService: '💬',
+    TweenService: '🎞️',
+    RunService: '⚙️',
+    UserInputService: '🎮',
+    ContextActionService: '🎯',
+    TeleportService: '🚀',
+    MarketplaceService: '🛒',
+    Debris: '🗑️',
+    Folder: '📁',
+    Model: '📦',
+    Part: '🟦',
+    MeshPart: '🔷',
+    WedgePart: '📐',
+    TrussPart: '🪜',
+    SpawnLocation: '🚩',
+    Terrain: '🏔️',
+    Camera: '📷',
+    Attachment: '📎',
+    RemoteEvent: '⚡',
+    RemoteFunction: '🔀',
+    UnreliableRemoteEvent: '⚡',
+    BindableEvent: '🪢',
+    BindableFunction: '🔗',
+    Script: '📜',
+    LocalScript: '📝',
+    ModuleScript: '📄',
+    ScreenGui: '🪟',
+    Frame: '🖼️',
+    ScrollingFrame: '📜',
+    TextLabel: '🏷️',
+    TextButton: '🔘',
+    TextBox: '📝',
+    ImageLabel: '🖼️',
+    ImageButton: '🖼️',
+    UIListLayout: '📐',
+    UIGridLayout: '🔲',
+    Humanoid: '🧍',
+    Tool: '🗡️',
+    ProximityPrompt: '⏳',
+    ClickDetector: '👆',
+    Highlight: '✨',
+    ParticleEmitter: '✨',
+    Sound: '🔊',
+    Animation: '🕺',
+    Animator: '🎭',
+    StringValue: '🔤',
+    NumberValue: '🔢',
+    IntValue: '🔢',
+    BoolValue: '☑️',
+    ObjectValue: '🎯',
+    Color3Value: '🎨',
+    Vector3Value: '📐',
+    CFrameValue: '🧭',
+    DataModel: '🎮'
+  };
+  return map[className] || '🔹';
+}
+
 function renderDefaultInstanceTree(info = null) {
+  if (!potassiumInstanceTree) return;
+  potassiumInstanceTree.innerHTML = `
+    <div class="empty-hint" style="padding: 14px; text-align: center;">
+      <div style="font-weight:600; color:#58a6ff; margin-bottom: 4px;">Roblox Instance Tree Ready</div>
+      <div>Click <b>"Retrieve Tree"</b> above to inspect live DataModel hierarchy.</div>
+    </div>
+  `;
+}
+
+function renderTreeError(errMsg) {
+  if (!potassiumInstanceTree) return;
+  potassiumInstanceTree.innerHTML = `
+    <div style="padding: 12px; background: #161b22; border: 1px dashed #f85149; border-radius: 4px; color: #f85149; font-size: 11px;">
+      <div style="font-weight: 700; margin-bottom: 4px;">⚠️ Live Instance Retrieval Failed</div>
+      <div style="color: #8b949e; margin-bottom: 8px;">${escapeHtml(errMsg)}</div>
+      <button class="btn btn-secondary btn-xs" onclick="retrieveLiveInstanceTree()">Retry Retrieval</button>
+    </div>
+  `;
+}
+
+async function retrieveLiveInstanceTree(targetPid = null) {
+  if (!potassiumInstanceTree) return;
+  const pid = targetPid || activeTargetPid;
+
+  if (btnInspectDataModel) {
+    btnInspectDataModel.textContent = 'Retrieving...';
+    btnInspectDataModel.disabled = true;
+  }
+
+  potassiumInstanceTree.innerHTML = `
+    <div class="k-tree-loading" style="padding: 14px 10px;">
+      <span class="k-dot-pulse">●</span>
+      <span>Retrieving live instance tree from client ${pid === 'all' ? '(auto)' : `#${pid}`}...</span>
+    </div>
+  `;
+
+  try {
+    const res = await fetch(`/api/potassium/query-tree?pid=${encodeURIComponent(pid)}&path=game`);
+    const data = await res.json();
+
+    if (data.success && data.children) {
+      liveTreeLoaded = true;
+      currentTreeMetadata = data.metadata || null;
+      liveRootChildren = data.children || [];
+      renderLiveTree(currentTreeMetadata, liveRootChildren, pid);
+      showToast(`Retrieved ${data.children.length} services/instances from live game`);
+    } else {
+      renderTreeError(data.error || 'Failed to retrieve instance tree');
+    }
+  } catch (err) {
+    renderTreeError(err.message);
+  } finally {
+    if (btnInspectDataModel) {
+      btnInspectDataModel.textContent = 'Retrieve Tree';
+      btnInspectDataModel.disabled = false;
+    }
+  }
+}
+
+function renderLiveTree(meta, children, pid) {
   if (!potassiumInstanceTree) return;
   potassiumInstanceTree.innerHTML = '';
 
-  const services = [
-    { name: 'Workspace', icon: '🌐', cls: 'Workspace', note: 'Camera, Terrain, Scene' },
-    { name: 'Players', icon: '👥', cls: 'Players', note: info ? `LocalPlayer: ${info.playerName}` : 'LocalPlayer' },
-    { name: 'Lighting', icon: '💡', cls: 'Lighting', note: 'Atmosphere, Sky' },
-    { name: 'ReplicatedStorage', icon: '📦', cls: 'ReplicatedStorage', note: 'Shared modules & remotes' },
-    { name: 'ReplicatedFirst', icon: '⚡', cls: 'ReplicatedFirst', note: 'Pre-load assets' },
-    { name: 'StarterGui', icon: '🖥️', cls: 'StarterGui', note: 'ScreenGuis' },
-    { name: 'StarterPlayer', icon: '🏃', cls: 'StarterPlayer', note: 'Scripts & characters' },
-    { name: 'HttpService', icon: '🔗', cls: 'HttpService', note: 'Web requests' }
-  ];
+  const dexTreeCountBadge = document.getElementById('dex-tree-count-badge');
+  const dexTreeRootName = document.getElementById('dex-tree-root-name');
+  if (dexTreeCountBadge) dexTreeCountBadge.textContent = children.length;
+  if (dexTreeRootName) dexTreeRootName.textContent = meta && meta.playerName ? `${meta.playerName}'s Game` : 'DataModel';
 
-  // Root DataModel
-  const root = document.createElement('div');
-  root.className = 'k-tree-row selected';
-  root.innerHTML = `
+  // Root DataModel Node
+  const rootWrap = document.createElement('div');
+  rootWrap.className = 'k-tree-node-wrap';
+  rootWrap.dataset.name = 'datamodel';
+  rootWrap.dataset.className = 'datamodel';
+
+  const rootNode = document.createElement('div');
+  rootNode.className = 'k-tree-row selected';
+  rootNode.innerHTML = `
+    <span class="k-tree-plus">-</span>
     <span class="k-tree-icon">🎮</span>
     <span class="k-tree-name"><strong>DataModel</strong> (game)</span>
-    <span class="k-tree-class">${info ? `PID: ${info.pid || activeTargetPid}` : 'Roblox'}</span>
+    <span class="k-tree-class">${meta ? `PlaceId: ${meta.placeId}` : `Client #${pid}`}</span>
   `;
-  potassiumInstanceTree.appendChild(root);
 
-  if (info) {
-    const metaRow = document.createElement('div');
-    metaRow.style.padding = '4px 8px 4px 24px';
-    metaRow.style.fontSize = '10.5px';
-    metaRow.style.color = '#58a6ff';
-    metaRow.innerHTML = `
-      PlaceId: <b>${info.placeId || '-'}</b> | GameId: <b>${info.gameId || '-'}</b><br>
-      LocalPlayer: <b>${escapeHtml(info.playerName || 'Unknown')}</b> (UserId: ${info.userId || 0})
+  rootNode.addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.querySelectorAll('.k-tree-row').forEach(r => r.classList.remove('selected'));
+    rootNode.classList.add('selected');
+    selectInstanceNode({
+      name: 'DataModel',
+      className: 'DataModel',
+      path: 'game',
+      childCount: children.length
+    }, rootNode);
+  });
+  rootWrap.appendChild(rootNode);
+
+  if (meta) {
+    const metaBox = document.createElement('div');
+    metaBox.style.padding = '4px 8px 6px 24px';
+    metaBox.style.fontSize = '10.5px';
+    metaBox.style.color = '#58a6ff';
+    metaBox.style.borderBottom = '1px solid #21262d';
+    metaBox.style.marginBottom = '4px';
+    metaBox.innerHTML = `
+      PlaceId: <b>${meta.placeId || '-'}</b> | GameId: <b>${meta.gameId || '-'}</b><br>
+      LocalPlayer: <b>${escapeHtml(meta.playerName || 'Player')}</b> (UserId: ${meta.userId || 0})
     `;
-    potassiumInstanceTree.appendChild(metaRow);
+    rootWrap.appendChild(metaBox);
   }
 
-  services.forEach(s => {
-    const row = document.createElement('div');
-    row.className = 'k-tree-row';
-    row.style.paddingLeft = '20px';
-    row.innerHTML = `
-      <span class="k-tree-icon">${s.icon}</span>
-      <span class="k-tree-name">${s.name}</span>
-      <span class="k-tree-class">${s.note}</span>
-    `;
-    row.addEventListener('click', () => {
-      document.querySelectorAll('.k-tree-row').forEach(r => r.classList.remove('selected'));
-      row.classList.add('selected');
-      if (kReplInput) {
-        kReplInput.value = `for _, child in ipairs(game:GetService("${s.name}"):GetChildren()) do print(child.Name, child.ClassName) end`;
-        kReplInput.focus();
+  // Children Container
+  const childrenContainer = document.createElement('div');
+  childrenContainer.className = 'k-tree-children';
+  childrenContainer.id = 'k-root-children-wrap';
+
+  children.forEach(child => {
+    const row = createInstanceTreeNode(child, 1);
+    childrenContainer.appendChild(row);
+  });
+
+  rootWrap.appendChild(childrenContainer);
+  potassiumInstanceTree.appendChild(rootWrap);
+
+  if (kTreeSearch) {
+    kTreeSearch.value = '';
+    kTreeSearch.oninput = () => {
+      const query = kTreeSearch.value.trim().toLowerCase();
+      const clearBtn = document.getElementById('btn-dex-clear-search');
+      if (clearBtn) clearBtn.style.display = query ? 'block' : 'none';
+      filterTreeNodes(childrenContainer, query);
+    };
+  }
+
+  // Auto-select DataModel to display initial properties
+  selectInstanceNode({
+    name: 'DataModel',
+    className: 'DataModel',
+    path: 'game',
+    childCount: children.length
+  }, rootNode);
+}
+
+function createInstanceTreeNode(inst, depth = 1) {
+  const wrap = document.createElement('div');
+  wrap.className = 'k-tree-node-wrap';
+  wrap.dataset.name = (inst.name || '').toLowerCase();
+  wrap.dataset.className = (inst.className || '').toLowerCase();
+
+  const row = document.createElement('div');
+  row.className = 'k-tree-row';
+  row.style.paddingLeft = `${depth * 14}px`;
+
+  const plusBtn = document.createElement('span');
+  plusBtn.className = `k-tree-plus ${inst.hasChildren ? '' : 'empty'}`;
+  plusBtn.textContent = inst.hasChildren ? '+' : ' ';
+
+  const icon = document.createElement('span');
+  icon.className = 'k-tree-icon';
+  icon.textContent = getInstanceIcon(inst.className);
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'k-tree-name';
+  nameSpan.textContent = inst.name;
+
+  const classSpan = document.createElement('span');
+  classSpan.className = 'k-tree-class';
+  classSpan.textContent = inst.className;
+
+  row.appendChild(plusBtn);
+  row.appendChild(icon);
+  row.appendChild(nameSpan);
+  row.appendChild(classSpan);
+
+  if (inst.childCount > 0) {
+    const badge = document.createElement('span');
+    badge.className = 'k-tree-badge';
+    badge.textContent = inst.childCount;
+    row.appendChild(badge);
+  }
+
+  wrap.appendChild(row);
+
+  let subContainer = null;
+  let isExpanded = false;
+  let isLoaded = false;
+
+  const toggleExpand = async (e) => {
+    if (e) e.stopPropagation();
+    if (!inst.hasChildren) return;
+
+    if (isExpanded) {
+      isExpanded = false;
+      plusBtn.textContent = '+';
+      if (subContainer) subContainer.style.display = 'none';
+      return;
+    }
+
+    isExpanded = true;
+    plusBtn.textContent = '-';
+
+    if (!subContainer) {
+      subContainer = document.createElement('div');
+      subContainer.className = 'k-tree-children';
+      wrap.appendChild(subContainer);
+    }
+    subContainer.style.display = 'flex';
+
+    if (!isLoaded) {
+      subContainer.innerHTML = `
+        <div class="k-tree-loading" style="padding-left: ${(depth + 1) * 14}px;">
+          <span class="k-dot-pulse">●</span> Fetching children...
+        </div>
+      `;
+
+      try {
+        const queryPath = inst.path || inst.name;
+        const res = await fetch(`/api/potassium/query-tree?pid=${encodeURIComponent(activeTargetPid)}&path=${encodeURIComponent(queryPath)}`);
+        const data = await res.json();
+        subContainer.innerHTML = '';
+
+        if (data.success && data.children && data.children.length > 0) {
+          isLoaded = true;
+          data.children.forEach(childInst => {
+            const childRow = createInstanceTreeNode(childInst, depth + 1);
+            subContainer.appendChild(childRow);
+          });
+        } else if (data.success && (!data.children || data.children.length === 0)) {
+          isLoaded = true;
+          subContainer.innerHTML = `
+            <div class="empty-hint" style="padding-left: ${(depth + 1) * 14}px; font-size: 10px;">
+              No children
+            </div>
+          `;
+        } else {
+          subContainer.innerHTML = `
+            <div class="empty-hint" style="padding-left: ${(depth + 1) * 14}px; color: #f85149; font-size: 10px;">
+              ${escapeHtml(data.error || 'Failed to load children')}
+            </div>
+          `;
+        }
+      } catch (err) {
+        subContainer.innerHTML = `
+          <div class="empty-hint" style="padding-left: ${(depth + 1) * 14}px; color: #f85149; font-size: 10px;">
+            ${escapeHtml(err.message)}
+          </div>
+        `;
       }
+    }
+  };
+
+  plusBtn.addEventListener('click', toggleExpand);
+
+  row.addEventListener('click', () => {
+    document.querySelectorAll('.k-tree-row').forEach(r => r.classList.remove('selected'));
+    row.classList.add('selected');
+    selectInstanceNode(inst, row);
+  });
+
+  row.addEventListener('dblclick', toggleExpand);
+
+  return wrap;
+}
+
+function selectInstanceNode(inst, rowEl) {
+  selectedInstance = inst;
+
+  // 1. Update Docked Properties Subheader
+  const dexSelectedClass = document.getElementById('dex-selected-class');
+  const dexSelectedName = document.getElementById('dex-selected-name');
+  if (dexSelectedClass) dexSelectedClass.textContent = inst.className;
+  if (dexSelectedName) dexSelectedName.textContent = inst.name;
+
+  // 2. Update Full Properties Tab Header
+  const dexFullName = document.getElementById('dex-full-name');
+  const dexFullClass = document.getElementById('dex-full-class');
+  const dexFullPath = document.getElementById('dex-full-path');
+  const dexFullIcon = document.getElementById('dex-full-icon');
+  if (dexFullName) dexFullName.textContent = inst.name;
+  if (dexFullClass) dexFullClass.textContent = inst.className;
+  if (dexFullPath) dexFullPath.textContent = inst.path || `game.${inst.name}`;
+  if (dexFullIcon) dexFullIcon.textContent = getInstanceIcon(inst.className);
+
+  // 3. Update REPL placeholder
+  if (kReplInput) {
+    const safeRef = inst.path && inst.path.startsWith('game') ? inst.path : `game.${inst.name}`;
+    kReplInput.placeholder = `Inspect ${inst.name} (e.g. print(${safeRef}.Name))`;
+  }
+
+  // 4. Automatically Fetch Properties from live client
+  fetchAndRenderProperties(inst);
+}
+
+async function fetchAndRenderProperties(inst) {
+  const queryPath = inst.path || inst.name;
+  const dockedContainer = document.getElementById('dex-docked-props-content');
+  const fullContainer = document.getElementById('dex-full-props-content');
+
+  const loadingHtml = `
+    <div class="k-tree-loading" style="padding: 10px 14px;">
+      <span class="k-dot-pulse">●</span> Fetching properties...
+    </div>
+  `;
+  if (dockedContainer) dockedContainer.innerHTML = loadingHtml;
+  if (fullContainer) fullContainer.innerHTML = loadingHtml;
+
+  try {
+    const res = await fetch(`/api/potassium/query-properties?pid=${encodeURIComponent(activeTargetPid)}&path=${encodeURIComponent(queryPath)}`);
+    const data = await res.json();
+
+    if (data.success && data.groups && data.groups.length > 0) {
+      currentSelectedGroups = data.groups;
+      renderDexProperties(data.groups, dockedContainer, dockedPropFilterText);
+      renderDexProperties(data.groups, fullContainer, fullPropFilterText);
+    } else if (data.success && data.properties) {
+      // Legacy fallback
+      const groups = [{ category: 'PROPERTIES', properties: Object.entries(data.properties).map(([k, v]) => ({ name: k, type: typeof v, value: v })) }];
+      currentSelectedGroups = groups;
+      renderDexProperties(groups, dockedContainer, dockedPropFilterText);
+      renderDexProperties(groups, fullContainer, fullPropFilterText);
+    } else {
+      const errHtml = `<div class="empty-hint" style="color: #f85149; padding: 12px;">${escapeHtml(data.error || 'Failed to inspect properties')}</div>`;
+      if (dockedContainer) dockedContainer.innerHTML = errHtml;
+      if (fullContainer) fullContainer.innerHTML = errHtml;
+    }
+  } catch (err) {
+    const errHtml = `<div class="empty-hint" style="color: #f85149; padding: 12px;">${escapeHtml(err.message)}</div>`;
+    if (dockedContainer) dockedContainer.innerHTML = errHtml;
+    if (fullContainer) fullContainer.innerHTML = errHtml;
+  }
+}
+
+function renderDexProperties(groups, container, filter = '') {
+  if (!container) return;
+  container.innerHTML = '';
+  const filterQuery = (filter || '').trim().toLowerCase();
+
+  let renderedAny = false;
+
+  groups.forEach(group => {
+    const matchingProps = (group.properties || []).filter(prop => {
+      if (!filterQuery) return true;
+      const k = (prop.name || '').toLowerCase();
+      const v = String(prop.value || '').toLowerCase();
+      return k.includes(filterQuery) || v.includes(filterQuery);
     });
-    potassiumInstanceTree.appendChild(row);
+
+    if (matchingProps.length === 0) return;
+    renderedAny = true;
+
+    const groupEl = document.createElement('div');
+    groupEl.className = 'dex-prop-group';
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'dex-prop-group-title';
+    titleEl.textContent = group.category;
+    groupEl.appendChild(titleEl);
+
+    matchingProps.forEach(prop => {
+      const row = document.createElement('div');
+      row.className = 'dex-prop-grid-row';
+
+      const keySpan = document.createElement('span');
+      keySpan.className = 'dex-prop-grid-key';
+      keySpan.textContent = prop.name;
+
+      const valWrap = document.createElement('div');
+      valWrap.className = 'dex-prop-grid-val';
+
+      const propType = prop.type || typeof prop.value;
+      const valStr = String(prop.value);
+
+      if (propType === 'boolean' || prop.value === true || prop.value === false) {
+        const isTrue = prop.value === true || valStr === 'true';
+        const pill = document.createElement('span');
+        pill.className = `dex-val-boolean ${isTrue ? 'is-true' : 'is-false'}`;
+        pill.textContent = isTrue ? 'true' : 'false';
+        pill.title = 'Click to toggle property on client';
+        pill.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (selectedInstance) {
+            const p = selectedInstance.path || `game.${selectedInstance.name}`;
+            const code = `pcall(function() ${p}.${prop.name} = not ${p}.${prop.name} end)`;
+            executeLuauOnPotassium(code, activeTargetPid, 'repl');
+            showToast(`Toggled ${prop.name}`);
+            setTimeout(() => fetchAndRenderProperties(selectedInstance), 400);
+          }
+        });
+        valWrap.appendChild(pill);
+      } else {
+        const valSpan = document.createElement('span');
+        if (propType === 'number') {
+          valSpan.className = 'dex-val-number';
+        } else if (propType === 'string') {
+          valSpan.className = 'dex-val-string';
+        } else if (propType === 'Instance' && valStr !== 'nil') {
+          valSpan.className = 'dex-val-instance';
+        } else if (valStr === 'nil') {
+          valSpan.className = 'dex-val-nil';
+        } else {
+          valSpan.className = 'dex-val-string';
+        }
+        valSpan.textContent = valStr;
+        valSpan.title = `${prop.name}: ${valStr} (${propType})`;
+        valWrap.appendChild(valSpan);
+      }
+
+      row.appendChild(keySpan);
+      row.appendChild(valWrap);
+      groupEl.appendChild(row);
+    });
+
+    container.appendChild(groupEl);
+  });
+
+  if (!renderedAny) {
+    container.innerHTML = `<div class="empty-hint" style="padding: 12px; font-size: 11px;">No properties match "${escapeHtml(filter)}"</div>`;
+  }
+}
+
+function filterTreeNodes(container, query) {
+  if (!container) return;
+  const nodes = container.querySelectorAll('.k-tree-node-wrap');
+  nodes.forEach(node => {
+    if (!query) {
+      node.style.display = '';
+      return;
+    }
+    const name = node.dataset.name || '';
+    const cls = node.dataset.className || '';
+    const matches = name.includes(query) || cls.includes(query);
+    node.style.display = matches ? '' : 'none';
   });
 }
 
 async function inspectLiveDataModel() {
-  if (btnInspectDataModel) {
-    btnInspectDataModel.textContent = 'Querying...';
-    btnInspectDataModel.disabled = true;
-  }
-
-  const script = `
-    local ok, res = pcall(function()
-      local HttpService = game:GetService("HttpService")
-      local lp = game:GetService("Players").LocalPlayer
-      local info = {
-        placeId = game.PlaceId,
-        gameId = game.GameId,
-        jobId = game.JobId,
-        playerName = lp and lp.Name or "Player",
-        userId = lp and lp.UserId or 0
-      }
-      return "__GOUSSE_INSPECT__:" .. HttpService:JSONEncode(info)
-    end)
-    if ok then print(res) else print("__GOUSSE_ERR__:" .. tostring(res)) end
-  `;
-
-  try {
-    const execRes = await fetch('/api/potassium/execute', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source: script, pid: activeTargetPid })
-    });
-    const execData = await execRes.json();
-    const cursor = execData.console_cursor || 0;
-
-    // Poll logs
-    setTimeout(async () => {
-      const logRes = await fetch(`/api/potassium/console?after_cursor=${cursor}&wait_ms=1000&limit=50`);
-      const logData = await logRes.json();
-      let foundInfo = null;
-
-      (logData.entries || []).forEach(e => {
-        if (e.text && e.text.includes('__GOUSSE_INSPECT__:')) {
-          try {
-            const rawJson = e.text.split('__GOUSSE_INSPECT__:')[1];
-            foundInfo = JSON.parse(rawJson);
-          } catch (_) {}
-        }
-      });
-
-      if (foundInfo) {
-        foundInfo.pid = activeTargetPid;
-        renderDefaultInstanceTree(foundInfo);
-        showToast(`Inspected Game (PlaceId: ${foundInfo.placeId})`);
-      } else {
-        renderDefaultInstanceTree();
-        showToast('Inspection dispatched (check console for output)');
-      }
-      if (btnInspectDataModel) {
-        btnInspectDataModel.textContent = 'Query Live';
-        btnInspectDataModel.disabled = false;
-      }
-    }, 400);
-  } catch (err) {
-    showToast('Failed to inspect: ' + err.message);
-    if (btnInspectDataModel) {
-      btnInspectDataModel.textContent = 'Query Live';
-      btnInspectDataModel.disabled = false;
-    }
-  }
+  retrieveLiveInstanceTree(activeTargetPid);
 }
 
 async function executeLuauOnPotassium(source, targetPid = null, origin = 'repl') {
@@ -2088,15 +2504,71 @@ async function executeLuauOnPotassium(source, targetPid = null, origin = 'repl')
   appendLogLine(potassiumConsoleLogs, `> [Dispatch to ${targetName}]: ${source.length > 80 ? source.substring(0, 80) + '...' : source}`, 'info', pid);
   appendLogLine(studioOutputList, `> [Dispatch to ${targetName}]: ${source.length > 80 ? source.substring(0, 80) + '...' : source}`, 'info', pid);
 
-  if (origin === 'studio') {
+  // Auto-navigate to external console if enabled (especially when running from Script Studio)
+  const shouldAutoNav = chkAutoNavConsole ? chkAutoNavConsole.checked : true;
+  if (origin === 'studio' && shouldAutoNav) {
+    switchView('potassium');
+    showToast(`Navigated to External Console Stream`);
+  } else if (origin === 'studio') {
     switchStudioBottomPanel('output');
   }
+
+  // Wrap source so standard print/warn/error automatically output to:
+  // 1. Executor external console window (rconsoleprint)
+  // 2. Gousse Studio Console stream via /api/studio-log
+  // 3. Roblox Developer Console (F9)
+  const wrappedSource = `
+local _origPrint = print
+local _origWarn = warn
+
+local function _gStudioSend(text, level)
+  pcall(function()
+    if rconsoleprint then
+      rconsoleprint("[" .. string.upper(level) .. "] " .. tostring(text) .. "\\n")
+    end
+  end)
+  pcall(function()
+    local req = (syn and syn.request) or (http and http.request) or http_request or request
+    if req and game:GetService("HttpService") then
+      req({
+        Url = "http://localhost:3456/api/studio-log",
+        Method = "POST",
+        Headers = { ["Content-Type"] = "application/json" },
+        Body = game:GetService("HttpService"):JSONEncode({
+          msg = tostring(text),
+          level = level
+        })
+      })
+    end
+  end)
+end
+
+local print = function(...)
+  local t = {}
+  for i = 1, select("#", ...) do table.insert(t, tostring(select(i, ...))) end
+  local s = table.concat(t, " ")
+  _gStudioSend(s, "info")
+  _origPrint(...)
+end
+
+local warn = function(...)
+  local t = {}
+  for i = 1, select("#", ...) do table.insert(t, tostring(select(i, ...))) end
+  local s = table.concat(t, " ")
+  _gStudioSend(s, "warn")
+  _origWarn(...)
+end
+
+task.spawn(function()
+${source}
+end)
+`;
 
   try {
     const res = await fetch('/api/potassium/execute', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source, pid })
+      body: JSON.stringify({ source: wrappedSource, pid })
     });
     const data = await res.json();
     if (data.success) {
@@ -2104,21 +2576,17 @@ async function executeLuauOnPotassium(source, targetPid = null, origin = 'repl')
       appendLogLine(potassiumConsoleLogs, `✓ Dispatched (Targets: ${(data.targets || []).join(', ') || targetName})`, 'info', pid);
       appendLogLine(studioOutputList, `✓ Dispatched (Targets: ${(data.targets || []).join(', ') || targetName})`, 'info', pid);
 
-      // Active polling loop for output stream (3 attempts with wait_ms)
+      // Active polling loop for output stream (4 attempts with wait_ms)
       let attempts = 0;
       let receivedAny = false;
       const pollInterval = setInterval(async () => {
         attempts++;
         const gotEntries = await pollPotassiumConsole(data.console_cursor || 0);
         if (gotEntries) receivedAny = true;
-        if (attempts >= 4) {
+        if (attempts >= 5) {
           clearInterval(pollInterval);
-          if (!receivedAny && potassiumClients.length > 0) {
-            appendLogLine(potassiumConsoleLogs, `[Execution completed] Tip: In Roblox, standard print() outputs to Developer Console (F9). You can also use rconsoleprint() for external output.`, 'info', pid);
-            appendLogLine(studioOutputList, `[Execution completed] Tip: In Roblox, standard print() outputs to Developer Console (F9).`, 'info', pid);
-          }
         }
-      }, 900);
+      }, 800);
     } else {
       appendLogLine(potassiumConsoleLogs, `Dispatch Error: ${data.error || 'Unknown error'}`, 'error', pid);
       appendLogLine(studioOutputList, `Dispatch Error: ${data.error || 'Unknown error'}`, 'error', pid);
@@ -2194,6 +2662,67 @@ if (btnKClearConsole) btnKClearConsole.addEventListener('click', clearPotassiumC
 if (btnClearStudioOutput) btnClearStudioOutput.addEventListener('click', clearPotassiumConsole);
 if (btnKPollConsole) btnKPollConsole.addEventListener('click', () => pollPotassiumConsole());
 
+// Instance card action button listeners
+if (btnKCopyPath) {
+  btnKCopyPath.addEventListener('click', () => {
+    if (selectedInstance && (selectedInstance.path || selectedInstance.name)) {
+      const p = selectedInstance.path || `game.${selectedInstance.name}`;
+      navigator.clipboard.writeText(p);
+      showToast(`Copied: ${p}`);
+    }
+  });
+}
+
+if (btnKInspectProps) {
+  btnKInspectProps.addEventListener('click', async () => {
+    if (!selectedInstance || !kPropsDisplay) return;
+    const p = selectedInstance.path || selectedInstance.name;
+    kPropsDisplay.style.display = 'flex';
+    kPropsDisplay.innerHTML = '<div class="empty-hint"><span class="k-dot-pulse">●</span> Querying properties from client...</div>';
+
+    try {
+      const res = await fetch(`/api/potassium/query-properties?pid=${encodeURIComponent(activeTargetPid)}&path=${encodeURIComponent(p)}`);
+      const data = await res.json();
+      if (data.success && data.properties) {
+        kPropsDisplay.innerHTML = '';
+        for (const [k, v] of Object.entries(data.properties)) {
+          const row = document.createElement('div');
+          row.className = 'k-prop-row';
+          row.innerHTML = `<span class="k-prop-key">${escapeHtml(k)}:</span><span class="k-prop-val" title="${escapeHtml(String(v))}">${escapeHtml(String(v))}</span>`;
+          kPropsDisplay.appendChild(row);
+        }
+      } else {
+        kPropsDisplay.innerHTML = `<div class="empty-hint" style="color:#f85149;">${escapeHtml(data.error || 'Failed to inspect properties')}</div>`;
+      }
+    } catch (err) {
+      kPropsDisplay.innerHTML = `<div class="empty-hint" style="color:#f85149;">${escapeHtml(err.message)}</div>`;
+    }
+  });
+}
+
+if (btnKSendRepl) {
+  btnKSendRepl.addEventListener('click', () => {
+    if (selectedInstance && kReplInput) {
+      const p = selectedInstance.path || `game.${selectedInstance.name}`;
+      kReplInput.value = `print(${p}:GetFullName())`;
+      kReplInput.focus();
+    }
+  });
+}
+
+if (btnKDeleteInst) {
+  btnKDeleteInst.addEventListener('click', () => {
+    if (selectedInstance) {
+      const p = selectedInstance.path || `game.${selectedInstance.name}`;
+      if (confirm(`Destroy instance ${selectedInstance.name}?`)) {
+        executeLuauOnPotassium(`pcall(function() ${p}:Destroy() end)`, activeTargetPid, 'repl');
+        showToast(`Dispatched Destroy for ${selectedInstance.name}`);
+        setTimeout(() => retrieveLiveInstanceTree(activeTargetPid), 600);
+      }
+    }
+  });
+}
+
 if (btnKReplExec && kReplInput) {
   btnKReplExec.addEventListener('click', () => {
     const val = kReplInput.value.trim();
@@ -2268,6 +2797,99 @@ setInterval(() => {
     pollPotassiumConsole();
   }
 }, 4000);
+
+// Dex Sidebar Tab Switching & Controls
+function switchDexTab(tabId) {
+  const tabs = ['explorer', 'properties', 'clients'];
+  tabs.forEach(t => {
+    const btn = document.getElementById(`tab-dex-${t}`);
+    const panel = document.getElementById(`dex-tab-content-${t}`);
+    const isActive = t === tabId;
+    if (btn) btn.classList.toggle('active', isActive);
+    if (panel) {
+      panel.style.display = isActive ? 'flex' : 'none';
+      panel.classList.toggle('active', isActive);
+    }
+  });
+
+  if (tabId === 'properties' && selectedInstance) {
+    if (currentSelectedGroups && currentSelectedGroups.length > 0) {
+      const fullContainer = document.getElementById('dex-full-props-content');
+      renderDexProperties(currentSelectedGroups, fullContainer, fullPropFilterText);
+    } else {
+      fetchAndRenderProperties(selectedInstance);
+    }
+  }
+}
+
+const tabDexExplorer = document.getElementById('tab-dex-explorer');
+const tabDexProperties = document.getElementById('tab-dex-properties');
+const tabDexClients = document.getElementById('tab-dex-clients');
+const btnDexExpandProps = document.getElementById('btn-dex-expand-props');
+
+if (tabDexExplorer) tabDexExplorer.addEventListener('click', () => switchDexTab('explorer'));
+if (tabDexProperties) tabDexProperties.addEventListener('click', () => switchDexTab('properties'));
+if (tabDexClients) tabDexClients.addEventListener('click', () => switchDexTab('clients'));
+if (btnDexExpandProps) btnDexExpandProps.addEventListener('click', () => switchDexTab('properties'));
+
+// Filter Chips and Search
+const btnDexFilters = document.getElementById('btn-dex-filters');
+const dexFilterChips = document.getElementById('dex-filter-chips');
+if (btnDexFilters && dexFilterChips) {
+  btnDexFilters.addEventListener('click', () => {
+    const isHidden = dexFilterChips.style.display === 'none';
+    dexFilterChips.style.display = isHidden ? 'flex' : 'none';
+    btnDexFilters.classList.toggle('active', isHidden);
+  });
+}
+
+document.querySelectorAll('.dex-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.dex-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    const filter = chip.dataset.filter;
+    const searchInput = document.getElementById('k-tree-search');
+    if (searchInput) {
+      searchInput.value = filter === 'all' ? '' : filter;
+      const clearBtn = document.getElementById('btn-dex-clear-search');
+      if (clearBtn) clearBtn.style.display = filter === 'all' ? 'none' : 'block';
+      const container = document.getElementById('k-root-children-wrap');
+      filterTreeNodes(container, filter === 'all' ? '' : filter.toLowerCase());
+    }
+  });
+});
+
+const btnDexClearSearch = document.getElementById('btn-dex-clear-search');
+if (btnDexClearSearch) {
+  btnDexClearSearch.addEventListener('click', () => {
+    const searchInput = document.getElementById('k-tree-search');
+    if (searchInput) {
+      searchInput.value = '';
+      btnDexClearSearch.style.display = 'none';
+      const container = document.getElementById('k-root-children-wrap');
+      filterTreeNodes(container, '');
+    }
+  });
+}
+
+// Property Search Filtering (in docked and full tabs)
+const dexDockedPropSearch = document.getElementById('dex-docked-prop-search');
+if (dexDockedPropSearch) {
+  dexDockedPropSearch.addEventListener('input', () => {
+    dockedPropFilterText = dexDockedPropSearch.value;
+    const container = document.getElementById('dex-docked-props-content');
+    renderDexProperties(currentSelectedGroups, container, dockedPropFilterText);
+  });
+}
+
+const dexFullPropSearch = document.getElementById('dex-full-prop-search');
+if (dexFullPropSearch) {
+  dexFullPropSearch.addEventListener('input', () => {
+    fullPropFilterText = dexFullPropSearch.value;
+    const container = document.getElementById('dex-full-props-content');
+    renderDexProperties(currentSelectedGroups, container, fullPropFilterText);
+  });
+}
 
 // Search & Filter event listeners
 taskSearch.addEventListener('input', renderTasks);
