@@ -54,6 +54,15 @@
           <span>Script Studio</span>
         </button>
 
+        <button class="nav-item" data-view="guisandbox">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <rect x="7" y="7" width="10" height="10" rx="1" ry="1"></rect>
+          </svg>
+          <span>ScreenGui Studio</span>
+          <span class="badge-mini" style="margin-left: auto; background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); font-size: 10px; padding: 1px 5px; border-radius: 4px;">UI</span>
+        </button>
+
         <button class="nav-item" data-view="deployment">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="6" y1="3" x2="6" y2="15"></line>
@@ -741,6 +750,268 @@
           </div>
         </div>
       </section>
+
+      <!-- SCREEN GUI DESIGNER & SANDBOX VIEW -->
+      <section id="view-guisandbox" class="view-panel">
+        <div class="gui-sandbox-layout">
+          <!-- 1. LEFT PANEL: Explorer & Palette -->
+          <div class="gui-panel gui-explorer-panel">
+            <div class="gui-panel-header">
+              <div class="gui-panel-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
+                </svg>
+                <span>UI EXPLORER</span>
+              </div>
+              <div class="gui-panel-actions">
+                <button id="btn-gui-exp-copy" class="icon-btn-xs" title="Copy element (Ctrl+C)">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                </button>
+                <button id="btn-gui-exp-paste" class="icon-btn-xs" title="Paste element (Ctrl+V)" disabled>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                  </svg>
+                </button>
+                <button id="btn-gui-duplicate" class="icon-btn-xs" title="Duplicate element (Ctrl+D)">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Quick Add Elements Palette -->
+            <div class="gui-palette-section">
+              <div class="gui-palette-label">ADD GUI ELEMENT</div>
+              <div class="gui-palette-grid">
+                <button class="gui-palette-btn" data-gui-add="Frame" title="Add Frame">
+                  <img src="/RobloxCustom/instance/16x/100/Frame.png" width="14" height="14" alt="Frame">
+                  <span>Frame</span>
+                </button>
+                <button class="gui-palette-btn" data-gui-add="TextLabel" title="Add TextLabel">
+                  <img src="/RobloxCustom/instance/16x/100/TextLabel.png" width="14" height="14" alt="TextLabel">
+                  <span>TextLabel</span>
+                </button>
+                <button class="gui-palette-btn" data-gui-add="TextButton" title="Add TextButton">
+                  <img src="/RobloxCustom/instance/16x/100/TextButton.png" width="14" height="14" alt="TextButton">
+                  <span>TextButton</span>
+                </button>
+                <button class="gui-palette-btn" data-gui-add="TextBox" title="Add TextBox">
+                  <img src="/RobloxCustom/instance/16x/100/TextBox.png" width="14" height="14" alt="TextBox">
+                  <span>TextBox</span>
+                </button>
+                <button class="gui-palette-btn" data-gui-add="ImageLabel" title="Add ImageLabel">
+                  <img src="/RobloxCustom/instance/16x/100/ImageLabel.png" width="14" height="14" alt="ImageLabel">
+                  <span>ImageLabel</span>
+                </button>
+                <button class="gui-palette-btn" data-gui-add="ScrollingFrame" title="Add ScrollingFrame">
+                  <img src="/RobloxCustom/instance/16x/100/ScrollingFrame.png" width="14" height="14" alt="ScrollingFrame">
+                  <span>ScrollFrame</span>
+                </button>
+                <button class="gui-palette-btn" data-gui-add="UICorner" title="Add UICorner Rounding">
+                  <img src="/RobloxCustom/instance/16x/100/UICorner.png" width="14" height="14" alt="UICorner">
+                  <span>UICorner</span>
+                </button>
+                <button class="gui-palette-btn" data-gui-add="UIStroke" title="Add UIStroke Outline">
+                  <img src="/RobloxCustom/instance/16x/100/UIStroke.png" width="14" height="14" alt="UIStroke">
+                  <span>UIStroke</span>
+                </button>
+                <button class="gui-palette-btn" data-gui-add="LocalScript" title="Add LocalScript Logic">
+                  <img src="/RobloxCustom/instance/16x/100/LocalScript.png" width="14" height="14" alt="LocalScript">
+                  <span>LocalScript</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Hierarchy Tree Container -->
+            <div id="gui-hierarchy-tree" class="gui-hierarchy-tree">
+              <!-- Rendered recursively by gui-designer.js -->
+            </div>
+          </div>
+
+          <!-- 2. CENTER PANEL: Viewport & Canvas Sandbox -->
+          <div class="gui-panel gui-canvas-panel">
+            <!-- Top Canvas Toolbar -->
+            <div class="gui-canvas-toolbar">
+              <!-- Tool switch: Select vs Hand (Pan Camera) -->
+              <div class="gui-toolbar-group">
+                <div class="gui-mode-switch" title="Tool Mode (V: Select, H: Pan Camera)">
+                  <button id="btn-gui-tool-select" class="gui-mode-btn active" title="Select & Move (V)">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="m3 3 7 18 3-7 7-3L3 3z"></path>
+                    </svg>
+                    <span>Select</span>
+                  </button>
+                  <button id="btn-gui-tool-pan" class="gui-mode-btn" title="Drag Move Camera (H or Space+Drag)">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"></path>
+                      <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"></path>
+                      <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"></path>
+                      <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"></path>
+                    </svg>
+                    <span>Hand</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- History & Clipboard Actions -->
+              <div class="gui-toolbar-group">
+                <button id="btn-gui-undo" class="icon-btn-xs" title="Undo (Ctrl+Z)" disabled>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 7v6h6"></path>
+                    <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+                  </svg>
+                </button>
+                <button id="btn-gui-redo" class="icon-btn-xs" title="Redo (Ctrl+Y)" disabled>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 7v6h-6"></path>
+                    <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path>
+                  </svg>
+                </button>
+                <span style="width: 1px; height: 16px; background: #28303d; margin: 0 2px;"></span>
+                <button id="btn-gui-copy" class="icon-btn-xs" title="Copy Element (Ctrl+C)">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                </button>
+                <button id="btn-gui-paste" class="icon-btn-xs" title="Paste Element (Ctrl+V)" disabled>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                  </svg>
+                </button>
+              </div>
+
+              <!-- Device Preset -->
+              <div class="gui-toolbar-group">
+                <span class="gui-toolbar-label">Device:</span>
+                <select id="gui-device-select" class="filter-select gui-device-select">
+                  <!-- Populated dynamically -->
+                </select>
+                <span id="gui-viewport-dimensions-badge" class="badge-mini">844 × 390 px</span>
+              </div>
+
+              <!-- Mode Switch (Edit vs Play Sandbox) -->
+              <div class="gui-toolbar-group">
+                <div class="gui-mode-switch">
+                  <button id="btn-gui-mode-edit" class="gui-mode-btn active" title="Edit Mode (Drag, Resize, Select)">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 20h9"></path>
+                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                    </svg>
+                    <span>Edit</span>
+                  </button>
+                  <button id="btn-gui-mode-play" class="gui-mode-btn" title="Play Sandbox (Interactive buttons, inputs, clicks)">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    <span>Play Sandbox</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Sizing Mode -->
+              <div class="gui-toolbar-group">
+                <span class="gui-toolbar-label">Transform:</span>
+                <div class="gui-mode-switch">
+                  <button id="btn-gui-size-offset" class="gui-mode-btn active" title="Offset (Pixels)">Offset</button>
+                  <button id="btn-gui-size-scale" class="gui-mode-btn" title="Scale (Responsive %)">Scale</button>
+                </div>
+              </div>
+
+              <!-- Zoom & Camera Controls -->
+              <div class="gui-toolbar-group" style="margin-left: auto;">
+                <button id="btn-gui-zoom-out" class="icon-btn-xs" title="Zoom Out (Ctrl+-)">−</button>
+                <span id="gui-canvas-zoom-badge" class="badge-mini" style="min-width: 40px; text-align: center;">95%</span>
+                <button id="btn-gui-zoom-in" class="icon-btn-xs" title="Zoom In (Ctrl++)">+</button>
+                <button id="btn-gui-cam-reset" class="btn btn-secondary btn-xs" title="Reset Camera Pan & Zoom (Ctrl+0)">Reset Cam</button>
+              </div>
+            </div>
+
+            <!-- Canvas Viewport Scroll Area -->
+            <div class="gui-canvas-viewport-area">
+              <div id="gui-canvas-viewport-wrapper" class="gui-canvas-viewport-wrapper">
+                <div id="gui-sandbox-screen" class="gui-sandbox-screen">
+                  <!-- Rendered dynamically by gui-designer.js -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Canvas Bottom Status Hint -->
+            <div class="gui-canvas-footer-bar">
+              <div class="gui-status-hint">
+                <span class="status-dot-active">●</span>
+                <span>Enter / Right-Click: Edit Text • Space+Drag / Middle-Click: Move Camera • Ctrl+Z: Undo • Ctrl+Y: Redo • Ctrl+C/V: Copy/Paste • Arrows: Nudge</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. RIGHT PANEL: Inspector (Properties & Generated LocalScript) -->
+          <div class="gui-panel gui-inspector-panel">
+            <!-- Inspector Header & Element Info -->
+            <div class="gui-panel-header" style="border-bottom: 1px solid var(--border-color); padding: 8px 12px;">
+              <div class="gui-inspector-identity">
+                <span id="gui-props-header-icon" class="gui-header-icon"></span>
+                <div style="display: flex; flex-direction: column; overflow: hidden;">
+                  <span id="gui-props-header-name" class="gui-header-name">MainFrame</span>
+                  <span id="gui-props-header-class" class="gui-header-class">Frame</span>
+                </div>
+              </div>
+
+              <!-- Inspector Tabs -->
+              <div class="gui-inspector-tabs">
+                <button id="tab-gui-inspect-props" class="gui-tab-btn active">Properties</button>
+                <button id="tab-gui-inspect-script" class="gui-tab-btn">
+                  <span>LocalScript</span>
+                  <span id="gui-script-lines-badge" class="badge-mini" style="font-size: 9px; padding: 1px 4px;">0 lines</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Tab 1: Properties List -->
+            <div id="gui-panel-inspect-props" class="gui-inspect-tab-content active">
+              <div id="gui-props-container" class="gui-props-container">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+
+            <!-- Tab 2: Auto-updating LocalScript Code -->
+            <div id="gui-panel-inspect-script" class="gui-inspect-tab-content" style="display: none;">
+              <div class="gui-script-toolbar">
+                <button id="btn-gui-copy-script" class="btn btn-secondary btn-xs">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  <span>Copy Script</span>
+                </button>
+                <button id="btn-gui-run-roblox" class="btn btn-success btn-xs" title="Deploy directly to connected Roblox client via Potassium">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                  <span>Run on Roblox</span>
+                </button>
+                <button id="btn-gui-open-studio" class="btn btn-secondary btn-xs" title="Open in Monaco Script Studio">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="16 18 22 12 16 6"></polyline>
+                    <polyline points="8 6 2 12 8 18"></polyline>
+                  </svg>
+                  <span>Open in Studio</span>
+                </button>
+              </div>
+              <div id="gui-script-code-area" class="gui-script-code-area">
+                <!-- Highlighted code table or text -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
 
     <!-- TASK MODAL / DRAWER -->
@@ -882,6 +1153,7 @@
   </div>
 
   <script src="roblox-lsp.js?v=18"></script>
+  <script src="gui-designer.js?v=1"></script>
   <script src="app.js?v=18"></script>
 </body>
 </html>

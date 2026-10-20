@@ -1203,6 +1203,14 @@ function switchView(view) {
     btnTopAction.style.display = 'none';
     refreshPotassiumStatus();
     pollPotassiumConsole();
+  } else if (view === 'guisandbox') {
+    viewHeading.textContent = 'ScreenGui Studio | Sandboxed UI Designer';
+    viewSubheading.textContent = 'Desktop & Mobile responsive canvas, live hierarchy explorer & auto-updating LocalScript generator';
+    pipelineViewSwitch.style.display = 'none';
+    btnTopAction.style.display = 'none';
+    if (window.GuiDesigner && typeof window.GuiDesigner.init === 'function') {
+      window.GuiDesigner.init();
+    }
   }
 }
 
