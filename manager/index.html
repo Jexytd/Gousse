@@ -379,7 +379,7 @@
                 <div class="empty-hint">No problems detected in the active file.</div>
               </div>
               <div id="studio-output-list" class="studio-output-content" style="display: none;">
-                <div class="empty-hint">Ready to execute. Click "▶ Run" or press Ctrl+Enter to dispatch code to Potassium.</div>
+                <div class="empty-hint">Ready to execute. Click "Run" or press Ctrl+Enter to dispatch code to Potassium.</div>
               </div>
             </div>
             <div class="editor-statusbar">
@@ -579,7 +579,7 @@
               <div class="dex-full-props-view">
                 <div class="dex-full-props-header">
                   <div class="dex-full-inst-badge">
-                    <span id="dex-full-icon" class="dex-full-icon">🎮</span>
+                    <span id="dex-full-icon" class="dex-full-icon"></span>
                     <div class="dex-full-titles">
                       <div class="dex-full-name" id="dex-full-name">DataModel</div>
                       <div class="dex-full-class" id="dex-full-class">DataModel</div>
@@ -660,11 +660,11 @@
             <!-- Luau REPL Command Bar -->
             <div class="k-repl-container">
               <div class="k-repl-quick-chips">
-                <button class="k-chip" data-cmd="print('Current GameId:', game.GameId, 'PlaceId:', game.PlaceId)">⚡ PlaceId & GameId</button>
-                <button class="k-chip" data-cmd="local p = game:GetService('Players').LocalPlayer; print('LocalPlayer:', p and p.Name, 'UserId:', p and p.UserId)">👤 LocalPlayer</button>
-                <button class="k-chip" data-cmd="for _, p in ipairs(game:GetService('Players'):GetPlayers()) do print('Player in server:', p.Name, 'UserId:', p.UserId) end">🎮 List Players</button>
-                <button class="k-chip" data-cmd="local ch = game.Players.LocalPlayer.Character; if ch and ch:FindFirstChild('Humanoid') then ch.Humanoid.WalkSpeed = 100; print('WalkSpeed set to 100') end">🚀 Speed 100</button>
-                <button class="k-chip" data-cmd="print('Executor:', identifyexecutor and identifyexecutor() or 'Potassium')">🛡️ Executor Name</button>
+                <button class="k-chip" data-cmd="print('Current GameId:', game.GameId, 'PlaceId:', game.PlaceId)">PlaceId &amp; GameId</button>
+                <button class="k-chip" data-cmd="local p = game:GetService('Players').LocalPlayer; print('LocalPlayer:', p and p.Name, 'UserId:', p and p.UserId)">LocalPlayer</button>
+                <button class="k-chip" data-cmd="for _, p in ipairs(game:GetService('Players'):GetPlayers()) do print('Player in server:', p.Name, 'UserId:', p.UserId) end">List Players</button>
+                <button class="k-chip" data-cmd="local ch = game.Players.LocalPlayer.Character; if ch and ch:FindFirstChild('Humanoid') then ch.Humanoid.WalkSpeed = 100; print('WalkSpeed set to 100') end">Speed 100</button>
+                <button class="k-chip" data-cmd="print('Executor:', identifyexecutor and identifyexecutor() or 'Potassium')">Executor Name</button>
               </div>
               <div class="k-repl-input-row">
                 <span class="k-repl-prompt">luau&gt;</span>

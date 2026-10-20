@@ -654,8 +654,10 @@ function updateProblemsUI(markers) {
 
     const row = document.createElement('div');
     row.className = 'problem-row';
+    const errIconSvg = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"/></svg>';
+    const warnIconSvg = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M6.457 1.047c.659-1.234 2.427-1.234 3.086 0l6.082 11.378A1.75 1.75 0 0114.082 15H1.918a1.75 1.75 0 01-1.543-2.575L6.457 1.047zM8 5a.75.75 0 00-.75.75v3.5a.75.75 0 001.5 0v-3.5A.75.75 0 008 5zm0 8a1 1 0 100-2 1 1 0 000 2z"/></svg>';
     row.innerHTML = `
-      <span class="problem-icon ${isError ? 'err' : 'warn'}">${isError ? '✕' : '⚠'}</span>
+      <span class="problem-icon ${isError ? 'err' : 'warn'}">${isError ? errIconSvg : warnIconSvg}</span>
       <span class="problem-pos">Ln ${m.startLineNumber}, Col ${m.startColumn}</span>
       <span class="problem-msg">${escapeHtml(m.message)}</span>
     `;
@@ -1971,77 +1973,58 @@ let dockedPropFilterText = '';
 let fullPropFilterText = '';
 
 function getInstanceIcon(className) {
-  const map = {
-    Workspace: '🌍',
-    Players: '👥',
-    Player: '👤',
-    Lighting: '💡',
-    ReplicatedFirst: '🎁',
-    ReplicatedStorage: '📦',
-    ServerScriptService: '⚙️',
-    ServerStorage: '🗄️',
-    StarterGui: '🖥️',
-    StarterPack: '🎒',
-    StarterPlayer: '🏃',
-    SoundService: '🔊',
-    HttpService: '🔗',
-    Chat: '💬',
-    TextChatService: '💬',
-    TweenService: '🎞️',
-    RunService: '⚙️',
-    UserInputService: '🎮',
-    ContextActionService: '🎯',
-    TeleportService: '🚀',
-    MarketplaceService: '🛒',
-    Debris: '🗑️',
-    Folder: '📁',
-    Model: '📦',
-    Part: '🟦',
-    MeshPart: '🔷',
-    WedgePart: '📐',
-    TrussPart: '🪜',
-    SpawnLocation: '🚩',
-    Terrain: '🏔️',
-    Camera: '📷',
-    Attachment: '📎',
-    RemoteEvent: '⚡',
-    RemoteFunction: '🔀',
-    UnreliableRemoteEvent: '⚡',
-    BindableEvent: '🪢',
-    BindableFunction: '🔗',
-    Script: '📜',
-    LocalScript: '📝',
-    ModuleScript: '📄',
-    ScreenGui: '🪟',
-    Frame: '🖼️',
-    ScrollingFrame: '📜',
-    TextLabel: '🏷️',
-    TextButton: '🔘',
-    TextBox: '📝',
-    ImageLabel: '🖼️',
-    ImageButton: '🖼️',
-    UIListLayout: '📐',
-    UIGridLayout: '🔲',
-    Humanoid: '🧍',
-    Tool: '🗡️',
-    ProximityPrompt: '⏳',
-    ClickDetector: '👆',
-    Highlight: '✨',
-    ParticleEmitter: '✨',
-    Sound: '🔊',
-    Animation: '🕺',
-    Animator: '🎭',
-    StringValue: '🔤',
-    NumberValue: '🔢',
-    IntValue: '🔢',
-    BoolValue: '☑️',
-    ObjectValue: '🎯',
-    Color3Value: '🎨',
-    Vector3Value: '📐',
-    CFrameValue: '🧭',
-    DataModel: '🎮'
-  };
-  return map[className] || '🔹';
+  const c = className || '';
+  if (c === 'Workspace') {
+    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`;
+  }
+  if (c === 'Players') {
+    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`;
+  }
+  if (c === 'Player') {
+    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
+  }
+  if (c === 'Lighting') {
+    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#facc15" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
+  }
+  if (c === 'ReplicatedFirst' || c === 'ReplicatedStorage' || c === 'ServerStorage') {
+    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>`;
+  }
+  if (c === 'ServerScriptService' || c === 'RunService') {
+    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`;
+  }
+  if (c.includes('Script') || c === 'LocalScript' || c === 'ModuleScript') {
+    const stroke = c === 'LocalScript' ? '#38bdf8' : (c === 'ModuleScript' ? '#c084fc' : '#fb923c');
+    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${stroke}" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>`;
+  }
+  if (c.includes('Remote') || c.includes('Bindable')) {
+    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`;
+  }
+  if (c.includes('Gui') || c === 'Frame' || c.includes('Text') || c.includes('Image')) {
+    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>`;
+  }
+  if (c.includes('Part') || c === 'SpawnLocation' || c === 'WedgePart' || c === 'TrussPart') {
+    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>`;
+  }
+  if (c === 'Model') {
+    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>`;
+  }
+  if (c === 'Humanoid') {
+    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`;
+  }
+  if (c === 'Camera') {
+    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>`;
+  }
+  if (c === 'Sound' || c === 'SoundService') {
+    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
+  }
+  if (c === 'Folder') {
+    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
+  }
+  if (c === 'DataModel') {
+    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="8" cy="12" r="1.5" fill="#38bdf8"></circle><circle cx="16" cy="12" r="1.5" fill="#38bdf8"></circle></svg>`;
+  }
+  // Default clean component icon
+  return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><circle cx="12" cy="12" r="3"></circle></svg>`;
 }
 
 function renderDefaultInstanceTree(info = null) {
@@ -2058,7 +2041,7 @@ function renderTreeError(errMsg) {
   if (!potassiumInstanceTree) return;
   potassiumInstanceTree.innerHTML = `
     <div style="padding: 12px; background: #161b22; border: 1px dashed #f85149; border-radius: 4px; color: #f85149; font-size: 11px;">
-      <div style="font-weight: 700; margin-bottom: 4px;">⚠️ Live Instance Retrieval Failed</div>
+      <div style="font-weight: 700; margin-bottom: 4px;">[Alert] Live Instance Retrieval Failed</div>
       <div style="color: #8b949e; margin-bottom: 8px;">${escapeHtml(errMsg)}</div>
       <button class="btn btn-secondary btn-xs" onclick="retrieveLiveInstanceTree()">Retry Retrieval</button>
     </div>
@@ -2123,7 +2106,7 @@ function renderLiveTree(meta, children, pid) {
   rootNode.className = 'k-tree-row selected';
   rootNode.innerHTML = `
     <span class="k-tree-plus">-</span>
-    <span class="k-tree-icon">🎮</span>
+    <span class="k-tree-icon">${getInstanceIcon('DataModel')}</span>
     <span class="k-tree-name"><strong>DataModel</strong> (game)</span>
     <span class="k-tree-class">${meta ? `PlaceId: ${meta.placeId}` : `Client #${pid}`}</span>
   `;
@@ -2203,7 +2186,7 @@ function createInstanceTreeNode(inst, depth = 1) {
 
   const icon = document.createElement('span');
   icon.className = 'k-tree-icon';
-  icon.textContent = getInstanceIcon(inst.className);
+  icon.innerHTML = getInstanceIcon(inst.className);
 
   const nameSpan = document.createElement('span');
   nameSpan.className = 'k-tree-name';
@@ -2325,7 +2308,7 @@ function selectInstanceNode(inst, rowEl) {
   if (dexFullName) dexFullName.textContent = inst.name;
   if (dexFullClass) dexFullClass.textContent = inst.className;
   if (dexFullPath) dexFullPath.textContent = inst.path || `game.${inst.name}`;
-  if (dexFullIcon) dexFullIcon.textContent = getInstanceIcon(inst.className);
+  if (dexFullIcon) dexFullIcon.innerHTML = getInstanceIcon(inst.className);
 
   // 3. Update REPL placeholder
   if (kReplInput) {
@@ -2497,8 +2480,8 @@ async function executeLuauOnPotassium(source, targetPid = null, origin = 'repl')
   const targetName = pid === 'all' ? 'All Clients' : `Client #${pid}`;
 
   if (potassiumClients.length === 0) {
-    appendLogLine(potassiumConsoleLogs, `⚠️ Warning: No attached Potassium client found. Make sure Roblox is running and Potassium is attached.`, 'warn');
-    appendLogLine(studioOutputList, `⚠️ Warning: No attached Potassium client found. Make sure Roblox is running and Potassium is attached.`, 'warn');
+    appendLogLine(potassiumConsoleLogs, `[Warning] No attached Potassium client found. Make sure Roblox is running and Potassium is attached.`, 'warn');
+    appendLogLine(studioOutputList, `[Warning] No attached Potassium client found. Make sure Roblox is running and Potassium is attached.`, 'warn');
   }
 
   appendLogLine(potassiumConsoleLogs, `> [Dispatch to ${targetName}]: ${source.length > 80 ? source.substring(0, 80) + '...' : source}`, 'info', pid);
@@ -2573,8 +2556,8 @@ end)
     const data = await res.json();
     if (data.success) {
       showToast(`Dispatched to ${targetName}`);
-      appendLogLine(potassiumConsoleLogs, `✓ Dispatched (Targets: ${(data.targets || []).join(', ') || targetName})`, 'info', pid);
-      appendLogLine(studioOutputList, `✓ Dispatched (Targets: ${(data.targets || []).join(', ') || targetName})`, 'info', pid);
+      appendLogLine(potassiumConsoleLogs, `[OK] Dispatched (Targets: ${(data.targets || []).join(', ') || targetName})`, 'info', pid);
+      appendLogLine(studioOutputList, `[OK] Dispatched (Targets: ${(data.targets || []).join(', ') || targetName})`, 'info', pid);
 
       // Active polling loop for output stream (4 attempts with wait_ms)
       let attempts = 0;
