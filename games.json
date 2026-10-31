@@ -2,6 +2,13 @@
   "version": "1.0.0",
   "universal": "games/universal.luau",
   "games": {
+    "111958650": {
+      "name": "Arsenal",
+      "status": "review",
+      "lead": "Jexytd",
+      "entry": "games/arsenal/main.luau",
+      "places": {}
+    },
     "994732206": {
       "name": "Blox Fruits",
       "status": "public",
@@ -22,18 +29,19 @@
         }
       }
     },
-    "111958650": {
-      "name": "Arsenal",
-      "status": "review",
-      "lead": "Jexytd",
-      "entry": "games/arsenal/main.luau",
-      "places": {}
-    },
     "1168263273": {
       "name": "Bad Business",
       "status": "development",
       "lead": "Gouang",
       "entry": "games/bad_business/main.luau",
+      "places": {}
+    },
+    "110838858426924": {
+      "name": "Tycoon Streamer",
+      "status": "public",
+      "lead": "Gouang",
+      "scriptType": "Modular (modules/)",
+      "entry": "games/tycoon_streamer/main.luau",
       "places": {}
     }
   },

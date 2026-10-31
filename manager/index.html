@@ -7,10 +7,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="index.css?v=18">
+  <link rel="stylesheet" href="index.css?v=23">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
 </head>
 <body>
+  <!-- Dynamic Theme Background & Ambient Layers -->
+  <div id="theme-bg-layer" class="theme-bg-layer"></div>
+  <div id="theme-overlay-layer" class="theme-overlay-layer"></div>
+  <div id="theme-particles-layer" class="theme-particles-layer"></div>
+
   <div class="workbench">
     <!-- Compact Left Sidebar -->
     <aside class="sidebar">
@@ -95,19 +100,42 @@
           <span class="nav-counter" id="nav-console-count">0</span>
         </button>
 
-        <div class="nav-section-label" style="margin-top: 1.25rem;">TEAM FILTERS</div>
-        <button class="nav-filter active" data-assignee-filter="all">
-          <span class="filter-dot"></span>
-          <span>All Members</span>
-        </button>
-        <button class="nav-filter" data-assignee-filter="Jexytd">
-          <span class="filter-avatar">J</span>
-          <span>Jexytd</span>
-        </button>
-        <button class="nav-filter" data-assignee-filter="Gouang">
-          <span class="filter-avatar">G</span>
-          <span>Gouang</span>
-        </button>
+        <!-- Studio Themes & Wallpaper -->
+        <div class="theme-section-header" style="margin-top: 1.25rem; display: flex; align-items: center; justify-content: space-between; padding: 0 4px 6px 4px;">
+          <div class="nav-section-label" style="margin: 0;">STUDIO THEME</div>
+          <button id="btn-open-theme-modal" class="theme-config-btn" title="Customize Theme & Background GIF">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="theme-nav-grid">
+          <button class="theme-pill-btn active" data-theme-choice="obsidian" title="Obsidian Dark (Tactical)">
+            <span class="theme-pill-emoji">🌙</span>
+            <span class="theme-pill-name">Obsidian</span>
+          </button>
+          <button class="theme-pill-btn" data-theme-choice="halloween" title="Spooky Halloween Night">
+            <span class="theme-pill-emoji">🎃</span>
+            <span class="theme-pill-name">Halloween</span>
+          </button>
+          <button class="theme-pill-btn" data-theme-choice="cyberpunk" title="Cyberpunk Neon 2077">
+            <span class="theme-pill-emoji">⚡</span>
+            <span class="theme-pill-name">Cyberpunk</span>
+          </button>
+          <button class="theme-pill-btn" data-theme-choice="crimson" title="Crimson Blood & Amber">
+            <span class="theme-pill-emoji">🩸</span>
+            <span class="theme-pill-name">Crimson</span>
+          </button>
+          <button class="theme-pill-btn" data-theme-choice="cosmos" title="Deep Cosmos Nebula">
+            <span class="theme-pill-emoji">🌌</span>
+            <span class="theme-pill-name">Cosmos</span>
+          </button>
+          <button class="theme-pill-btn" data-theme-choice="custom" id="nav-btn-custom-theme" title="Custom Background GIF / Wallpaper">
+            <span class="theme-pill-emoji">🎨</span>
+            <span class="theme-pill-name">Custom GIF</span>
+          </button>
+        </div>
       </nav>
 
       <!-- Sidebar Footer -->
@@ -138,6 +166,10 @@
             <button class="btn btn-segmented" id="btn-switch-table">List View</button>
           </div>
 
+          <button id="btn-top-theme" class="btn btn-secondary btn-sm" title="Studio Themes & Wallpaper">
+            <span id="top-theme-icon">🎃</span>
+            <span>Theme</span>
+          </button>
           <button id="btn-top-action" class="btn btn-primary btn-sm">+ New Task</button>
         </div>
       </header>
@@ -229,7 +261,6 @@
                 <th style="width: 80px;">ID</th>
                 <th>Task Title</th>
                 <th style="width: 140px;">Game Context</th>
-                <th style="width: 110px;">Assignee</th>
                 <th style="width: 100px;">Priority</th>
                 <th style="width: 110px;">Deadline</th>
                 <th style="width: 120px;">Status</th>
@@ -246,20 +277,59 @@
       <!-- VIEW 2: GAME REGISTRY -->
       <section id="view-registry" class="view-panel">
         <div class="registry-toolbar">
-          <input type="text" id="registry-search" class="compact-input" placeholder="Search by game name or Universe ID...">
-          <button id="btn-register-game" class="btn btn-primary btn-sm">+ Register Game</button>
+          <div class="search-input-wrap registry-search-wrap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="registry-search" placeholder="Search by game name, Universe ID, or sub-place...">
+          </div>
+
+          <div class="registry-toolbar-actions">
+            <!-- View Mode Switch: Cards vs List -->
+            <div class="btn-group" id="registry-view-switch">
+              <button class="btn btn-segmented active" id="btn-registry-card" title="Card Grid View">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="14" width="7" height="7"></rect>
+                  <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+                <span>Cards</span>
+              </button>
+              <button class="btn btn-segmented" id="btn-registry-list" title="Table List View">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="8" y1="6" x2="21" y2="6"></line>
+                  <line x1="8" y1="12" x2="21" y2="12"></line>
+                  <line x1="8" y1="18" x2="21" y2="18"></line>
+                  <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                  <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                  <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                </svg>
+                <span>List</span>
+              </button>
+            </div>
+
+            <button id="btn-register-game" class="btn btn-primary btn-sm">+ Register Game</button>
+          </div>
         </div>
 
-        <div class="table-container">
+        <!-- Card Grid View Container -->
+        <div id="registry-cards-container" class="registry-cards-grid">
+          <!-- Dynamically populated -->
+        </div>
+
+        <!-- Table List View Container -->
+        <div id="registry-table-container" class="table-container" style="display: none;">
           <table class="data-table">
             <thead>
               <tr>
-                <th style="width: 180px;">Game Experience</th>
-                <th style="width: 120px;">Universe ID</th>
+                <th style="width: 220px;">Game Experience</th>
+                <th style="width: 130px;">Universe ID</th>
                 <th>Sub-Worlds / Place IDs</th>
                 <th style="width: 110px;">Lead</th>
                 <th style="width: 100px;">Status</th>
-                <th style="width: 120px; text-align: right;">Actions</th>
+                <th style="width: 200px; text-align: right;">Actions</th>
               </tr>
             </thead>
             <tbody id="registry-table-body">
@@ -484,6 +554,70 @@
                   <span class="spec-name">Fallback Module</span>
                   <span class="spec-val">games/universal.luau</span>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card: Discord Script Changelog Webhook (Owner / Developer Only) -->
+          <div class="work-card" style="grid-column: 1 / -1;">
+            <div class="card-header-dense">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                </svg>
+                <h3 class="card-dense-title">Discord Script Changelog & Release Broadcast (Owner Only)</h3>
+              </div>
+              <span class="badge-mini" style="background: rgba(99,102,241,0.15); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); font-size: 11px; padding: 2px 8px; border-radius: 4px;">Developer Tool</span>
+            </div>
+            <div class="card-dense-body">
+              <p class="dense-desc">
+                Kirim pengumuman pembaruan script / changelog langsung ke Discord Webhook tim/owner setiap kali merilis perubahan script di Gousse Hub.
+              </p>
+
+              <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 0.75rem; margin-top: 0.75rem;">
+                <div>
+                  <label class="dense-label" for="wh-input-url">Discord Webhook URL (Changelogs)</label>
+                  <input type="text" id="wh-input-url" class="compact-input" placeholder="https://discord.com/api/webhooks/..." style="width: 100%;">
+                </div>
+                <div>
+                  <label class="dense-label" for="wh-select-target">Target Script / Game</label>
+                  <select id="wh-select-target" class="compact-input" style="width: 100%;">
+                    <option value="Blox Fruits • Third Sea">Blox Fruits (Third Sea)</option>
+                    <option value="Blox Fruits (All Seas)">Blox Fruits (Suite)</option>
+                    <option value="Universal Game Suite">Universal Script</option>
+                    <option value="Arsenal">Arsenal</option>
+                    <option value="Bad Business">Bad Business</option>
+                    <option value="Gousse Hub (Core Library)">Core UI Library (v2.2)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="dense-label" for="wh-input-version">Version Tag</label>
+                  <input type="text" id="wh-input-version" class="compact-input" value="1.0.1" style="width: 100%;">
+                </div>
+              </div>
+
+              <div style="margin-top: 0.75rem;">
+                <label class="dense-label" for="wh-textarea-changelog">Script Changelog & Release Notes</label>
+                <textarea id="wh-textarea-changelog" class="compact-input" rows="3" placeholder="Contoh:&#10;• Menambahkan webhook telemetry GUI&#10;• Perbaikan physics bypass Third Sea&#10;• Optimalisasi speed tween" style="width: 100%; resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: var(--text-secondary);">
+                    <input type="checkbox" id="wh-auto-push" checked style="accent-color: #6366F1;">
+                    <span>Auto-broadcast changelog saat Commit & Push</span>
+                  </label>
+                  <button id="btn-save-wh-config" class="btn btn-secondary btn-sm" title="Simpan Webhook URL">Save Config</button>
+                </div>
+
+                <button id="btn-send-script-changelog" class="btn btn-primary" style="background: #6366F1; border-color: #4f46e5;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: middle;">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                  </svg>
+                  Broadcast Changelog to Discord
+                </button>
               </div>
             </div>
           </div>
@@ -1051,11 +1185,14 @@
               </select>
             </div>
             <div class="form-cell">
-              <label class="dense-label">Assignee</label>
-              <select id="task-input-assignee" class="filter-select">
-                <option value="Jexytd">Jexytd</option>
-                <option value="Gouang">Gouang</option>
-                <option value="Unassigned">Unassigned</option>
+              <label class="dense-label">Category / Feature Tag</label>
+              <select id="task-input-category" class="filter-select">
+                <option value="Feature">Feature / Module</option>
+                <option value="Exploit / Hook">Exploit / Hook</option>
+                <option value="UI & Themes">UI & Themes</option>
+                <option value="Bypass / Security">Bypass / Security</option>
+                <option value="Optimization">Optimization</option>
+                <option value="Bugfix">Bugfix</option>
               </select>
             </div>
           </div>
@@ -1110,10 +1247,11 @@
 
           <div class="form-row" style="margin-top: 0.75rem;">
             <div class="form-cell">
-              <label class="dense-label">Lead Developer</label>
-              <select id="reg-lead" class="filter-select">
-                <option value="Jexytd">Jexytd</option>
-                <option value="Gouang">Gouang</option>
+              <label class="dense-label">Script Architecture</label>
+              <select id="reg-script-type" class="filter-select">
+                <option value="Modular (modules/)">Modular (modules/)</option>
+                <option value="Monolithic">Monolithic</option>
+                <option value="Universal Library">Universal Library</option>
               </select>
             </div>
             <div class="form-cell">
@@ -1148,12 +1286,372 @@
       </div>
     </div>
 
+    <!-- GAME DETAIL & MENU PREVIEW MODAL -->
+    <div id="game-preview-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-window game-preview-window">
+        <!-- Top Header & Meta -->
+        <div class="game-preview-header">
+          <div class="game-preview-meta">
+            <div class="game-preview-avatar-wrap">
+              <img id="gp-thumb" class="game-preview-thumb" src="" alt="Thumbnail" style="display: none;">
+              <div id="gp-thumb-fallback" class="game-preview-thumb-fallback">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+              </div>
+            </div>
+            <div class="game-preview-titles">
+              <div class="game-preview-title-row">
+                <h2 id="gp-name" class="game-preview-title">Game Title</h2>
+                <span id="gp-status-pill" class="status-pill st-public">public</span>
+              </div>
+              <div class="game-preview-subrow">
+                <span class="gp-meta-chip">
+                  <span class="gp-meta-label">Universe ID:</span>
+                  <code id="gp-universe-id" class="gp-code">0</code>
+                </span>
+                <span class="gp-meta-chip">
+                  <span class="gp-meta-label">Author:</span>
+                  <span id="gp-lead" class="gp-val">Gouang</span>
+                </span>
+                <span class="gp-meta-chip">
+                  <span class="gp-meta-label">Entry:</span>
+                  <code id="gp-entry-path" class="gp-code">games/.../main.luau</code>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="game-preview-header-actions">
+            <button id="gp-btn-open-studio" class="btn btn-secondary btn-sm" title="Edit script in Studio">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="16 18 22 12 16 6"></polyline>
+                <polyline points="8 6 2 12 8 18"></polyline>
+              </svg>
+              <span>Open in Studio</span>
+            </button>
+            <button id="gp-btn-edit-manifest" class="btn btn-secondary btn-sm" title="Edit Game Registry Entry">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 20h9"></path>
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+              </svg>
+              <span>Edit</span>
+            </button>
+            <button id="btn-close-game-preview" class="icon-btn" title="Close">✕</button>
+          </div>
+        </div>
+
+        <!-- World / Place Switcher Bar -->
+        <div class="gp-world-selector-bar" id="gp-world-bar">
+          <div class="gp-world-label">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+            <span>Target World / Place:</span>
+          </div>
+          <div class="gp-world-chips" id="gp-world-chips">
+            <!-- Dynamically populated world chips -->
+          </div>
+        </div>
+
+        <!-- Navigation Tabs inside Preview Modal -->
+        <div class="game-preview-nav">
+          <button class="gp-nav-tab active" data-gp-tab="menu">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="3" y1="9" x2="21" y2="9"></line>
+              <line x1="9" y1="21" x2="9" y2="9"></line>
+            </svg>
+            <span>GousseUI Menu Preview</span>
+            <span class="gp-tab-badge" id="gp-badge-tab-count">0 Tabs</span>
+          </button>
+          <button class="gp-nav-tab" data-gp-tab="details">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span>Sub-places & Tasks</span>
+            <span class="gp-tab-badge" id="gp-badge-task-count">0 Tasks</span>
+          </button>
+          <button class="gp-nav-tab" data-gp-tab="code">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="16 18 22 12 16 6"></polyline>
+              <polyline points="8 6 2 12 8 18"></polyline>
+            </svg>
+            <span>Script Source Code</span>
+          </button>
+        </div>
+
+        <!-- Modal Body Panes -->
+        <div class="modal-body gp-modal-body">
+          <!-- PANE 1: GousseUI Interactive Window Simulation -->
+          <div id="gp-pane-menu" class="gp-pane active">
+            <div class="gousse-sim-stage">
+              <div class="gousse-window-sim">
+                <!-- Window Topbar -->
+                <div class="gws-topbar">
+                  <div class="gws-title-group">
+                    <span class="gws-title" id="gws-win-title">Gousse Hub</span>
+                    <span class="gws-subtitle" id="gws-win-subtitle">Universal • Game Suite</span>
+                  </div>
+                  <div class="gws-window-controls">
+                    <span class="gws-dot gws-min" title="Minimize"></span>
+                    <span class="gws-dot gws-max" title="Maximize"></span>
+                    <span class="gws-dot gws-close" title="Close"></span>
+                  </div>
+                </div>
+
+                <!-- Window Body: Sidebar Tabs + Content Area -->
+                <div class="gws-body">
+                  <div class="gws-sidebar" id="gws-tabs-list">
+                    <!-- Tabs rendered dynamically -->
+                  </div>
+                  <div class="gws-content" id="gws-tab-content">
+                    <!-- Active tab controls rendered dynamically -->
+                  </div>
+                </div>
+
+                <!-- Window Bottom Status Bar -->
+                <div class="gws-bottombar">
+                  <span class="gws-status-text">
+                    <span class="gws-dot-indicator"></span>
+                    <span id="gws-status-msg">Interactive GousseUI Menu Preview • Parsed from Game Script AST</span>
+                  </span>
+                  <span class="gws-tag" id="gws-keybind-badge">Keybind: RightControl</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PANE 2: Sub-places & Tasks Details -->
+          <div id="gp-pane-details" class="gp-pane">
+            <div class="gp-details-grid">
+              <!-- Sub-places card -->
+              <div class="gp-section-card">
+                <div class="gp-card-header">
+                  <h4>Sub-Places / Registered Worlds</h4>
+                  <span class="gp-card-count" id="gp-places-count">0 Worlds</span>
+                </div>
+                <div id="gp-places-container" class="gp-places-list">
+                  <!-- Rendered dynamically -->
+                </div>
+              </div>
+
+              <!-- Linked Tasks card -->
+              <div class="gp-section-card">
+                <div class="gp-card-header">
+                  <h4>Linked Pipeline Tasks</h4>
+                  <span class="gp-card-count" id="gp-tasks-count">0 Tasks</span>
+                </div>
+                <div id="gp-tasks-container" class="gp-tasks-list">
+                  <!-- Rendered dynamically -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PANE 3: Script Source Code -->
+          <div id="gp-pane-code" class="gp-pane">
+            <div class="gp-code-toolbar">
+              <span id="gp-code-path-label" class="gp-code-path">games/.../main.luau</span>
+              <button id="gp-btn-copy-code" class="btn btn-secondary btn-sm">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span>Copy Script</span>
+              </button>
+            </div>
+            <pre class="gp-code-view"><code id="gp-code-content">-- Loading script source...</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- THEME & BACKGROUND GIF CUSTOMIZATION MODAL -->
+    <div id="theme-customizer-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-window theme-customizer-window" style="max-width: 680px;">
+        <div class="modal-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 20px;">🎨</span>
+            <div>
+              <h3 style="margin: 0; font-size: 14px; font-weight: 600;">Studio Themes & Background Wallpaper Customizer</h3>
+              <p style="margin: 0; font-size: 11px; color: var(--text-muted);">Personalize your developer workbench with animated GIFs, opacity, and custom aesthetics</p>
+            </div>
+          </div>
+          <button id="btn-close-theme-modal" class="icon-btn" title="Close">✕</button>
+        </div>
+
+        <div class="modal-body" style="display: flex; flex-direction: column; gap: 1.25rem;">
+          <!-- 1. Theme Presets Grid -->
+          <div>
+            <label class="dense-label" style="margin-bottom: 6px;">SELECT PRESET THEME</label>
+            <div class="theme-preset-grid">
+              <div class="theme-card active" data-preset="obsidian">
+                <div class="theme-card-preview" style="background: linear-gradient(135deg, #0d1117 0%, #161b22 100%); border-left: 3px solid #58a6ff;">
+                  <span class="theme-card-badge">🌙 Default</span>
+                </div>
+                <div class="theme-card-info">
+                  <span class="theme-card-title">Obsidian Tactical</span>
+                  <span class="theme-card-desc">Sleek GitHub dark slate</span>
+                </div>
+              </div>
+
+              <div class="theme-card" data-preset="halloween">
+                <div class="theme-card-preview" style="background: linear-gradient(135deg, #0e0717 0%, #1c0e30 100%); border-left: 3px solid #ff7700;">
+                  <span class="theme-card-badge" style="background: rgba(255,119,0,0.25); color: #ff9500; border: 1px solid rgba(255,119,0,0.4);">🎃 Spooky</span>
+                </div>
+                <div class="theme-card-info">
+                  <span class="theme-card-title">Halloween Night</span>
+                  <span class="theme-card-desc">Jack-o'-lantern & purple neon</span>
+                </div>
+              </div>
+
+              <div class="theme-card" data-preset="cyberpunk">
+                <div class="theme-card-preview" style="background: linear-gradient(135deg, #090d16 0%, #161c2d 100%); border-left: 3px solid #00f0ff;">
+                  <span class="theme-card-badge" style="background: rgba(0,240,255,0.2); color: #00f0ff; border: 1px solid rgba(0,240,255,0.4);">⚡ High-Tech</span>
+                </div>
+                <div class="theme-card-info">
+                  <span class="theme-card-title">Cyberpunk 2077</span>
+                  <span class="theme-card-desc">Electric cyan & neon yellow</span>
+                </div>
+              </div>
+
+              <div class="theme-card" data-preset="crimson">
+                <div class="theme-card-preview" style="background: linear-gradient(135deg, #0d0407 0%, #200a12 100%); border-left: 3px solid #f43f5e;">
+                  <span class="theme-card-badge" style="background: rgba(244,63,94,0.2); color: #fb7185; border: 1px solid rgba(244,63,94,0.4);">🩸 Vampire</span>
+                </div>
+                <div class="theme-card-info">
+                  <span class="theme-card-title">Crimson Blood</span>
+                  <span class="theme-card-desc">Dark ruby & amber gold</span>
+                </div>
+              </div>
+
+              <div class="theme-card" data-preset="cosmos">
+                <div class="theme-card-preview" style="background: linear-gradient(135deg, #030712 0%, #0d1938 100%); border-left: 3px solid #38bdf8;">
+                  <span class="theme-card-badge" style="background: rgba(56,189,248,0.2); color: #38bdf8; border: 1px solid rgba(56,189,248,0.4);">🌌 Galaxy</span>
+                </div>
+                <div class="theme-card-info">
+                  <span class="theme-card-title">Deep Cosmos</span>
+                  <span class="theme-card-desc">Starry nebula & starlight cyan</span>
+                </div>
+              </div>
+
+              <div class="theme-card" data-preset="custom">
+                <div class="theme-card-preview" style="background: linear-gradient(135deg, #181824 0%, #29293d 100%); border-left: 3px solid #a855f7;">
+                  <span class="theme-card-badge" style="background: rgba(168,85,247,0.2); color: #c084fc; border: 1px solid rgba(168,85,247,0.4);">🎨 Custom GIF</span>
+                </div>
+                <div class="theme-card-info">
+                  <span class="theme-card-title">Custom Wallpaper</span>
+                  <span class="theme-card-desc">Paste your own GIF / Image URL</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Animated Background GIF / Wallpaper URL -->
+          <div class="theme-setting-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label class="dense-label" style="margin: 0;">BACKGROUND GIF / IMAGE WALLPAPER</label>
+              <label class="theme-toggle-label">
+                <input type="checkbox" id="theme-toggle-bg-enable" checked>
+                <span>Enable Background Wallpaper</span>
+              </label>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="theme-input-bg-url" class="compact-input" placeholder="Paste direct image or GIF URL (e.g. Tenor, Giphy, Imgur, Discord, etc.)...">
+              <button id="btn-preview-bg-url" class="btn btn-secondary btn-sm" style="white-space: nowrap;">Test Link</button>
+            </div>
+
+            <!-- Curated GIF Wallpaper Presets -->
+            <div style="margin-top: 8px;">
+              <span style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Or choose a curated wallpaper preset:</span>
+              <div class="theme-gif-chips">
+                <button type="button" class="theme-gif-chip" data-gif="crimson-blood">🩸 Crimson Blood Mist</button>
+                <button type="button" class="theme-gif-chip" data-gif="crimson-moon">🌑 Blood Moon Eclipse</button>
+                <button type="button" class="theme-gif-chip" data-gif="halloween-bats">🎃 Spooky Night & Bats</button>
+                <button type="button" class="theme-gif-chip" data-gif="halloween-pumpkins">🔥 Haunted Jack-o'-Lantern</button>
+                <button type="button" class="theme-gif-chip" data-gif="cyber-rain">🌧️ Cyberpunk Rain</button>
+                <button type="button" class="theme-gif-chip" data-gif="lofi-room">☕ Anime Cozy Lo-Fi</button>
+                <button type="button" class="theme-gif-chip" data-gif="synthwave-grid">🌆 80s Retrowave Grid</button>
+                <button type="button" class="theme-gif-chip" data-gif="pixel-stars">🌌 Pixel Starfield</button>
+                <button type="button" class="theme-gif-chip" data-gif="clear">❌ Clear Background</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Visual Controls: Sliders -->
+          <div class="theme-sliders-grid">
+            <div class="theme-slider-box">
+              <div class="theme-slider-header">
+                <label class="dense-label">Wallpaper Opacity</label>
+                <span id="label-val-opacity" class="theme-val-badge">88%</span>
+              </div>
+              <input type="range" id="slider-theme-opacity" min="20" max="100" value="88" class="theme-range-slider">
+            </div>
+
+            <div class="theme-slider-box">
+              <div class="theme-slider-header">
+                <label class="dense-label">Backdrop Blur</label>
+                <span id="label-val-blur" class="theme-val-badge">3px</span>
+              </div>
+              <input type="range" id="slider-theme-blur" min="0" max="24" value="3" class="theme-range-slider">
+            </div>
+
+            <div class="theme-slider-box">
+              <div class="theme-slider-header">
+                <label class="dense-label">Panels Glass Darkness</label>
+                <span id="label-val-darkness" class="theme-val-badge">32%</span>
+              </div>
+              <input type="range" id="slider-theme-darkness" min="10" max="80" value="32" class="theme-range-slider">
+            </div>
+
+            <div class="theme-slider-box">
+              <div class="theme-slider-header">
+                <label class="dense-label">Custom Accent Color</label>
+                <span id="label-val-accent" class="theme-val-badge">#ff7700</span>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="color" id="theme-color-accent" value="#ff7700" style="width: 38px; height: 30px; border: 1px solid var(--border-color); border-radius: var(--radius-xs); cursor: pointer; background: transparent;">
+                <input type="text" id="theme-text-accent" value="#ff7700" class="compact-input" style="flex: 1; font-family: var(--font-mono); font-size: 12px;">
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. Special Atmospheric Effects -->
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-inset); border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 16px;">🦇</span>
+              <div>
+                <div style="font-weight: 500; font-size: 12px; color: var(--text-primary);">Floating Spooky Halloween Bats & Embers</div>
+                <div style="font-size: 11px; color: var(--text-muted);">Atmospheric floating bats and glowing embers for Halloween theme</div>
+              </div>
+            </div>
+            <label class="theme-toggle-switch">
+              <input type="checkbox" id="theme-toggle-spooky-particles" checked>
+              <span class="slider-round"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+          <button id="btn-reset-theme" class="btn btn-secondary btn-sm">Reset to Default</button>
+          <div style="display: flex; gap: 8px;">
+            <button id="btn-cancel-theme" class="btn btn-secondary btn-sm">Close</button>
+            <button id="btn-save-theme" class="btn btn-primary btn-sm">Save & Apply Theme</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Notification Toast -->
     <div id="toast" class="toast"></div>
   </div>
 
   <script src="roblox-lsp.js?v=18"></script>
   <script src="gui-designer.js?v=1"></script>
-  <script src="app.js?v=18"></script>
+  <script src="app.js?v=22"></script>
 </body>
 </html>

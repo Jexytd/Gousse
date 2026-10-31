@@ -16,7 +16,10 @@ const LOADER_SNIPPET = 'loadstring(game:HttpGet("https://raw.githubusercontent.c
 
 // Elements
 const navItems = document.querySelectorAll('.nav-item');
-const navFilters = document.querySelectorAll('.nav-filter');
+const themePillBtns = document.querySelectorAll('.theme-pill-btn');
+const btnOpenThemeModal = document.getElementById('btn-open-theme-modal');
+const btnTopTheme = document.getElementById('btn-top-theme');
+const topThemeIcon = document.getElementById('top-theme-icon');
 const viewPanels = document.querySelectorAll('.view-panel');
 const viewHeading = document.getElementById('view-heading');
 const viewSubheading = document.getElementById('view-subheading');
@@ -43,6 +46,40 @@ const taskTableBody = document.getElementById('task-table-body');
 const registryTableBody = document.getElementById('registry-table-body');
 const registrySearch = document.getElementById('registry-search');
 const btnRegisterGame = document.getElementById('btn-register-game');
+const btnRegistryCard = document.getElementById('btn-registry-card');
+const btnRegistryList = document.getElementById('btn-registry-list');
+const registryCardsContainer = document.getElementById('registry-cards-container');
+const registryTableContainer = document.getElementById('registry-table-container');
+
+// Game Preview Modal elements
+const gamePreviewModal = document.getElementById('game-preview-modal');
+const btnCloseGamePreview = document.getElementById('btn-close-game-preview');
+const gpWorldBar = document.getElementById('gp-world-bar');
+const gpWorldChips = document.getElementById('gp-world-chips');
+const gpThumb = document.getElementById('gp-thumb');
+const gpThumbFallback = document.getElementById('gp-thumb-fallback');
+const gpName = document.getElementById('gp-name');
+const gpStatusPill = document.getElementById('gp-status-pill');
+const gpUniverseId = document.getElementById('gp-universe-id');
+const gpLead = document.getElementById('gp-lead');
+const gpEntryPath = document.getElementById('gp-entry-path');
+const gpBtnOpenStudio = document.getElementById('gp-btn-open-studio');
+const gpBtnEditManifest = document.getElementById('gp-btn-edit-manifest');
+const gpBtnCopyCode = document.getElementById('gp-btn-copy-code');
+const gpBadgeTabCount = document.getElementById('gp-badge-tab-count');
+const gpBadgeTaskCount = document.getElementById('gp-badge-task-count');
+const gpPlacesCount = document.getElementById('gp-places-count');
+const gpPlacesContainer = document.getElementById('gp-places-container');
+const gpTasksCount = document.getElementById('gp-tasks-count');
+const gpTasksContainer = document.getElementById('gp-tasks-container');
+const gpCodePathLabel = document.getElementById('gp-code-path-label');
+const gpCodeContent = document.getElementById('gp-code-content');
+const gwsWinTitle = document.getElementById('gws-win-title');
+const gwsWinSubtitle = document.getElementById('gws-win-subtitle');
+const gwsTabsList = document.getElementById('gws-tabs-list');
+const gwsTabContent = document.getElementById('gws-tab-content');
+const gwsStatusMsg = document.getElementById('gws-status-msg');
+const gwsKeybindBadge = document.getElementById('gws-keybind-badge');
 
 // Studio elements
 const filetreeList = document.getElementById('filetree-list');
@@ -83,7 +120,7 @@ const taskInputId = document.getElementById('task-input-id');
 const taskInputStatus = document.getElementById('task-input-status');
 const taskInputTitle = document.getElementById('task-input-title');
 const taskInputGame = document.getElementById('task-input-game');
-const taskInputAssignee = document.getElementById('task-input-assignee');
+const taskInputCategory = document.getElementById('task-input-category');
 const taskInputPriority = document.getElementById('task-input-priority');
 const taskInputDeadline = document.getElementById('task-input-deadline');
 const taskInputDesc = document.getElementById('task-input-desc');
@@ -96,7 +133,7 @@ const btnDeleteTask = document.getElementById('btn-delete-task');
 const gameModal = document.getElementById('game-modal');
 const regGameName = document.getElementById('reg-game-name');
 const regUniverseId = document.getElementById('reg-universe-id');
-const regLead = document.getElementById('reg-lead');
+const regScriptType = document.getElementById('reg-script-type');
 const regStatus = document.getElementById('reg-status');
 const regEntryPath = document.getElementById('reg-entry-path');
 const regPlacesList = document.getElementById('reg-places-list');
@@ -104,6 +141,31 @@ const btnRegAddPlace = document.getElementById('btn-reg-add-place');
 const btnCloseGameModal = document.getElementById('btn-close-game-modal');
 const btnCancelGame = document.getElementById('btn-cancel-game');
 const btnSaveGameReg = document.getElementById('btn-save-game-reg');
+
+// Theme Customizer Modal Elements
+const themeCustomizerModal = document.getElementById('theme-customizer-modal');
+const btnCloseThemeModal = document.getElementById('btn-close-theme-modal');
+const btnCancelTheme = document.getElementById('btn-cancel-theme');
+const btnSaveTheme = document.getElementById('btn-save-theme');
+const btnResetTheme = document.getElementById('btn-reset-theme');
+const themePresetCards = document.querySelectorAll('.theme-card');
+const themeToggleBgEnable = document.getElementById('theme-toggle-bg-enable');
+const themeInputBgUrl = document.getElementById('theme-input-bg-url');
+const btnPreviewBgUrl = document.getElementById('btn-preview-bg-url');
+const themeGifChips = document.querySelectorAll('.theme-gif-chip');
+const sliderThemeOpacity = document.getElementById('slider-theme-opacity');
+const sliderThemeBlur = document.getElementById('slider-theme-blur');
+const sliderThemeDarkness = document.getElementById('slider-theme-darkness');
+const themeColorAccent = document.getElementById('theme-color-accent');
+const themeTextAccent = document.getElementById('theme-text-accent');
+const themeToggleSpookyParticles = document.getElementById('theme-toggle-spooky-particles');
+const labelValOpacity = document.getElementById('label-val-opacity');
+const labelValBlur = document.getElementById('label-val-blur');
+const labelValDarkness = document.getElementById('label-val-darkness');
+const labelValAccent = document.getElementById('label-val-accent');
+const themeBgLayer = document.getElementById('theme-bg-layer');
+const themeOverlayLayer = document.getElementById('theme-overlay-layer');
+const themeParticlesLayer = document.getElementById('theme-particles-layer');
 
 const toast = document.getElementById('toast');
 
@@ -1175,8 +1237,7 @@ function switchView(view) {
     viewHeading.textContent = 'Game Experience Registry';
     viewSubheading.textContent = 'Universe IDs, sub-places, and routing manifest';
     pipelineViewSwitch.style.display = 'none';
-    btnTopAction.style.display = 'inline-flex';
-    btnTopAction.textContent = '+ Register Game';
+    btnTopAction.style.display = 'none';
   } else if (view === 'studio') {
     viewHeading.textContent = 'Script Studio';
     viewSubheading.textContent = 'Luau IntelliSense, syntax verification & code workspace';
@@ -1242,15 +1303,24 @@ btnTopAction.addEventListener('click', () => {
   }
 });
 
-// Team Filter in Sidebar
-navFilters.forEach(f => {
-  f.addEventListener('click', () => {
-    navFilters.forEach(x => x.classList.remove('active'));
-    f.classList.add('active');
-    activeAssigneeFilter = f.dataset.assigneeFilter;
-    renderTasks();
+// Studio Theme Quick Selector in Sidebar
+themePillBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const choice = btn.dataset.themeChoice;
+    if (choice === 'custom') {
+      openThemeModal();
+    } else {
+      selectPresetTheme(choice);
+    }
   });
 });
+
+if (btnOpenThemeModal) {
+  btnOpenThemeModal.addEventListener('click', openThemeModal);
+}
+if (btnTopTheme) {
+  btnTopTheme.addEventListener('click', openThemeModal);
+}
 
 // ==========================================
 // 5. Pipeline Tasks Rendering & Management
@@ -1304,11 +1374,10 @@ function getFilteredTasks() {
       (task.title || '').toLowerCase().includes(query) ||
       (task.description || '').toLowerCase().includes(query);
 
-    const matchesAssignee = activeAssigneeFilter === 'all' || task.assignee === activeAssigneeFilter;
     const matchesGame = gameF === 'all' || task.gameId === gameF;
     const matchesPrio = prioF === 'all' || task.priority === prioF;
 
-    return matchesSearch && matchesAssignee && matchesGame && matchesPrio;
+    return matchesSearch && matchesGame && matchesPrio;
   });
 }
 
@@ -1340,10 +1409,7 @@ function renderTasks() {
         <div class="task-title">${escapeHtml(task.title || 'Untitled task')}</div>
         <div class="task-meta">
           <span class="game-tag">${getGameName(task.gameId)}</span>
-          <div class="assignee-chip">
-            <span class="avatar-mini">${(task.assignee || 'U')[0]}</span>
-            <span>${task.assignee || 'Unassigned'}</span>
-          </div>
+          <span style="font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono);">${task.deadline ? '📅 ' + task.deadline : 'Active'}</span>
         </div>
       `;
 
@@ -1358,7 +1424,7 @@ function renderTasks() {
   } else {
     taskTableBody.innerHTML = '';
     if (tasks.length === 0) {
-      taskTableBody.innerHTML = `<tr><td colspan="8" class="empty-hint">No tasks match the active filters</td></tr>`;
+      taskTableBody.innerHTML = `<tr><td colspan="7" class="empty-hint">No tasks match the active filters</td></tr>`;
       return;
     }
 
@@ -1369,12 +1435,6 @@ function renderTasks() {
         <td style="font-family: var(--font-mono); color: var(--text-muted);">${task.id || ''}</td>
         <td style="font-weight: 500; color: var(--text-primary);">${escapeHtml(task.title || '')}</td>
         <td><span class="game-tag">${getGameName(task.gameId)}</span></td>
-        <td>
-          <div class="assignee-chip">
-            <span class="avatar-mini">${(task.assignee || 'U')[0]}</span>
-            <span>${task.assignee || 'Unassigned'}</span>
-          </div>
-        </td>
         <td><span class="priority-pill p-${task.priority || 'Medium'}">${task.priority || 'Med'}</span></td>
         <td style="font-family: var(--font-mono); font-size: 11px;">${task.deadline || '—'}</td>
         <td><span class="status-pill st-${task.status || 'backlog'}">${formatStatus(task.status)}</span></td>
@@ -1410,7 +1470,7 @@ function openTaskModal(taskId) {
     taskInputStatus.value = task.status || 'backlog';
     taskInputTitle.value = task.title || '';
     taskInputGame.value = task.gameId || 'universal';
-    taskInputAssignee.value = task.assignee || 'Jexytd';
+    if (taskInputCategory) taskInputCategory.value = task.category || 'Feature';
     taskInputPriority.value = task.priority || 'Medium';
     taskInputDeadline.value = task.deadline || '';
     taskInputDesc.value = task.description || '';
@@ -1422,7 +1482,7 @@ function openTaskModal(taskId) {
     taskInputStatus.value = 'backlog';
     taskInputTitle.value = '';
     taskInputGame.value = 'universal';
-    taskInputAssignee.value = activeAssigneeFilter !== 'all' ? activeAssigneeFilter : 'Jexytd';
+    if (taskInputCategory) taskInputCategory.value = 'Feature';
     taskInputPriority.value = 'Medium';
     taskInputDeadline.value = new Date().toISOString().split('T')[0];
     taskInputDesc.value = '';
@@ -1450,7 +1510,9 @@ btnSaveTask.addEventListener('click', async () => {
     title,
     status: taskInputStatus.value,
     gameId: taskInputGame.value,
-    assignee: taskInputAssignee.value,
+    category: taskInputCategory ? taskInputCategory.value : 'Feature',
+    author: 'Gouang',
+    assignee: 'Gouang',
     priority: taskInputPriority.value,
     deadline: taskInputDeadline.value,
     description: taskInputDesc.value.trim()
@@ -1486,55 +1548,961 @@ btnDeleteTask.addEventListener('click', async () => {
 // 6. Game Registry
 // ==========================================
 
-function renderRegistry() {
-  const query = (registrySearch.value || '').toLowerCase().trim();
-  registryTableBody.innerHTML = '';
+let activeRegistryView = 'card';
+const gameThumbnailsMap = new Map();
+let currentPreviewGameId = null;
+let currentParsedUi = null;
+let activePreviewTabId = null;
 
-  const entries = Object.entries(manifest.games || {}).filter(([uid, g]) => {
-    return !query || (g.name || '').toLowerCase().includes(query) || uid.includes(query);
+// Lucide icon SVG generator (No emojis/emoticons)
+function getLucideIconSvg(name) {
+  const n = (name || '').toLowerCase().trim();
+  if (n === 'crosshair' || n === 'target' || n === 'aim') {
+    return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="22" y1="12" x2="18" y2="12"></line><line x1="6" y1="12" x2="2" y2="12"></line><line x1="12" y1="6" x2="12" y2="2"></line><line x1="12" y1="22" x2="12" y2="18"></line></svg>`;
+  }
+  if (n === 'swords' || n === 'sword' || n === 'combat') {
+    return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"></polyline><line x1="13" y1="19" x2="19" y2="13"></line><line x1="16" y1="16" x2="20" y2="20"></line><line x1="19" y1="21" x2="21" y2="19"></line></svg>`;
+  }
+  if (n === 'shield' || n === 'defense') {
+    return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`;
+  }
+  if (n === 'compass' || n === 'map' || n === 'navigation' || n === 'teleport') {
+    return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>`;
+  }
+  if (n === 'eye' || n === 'visuals' || n === 'esp') {
+    return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+  }
+  if (n === 'gauge' || n === 'movement' || n === 'speed') {
+    return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 14 4-4"></path><path d="M3.34 19a10 10 0 1 1 17.32 0"></path></svg>`;
+  }
+  if (n === 'settings' || n === 'config' || n === 'gear') {
+    return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`;
+  }
+  if (n === 'sliders' || n === 'controls') {
+    return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>`;
+  }
+  return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>`;
+}
+
+// Fetch official Roblox game icons & cache in memory
+async function loadGameThumbnails(universeIds) {
+  if (!universeIds || universeIds.length === 0) return;
+  const missing = universeIds.filter(id => id !== 'universal' && !gameThumbnailsMap.has(id));
+  if (missing.length === 0) return;
+
+  try {
+    const res = await fetch(`/api/roblox-thumbnails?universeIds=${encodeURIComponent(missing.join(','))}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.thumbnails) {
+        Object.entries(data.thumbnails).forEach(([uid, url]) => {
+          gameThumbnailsMap.set(uid, url);
+        });
+        updateRenderedThumbnails();
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to load Roblox thumbnails:', err);
+  }
+}
+
+function updateRenderedThumbnails() {
+  document.querySelectorAll('[data-thumb-uid]').forEach(el => {
+    const uid = el.getAttribute('data-thumb-uid');
+    const url = gameThumbnailsMap.get(uid);
+    if (!url) return;
+
+    if (el.tagName === 'IMG') {
+      el.src = url;
+      el.style.display = 'block';
+      const fallback = el.nextElementSibling;
+      if (fallback && (fallback.classList.contains('game-card-avatar-fallback') || fallback.classList.contains('table-game-thumb-fallback'))) {
+        fallback.style.display = 'none';
+      }
+    } else if (el.classList.contains('game-card-banner-bg')) {
+      el.src = url;
+      el.style.display = 'block';
+    }
   });
 
-  if (entries.length === 0) {
-    registryTableBody.innerHTML = `<tr><td colspan="6" class="empty-hint">No games registered</td></tr>`;
+  if (currentPreviewGameId && gameThumbnailsMap.has(currentPreviewGameId)) {
+    gpThumb.src = gameThumbnailsMap.get(currentPreviewGameId);
+    gpThumb.style.display = 'block';
+    gpThumbFallback.style.display = 'none';
+  }
+}
+
+// Luau AST parser to extract GousseUI Window, Tabs, Sections, Controls
+function parseGousseUiScript(src) {
+  const result = {
+    window: { title: 'Gousse Hub', subTitle: 'Game Module', keybind: 'RightControl' },
+    tabs: []
+  };
+
+  if (!src) return result;
+
+  // Window title & subtitle
+  const winMatch = src.match(/GousseUI\s*:\s*CreateWindow\s*\(\s*\{([\s\S]*?)\}\s*\)/);
+  if (winMatch) {
+    const winProps = winMatch[1];
+    const tM = winProps.match(/Title\s*=\s*["']([^"']+)["']/);
+    const sM = winProps.match(/SubTitle\s*=\s*["']([^"']+)["']/);
+    const kM = winProps.match(/Keybind\s*=\s*(?:Enum\.KeyCode\.)?([A-Za-z0-9_]+)/);
+    if (tM) result.window.title = tM[1];
+    if (sM) result.window.subTitle = sM[1];
+    if (kM) result.window.keybind = kM[1];
+  }
+
+  // Parse Tabs: local <Var> = Window:CreateTab({ ... })
+  const tabRegex = /(?:local\s+([A-Za-z0-9_]+)\s*=\s*)?Window\s*:\s*CreateTab\s*\(\s*\{([\s\S]*?)\}\s*\)/g;
+  let tMatch;
+  const tabVarMap = new Map();
+
+  while ((tMatch = tabRegex.exec(src)) !== null) {
+    const varName = tMatch[1] || `tab_${result.tabs.length}`;
+    const tabProps = tMatch[2];
+    const nM = tabProps.match(/Name\s*=\s*["']([^"']+)["']/);
+    const iM = tabProps.match(/Icon\s*=\s*["']([^"']+)["']/);
+    const tabObj = {
+      id: varName,
+      name: nM ? nM[1] : `Tab ${result.tabs.length + 1}`,
+      icon: iM ? iM[1] : 'box',
+      elements: []
+    };
+    result.tabs.push(tabObj);
+    tabVarMap.set(varName, tabObj);
+  }
+
+  // Fallback tab if none defined
+  if (result.tabs.length === 0) {
+    const defaultTab = {
+      id: 'mainTab',
+      name: 'General',
+      icon: 'sliders',
+      elements: []
+    };
+    result.tabs.push(defaultTab);
+    tabVarMap.set('Window', defaultTab);
+    tabVarMap.set('mainTab', defaultTab);
+  }
+
+  // Parse elements per tab variable
+  for (const [varName, tabObj] of tabVarMap.entries()) {
+    const escapedVar = varName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const callRegex = new RegExp(escapedVar + '\\s*:\\s*(Create(?:Section|Toggle|Slider|Dropdown|Button|Paragraph|Keybind|ColorPicker))\\s*\\(', 'g');
+
+    let match;
+    while ((match = callRegex.exec(src)) !== null) {
+      const type = match[1];
+      const startIdx = match.index + match[0].length;
+
+      let depth = 1;
+      let endIdx = startIdx;
+      let inStr = false;
+      let strChar = null;
+
+      while (depth > 0 && endIdx < src.length) {
+        const c = src[endIdx];
+        const nextC = src[endIdx + 1];
+
+        if (!inStr && c === '-' && nextC === '-') {
+          const nextNl = src.indexOf('\n', endIdx);
+          endIdx = nextNl === -1 ? src.length : nextNl;
+          continue;
+        }
+
+        if (inStr) {
+          if (c === '\\') {
+            endIdx += 2;
+            continue;
+          }
+          if (c === strChar) {
+            inStr = false;
+            strChar = null;
+          }
+        } else {
+          if (c === '"' || c === "'") {
+            inStr = true;
+            strChar = c;
+          } else if (c === '(' || c === '{') {
+            depth++;
+          } else if (c === ')' || c === '}') {
+            depth--;
+          }
+        }
+        endIdx++;
+      }
+
+      const rawArgs = src.substring(startIdx, endIdx - 1).trim();
+      const elem = parseGousseUiElement(type, rawArgs);
+      if (elem) {
+        tabObj.elements.push(elem);
+      }
+    }
+  }
+
+  return result;
+}
+
+function parseGousseUiElement(type, rawArgs) {
+  if (type === 'CreateSection') {
+    const sM = rawArgs.match(/["']([^"']+)["']/);
+    return {
+      type: 'section',
+      title: sM ? sM[1] : 'Section'
+    };
+  }
+
+  if (type === 'CreateToggle') {
+    const nM = rawArgs.match(/Name\s*=\s*["']([^"']+)["']/);
+    const subM = rawArgs.match(/SubTitle\s*=\s*["']([^"']+)["']/);
+    const dM = rawArgs.match(/Default\s*=\s*(true|false)/);
+    return {
+      type: 'toggle',
+      name: nM ? nM[1] : 'Toggle',
+      subTitle: subM ? subM[1] : '',
+      default: dM ? dM[1] === 'true' : false
+    };
+  }
+
+  if (type === 'CreateSlider') {
+    const nM = rawArgs.match(/Name\s*=\s*["']([^"']+)["']/);
+    const minM = rawArgs.match(/Min\s*=\s*(-?\d+(?:\.\d+)?)/);
+    const maxM = rawArgs.match(/Max\s*=\s*(-?\d+(?:\.\d+)?)/);
+    const defM = rawArgs.match(/Default\s*=\s*(-?\d+(?:\.\d+)?)/);
+    const sfxM = rawArgs.match(/Suffix\s*=\s*["']([^"']+)["']/);
+    return {
+      type: 'slider',
+      name: nM ? nM[1] : 'Slider',
+      min: minM ? parseFloat(minM[1]) : 0,
+      max: maxM ? parseFloat(maxM[1]) : 100,
+      default: defM ? parseFloat(defM[1]) : (minM ? parseFloat(minM[1]) : 0),
+      suffix: sfxM ? sfxM[1] : ''
+    };
+  }
+
+  if (type === 'CreateDropdown') {
+    const nM = rawArgs.match(/Name\s*=\s*["']([^"']+)["']/);
+    const defM = rawArgs.match(/Default\s*=\s*["']([^"']+)["']/);
+    const optMatch = rawArgs.match(/Options\s*=\s*\{([\s\S]*?)\}/);
+    let options = [];
+    if (optMatch) {
+      const matches = optMatch[1].matchAll(/["']([^"']+)["']/g);
+      for (const m of matches) options.push(m[1]);
+    }
+    return {
+      type: 'dropdown',
+      name: nM ? nM[1] : 'Dropdown',
+      options: options.length > 0 ? options : ['Default'],
+      default: defM ? defM[1] : (options[0] || 'Default')
+    };
+  }
+
+  if (type === 'CreateButton') {
+    const nM = rawArgs.match(/Name\s*=\s*["']([^"']+)["']/);
+    const subM = rawArgs.match(/SubTitle\s*=\s*["']([^"']+)["']/);
+    const btnTextM = rawArgs.match(/ButtonText\s*=\s*["']([^"']+)["']/);
+    const varM = rawArgs.match(/Variant\s*=\s*["']([^"']+)["']/);
+    return {
+      type: 'button',
+      name: nM ? nM[1] : 'Button',
+      subTitle: subM ? subM[1] : '',
+      buttonText: btnTextM ? btnTextM[1] : 'Execute',
+      variant: varM ? varM[1] : 'primary'
+    };
+  }
+
+  if (type === 'CreateParagraph') {
+    const tM = rawArgs.match(/Title\s*=\s*["']([^"']+)["']/);
+    const cM = rawArgs.match(/Content\s*=\s*["']([\s\S]*?)["']/);
+    return {
+      type: 'paragraph',
+      title: tM ? tM[1] : 'Info',
+      content: cM ? cM[1].replace(/\\n/g, '\n') : ''
+    };
+  }
+
+  return null;
+}
+
+// Main Game Registry Render
+function renderRegistry() {
+  const query = (registrySearch.value || '').toLowerCase().trim();
+  const rawEntries = Object.entries(manifest.games || {});
+
+  const entries = rawEntries.filter(([uid, g]) => {
+    const nameMatch = (g.name || '').toLowerCase().includes(query);
+    const uidMatch = uid.includes(query);
+    const placesMatch = Object.values(g.places || {}).some(p => (p.name || '').toLowerCase().includes(query) || (p.script || '').toLowerCase().includes(query));
+    return !query || nameMatch || uidMatch || placesMatch;
+  });
+
+  const hasUniversal = !query || 'universal'.includes(query) || 'universal game suite'.includes(query);
+
+  // Trigger Roblox thumbnail fetch in background
+  const uids = entries.map(([u]) => u);
+  loadGameThumbnails(uids);
+
+  if (activeRegistryView === 'card') {
+    registryCardsContainer.style.display = 'grid';
+    registryTableContainer.style.display = 'none';
+    renderRegistryCards(entries, hasUniversal);
+  } else {
+    registryCardsContainer.style.display = 'none';
+    registryTableContainer.style.display = 'block';
+    renderRegistryTable(entries, hasUniversal);
+  }
+}
+
+// Render Card Grid View
+function renderRegistryCards(entries, hasUniversal) {
+  registryCardsContainer.innerHTML = '';
+
+  if (entries.length === 0 && !hasUniversal) {
+    registryCardsContainer.innerHTML = `<div class="empty-hint" style="grid-column: 1 / -1; padding: 40px; text-align: center;">No games match your query</div>`;
     return;
   }
 
+  // 1. Universal Card (Master Cross-Game Engine)
+  if (hasUniversal) {
+    const uTasks = (manifest.tasks || []).filter(t => t.gameId === 'universal');
+    const uCard = document.createElement('div');
+    uCard.className = 'game-card';
+    uCard.innerHTML = `
+      <div class="game-card-banner">
+        <div class="game-card-banner-overlay"></div>
+      </div>
+      <div class="game-card-header">
+        <div class="game-card-avatar">
+          <div class="game-card-avatar-fallback" style="background: linear-gradient(135deg, #10b981, #059669); color: #ffffff;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="game-card-title-box">
+          <h3 class="game-card-title">Universal Game Suite</h3>
+          <span class="game-card-uid-pill">Universe ID: universal</span>
+        </div>
+      </div>
+      <div class="game-card-body">
+        <div class="game-card-meta-row">
+          <div class="developer-chip" style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-secondary);">
+            <span class="avatar-mini" style="background: var(--theme-accent, #238636); color: #fff;">G</span>
+            <span>Gouang</span>
+          </div>
+          <span class="status-pill st-public">Master Core</span>
+        </div>
+        <div class="game-card-subplaces">
+          <span class="game-tag" style="background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">Cross-Place Fallback Engine</span>
+        </div>
+        <div class="game-card-tasks-badge">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 11 12 14 22 4"></polyline>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+          </svg>
+          <span>${uTasks.length} linked tasks</span>
+        </div>
+      </div>
+      <div class="game-card-footer">
+        <button class="btn btn-sm btn-preview-menu" data-uid="universal">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+          <span>Preview Menu</span>
+        </button>
+        <div style="display: flex; gap: 4px;">
+          <button class="btn btn-secondary btn-sm btn-open-script" data-entry="${manifest.universal || 'games/universal.luau'}">Open Script</button>
+        </div>
+      </div>
+    `;
+
+    uCard.querySelector('.btn-preview-menu').addEventListener('click', () => openGamePreviewModal('universal'));
+    uCard.querySelector('.btn-open-script').addEventListener('click', () => {
+      switchView('studio');
+      openFileInStudio(manifest.universal || 'games/universal.luau');
+    });
+
+    registryCardsContainer.appendChild(uCard);
+  }
+
+  // 2. Game Cards
   entries.forEach(([uid, g]) => {
     const places = Object.entries(g.places || {});
     const placeTags = places.map(([pid, p]) => {
-      return `<span class="game-tag" title="PlaceId: ${pid}">${escapeHtml(p.name || pid)}</span>`;
-    }).join(' ') || '<span style="color:var(--text-muted);">None (Master entry only)</span>';
+      return `<span class="game-tag clickable-world-tag" data-uid="${uid}" data-pid="${pid}" title="Click to preview ${escapeHtml(p.name || pid)} menu">${escapeHtml(p.name || pid)}</span>`;
+    }).join(' ') || '<span style="color:var(--text-muted); font-size: 11px;">Single World (Master entry)</span>';
+
+    const linkedTasks = (manifest.tasks || []).filter(t => t.gameId === uid);
+    const thumbUrl = gameThumbnailsMap.get(uid);
+
+    const card = document.createElement('div');
+    card.className = 'game-card';
+    card.innerHTML = `
+      <div class="game-card-banner">
+        <img class="game-card-banner-bg" data-thumb-uid="${uid}" src="${thumbUrl || ''}" alt="Banner" style="${thumbUrl ? 'display:block;' : 'display:none;'}">
+        <div class="game-card-banner-overlay"></div>
+      </div>
+      <div class="game-card-header">
+        <div class="game-card-avatar">
+          <img class="game-card-thumb-img" data-thumb-uid="${uid}" src="${thumbUrl || ''}" alt="${escapeHtml(g.name)}" style="${thumbUrl ? 'display:block;' : 'display:none;'}">
+          <div class="game-card-avatar-fallback" style="${thumbUrl ? 'display:none;' : 'display:flex;'}">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+          </div>
+        </div>
+        <div class="game-card-title-box">
+          <h3 class="game-card-title" title="${escapeHtml(g.name)}">${escapeHtml(g.name || 'Untitled')}</h3>
+          <span class="game-card-uid-pill" title="Universe ID">ID: ${uid}</span>
+        </div>
+      </div>
+      <div class="game-card-body">
+        <div class="game-card-meta-row">
+          <div class="developer-chip" style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-secondary);">
+            <span class="avatar-mini" style="background: var(--theme-accent, #238636); color: #fff;">G</span>
+            <span>Gouang</span>
+          </div>
+          <span class="status-pill st-${g.status || 'public'}">${g.status || 'public'}</span>
+        </div>
+        <div class="game-card-subplaces">
+          ${placeTags}
+        </div>
+        <div class="game-card-tasks-badge">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 11 12 14 22 4"></polyline>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+          </svg>
+          <span>${linkedTasks.length} linked tasks</span>
+        </div>
+      </div>
+      <div class="game-card-footer">
+        <button class="btn btn-sm btn-preview-menu" data-uid="${uid}">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+          <span>Preview Menu</span>
+        </button>
+        <div style="display: flex; gap: 4px;">
+          <button class="btn btn-secondary btn-sm btn-open-script" data-entry="${g.entry || `games/${slugify(g.name)}/main.luau`}">Open</button>
+          <button class="btn btn-secondary btn-sm btn-edit-game" data-uid="${uid}">Edit</button>
+        </div>
+      </div>
+    `;
+
+    card.querySelector('.btn-preview-menu').addEventListener('click', () => openGamePreviewModal(uid));
+    card.querySelectorAll('.clickable-world-tag').forEach(tag => {
+      tag.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openGamePreviewModal(tag.dataset.uid, tag.dataset.pid);
+      });
+    });
+    card.querySelector('.btn-open-script').addEventListener('click', () => {
+      switchView('studio');
+      openFileInStudio(g.entry || `games/${slugify(g.name)}/main.luau`);
+    });
+    card.querySelector('.btn-edit-game').addEventListener('click', () => openGameModal(uid));
+
+    registryCardsContainer.appendChild(card);
+  });
+}
+
+// Render Table List View
+function renderRegistryTable(entries, hasUniversal) {
+  registryTableBody.innerHTML = '';
+
+  if (entries.length === 0 && !hasUniversal) {
+    registryTableBody.innerHTML = `<tr><td colspan="6" class="empty-hint">No games match query</td></tr>`;
+    return;
+  }
+
+  // Universal row
+  if (hasUniversal) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <div class="table-game-cell">
+          <div class="table-game-thumb-fallback" style="background: linear-gradient(135deg, #10b981, #059669); color: #ffffff;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+            </svg>
+          </div>
+          <div>
+            <div style="font-weight: 600; color: var(--text-primary);">Universal Game Suite</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Master Fallback</div>
+          </div>
+        </div>
+      </td>
+      <td style="font-family: var(--font-mono); color: var(--text-muted);">universal</td>
+      <td><span class="game-tag" style="background: rgba(16, 185, 129, 0.12); color: #10b981;">All Roblox Experiences</span></td>
+      <td>
+        <div class="developer-chip" style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-secondary);">
+          <span class="avatar-mini" style="background: var(--theme-accent, #238636); color: #fff;">G</span>
+          <span>Gouang</span>
+        </div>
+      </td>
+      <td><span class="status-pill st-public">Master Core</span></td>
+      <td style="text-align: right;">
+        <button class="btn btn-sm btn-preview-menu" style="margin-right: 4px;">Preview</button>
+        <button class="btn btn-secondary btn-sm btn-open-script">Open</button>
+      </td>
+    `;
+    tr.querySelector('.btn-preview-menu').addEventListener('click', () => openGamePreviewModal('universal'));
+    tr.querySelector('.btn-open-script').addEventListener('click', () => {
+      switchView('studio');
+      openFileInStudio(manifest.universal || 'games/universal.luau');
+    });
+    registryTableBody.appendChild(tr);
+  }
+
+  // Games rows
+  entries.forEach(([uid, g]) => {
+    const places = Object.entries(g.places || {});
+    const placeTags = places.map(([pid, p]) => {
+      return `<span class="game-tag clickable-world-tag" data-uid="${uid}" data-pid="${pid}" title="Click to preview ${escapeHtml(p.name || pid)} menu">${escapeHtml(p.name || pid)}</span>`;
+    }).join(' ') || '<span style="color:var(--text-muted);">None (Master entry)</span>';
+
+    const thumbUrl = gameThumbnailsMap.get(uid);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td style="font-weight: 600; color: var(--text-primary);">${escapeHtml(g.name || 'Untitled')}</td>
+      <td>
+        <div class="table-game-cell">
+          <img class="table-game-thumb" data-thumb-uid="${uid}" src="${thumbUrl || ''}" alt="${escapeHtml(g.name)}" style="${thumbUrl ? 'display:block;' : 'display:none;'}">
+          <div class="table-game-thumb-fallback" style="${thumbUrl ? 'display:none;' : 'display:flex;'}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+          </div>
+          <div>
+            <div style="font-weight: 600; color: var(--text-primary);">${escapeHtml(g.name || 'Untitled')}</div>
+            <div style="font-size: 11px; color: var(--text-muted);">${places.length} sub-places</div>
+          </div>
+        </div>
+      </td>
       <td style="font-family: var(--font-mono);">${uid}</td>
       <td>${placeTags}</td>
       <td>
-        <div class="assignee-chip">
-          <span class="avatar-mini">${(g.lead || 'J')[0]}</span>
-          <span>${g.lead || 'Jexytd'}</span>
+        <div class="developer-chip" style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-secondary);">
+          <span class="avatar-mini" style="background: var(--theme-accent, #238636); color: #fff;">G</span>
+          <span>Gouang</span>
         </div>
       </td>
       <td><span class="status-pill st-${g.status || 'public'}">${g.status || 'public'}</span></td>
       <td style="text-align: right;">
+        <button class="btn btn-sm btn-preview-menu" style="margin-right: 4px;">Preview</button>
         <button class="btn btn-secondary btn-sm btn-open-script" style="margin-right: 4px;">Open</button>
         <button class="btn btn-secondary btn-sm btn-edit-game">Edit</button>
       </td>
     `;
 
+    tr.querySelector('.btn-preview-menu').addEventListener('click', () => openGamePreviewModal(uid));
+    tr.querySelectorAll('.clickable-world-tag').forEach(tag => {
+      tag.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openGamePreviewModal(tag.dataset.uid, tag.dataset.pid);
+      });
+    });
     tr.querySelector('.btn-open-script').addEventListener('click', () => {
       switchView('studio');
       openFileInStudio(g.entry || `games/${slugify(g.name)}/main.luau`);
     });
-
-    tr.querySelector('.btn-edit-game').addEventListener('click', () => {
-      openGameModal(uid);
-    });
+    tr.querySelector('.btn-edit-game').addEventListener('click', () => openGameModal(uid));
 
     registryTableBody.appendChild(tr);
   });
 }
+
+// View switcher event listeners
+btnRegistryCard.addEventListener('click', () => {
+  activeRegistryView = 'card';
+  btnRegistryCard.classList.add('active');
+  btnRegistryList.classList.remove('active');
+  renderRegistry();
+});
+
+btnRegistryList.addEventListener('click', () => {
+  activeRegistryView = 'list';
+  btnRegistryList.classList.add('active');
+  btnRegistryCard.classList.remove('active');
+  renderRegistry();
+});
+
+// ==========================================
+// 6b. Game Detail & Interactive Menu Preview
+// ==========================================
+
+let currentPreviewGameData = null;
+
+async function openGamePreviewModal(universeId, initialPlaceKey = 'main') {
+  currentPreviewGameId = universeId;
+
+  let gameData;
+  if (universeId === 'universal') {
+    gameData = {
+      name: 'Universal Game Suite',
+      lead: 'Gouang',
+      status: 'public',
+      entry: manifest.universal || 'games/universal.luau',
+      places: {}
+    };
+  } else {
+    gameData = manifest.games[universeId];
+    if (!gameData) return;
+  }
+
+  currentPreviewGameData = gameData;
+
+  // Header population
+  gpName.textContent = gameData.name || 'Untitled Experience';
+  gpUniverseId.textContent = universeId;
+  gpLead.textContent = 'Gouang (Solo)';
+  gpStatusPill.textContent = gameData.status || 'public';
+  gpStatusPill.className = `status-pill st-${gameData.status || 'public'}`;
+  gpEntryPath.textContent = gameData.entry || `games/${slugify(gameData.name)}/main.luau`;
+
+  // Thumbnail
+  const thumbUrl = gameThumbnailsMap.get(universeId);
+  if (thumbUrl) {
+    gpThumb.src = thumbUrl;
+    gpThumb.style.display = 'block';
+    gpThumbFallback.style.display = 'none';
+  } else {
+    gpThumb.style.display = 'none';
+    gpThumbFallback.style.display = 'flex';
+  }
+
+  // Populate World / Place Selector Bar
+  gpWorldChips.innerHTML = '';
+  const placesList = Object.entries(gameData.places || {});
+
+  // Main Entry Chip
+  const mainChip = document.createElement('button');
+  mainChip.type = 'button';
+  mainChip.className = 'gp-world-chip';
+  mainChip.dataset.worldKey = 'main';
+  mainChip.innerHTML = `
+    <span class="gp-world-chip-dot"></span>
+    <span>Main Entry Script</span>
+  `;
+  mainChip.addEventListener('click', () => selectPreviewWorld('main'));
+  gpWorldChips.appendChild(mainChip);
+
+  // Sub-place chips
+  placesList.forEach(([pid, p]) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'gp-world-chip';
+    chip.dataset.worldKey = pid;
+    chip.innerHTML = `
+      <span class="gp-world-chip-dot"></span>
+      <span>${escapeHtml(p.name || pid)}</span>
+      <span class="gp-world-chip-pid">${pid}</span>
+    `;
+    chip.addEventListener('click', () => selectPreviewWorld(pid));
+    gpWorldChips.appendChild(chip);
+  });
+
+  // Tab 2: Sub-places & Tasks
+  gpPlacesCount.textContent = `${placesList.length} Worlds`;
+  gpPlacesContainer.innerHTML = '';
+
+  if (placesList.length === 0) {
+    gpPlacesContainer.innerHTML = `<div class="empty-hint" style="padding: 16px; font-size: 11px;">Single World Experience (Only Master entry script configured)</div>`;
+  } else {
+    placesList.forEach(([pid, p]) => {
+      const pItem = document.createElement('div');
+      pItem.className = 'gp-place-item';
+      pItem.innerHTML = `
+        <div class="gp-place-info">
+          <div class="gp-place-name">${escapeHtml(p.name || pid)}</div>
+          <div class="gp-place-pid">Place ID: ${pid} • <code>${escapeHtml(p.script || '')}</code></div>
+        </div>
+        <div style="display: flex; gap: 4px;">
+          <button class="btn btn-sm btn-preview-sub-menu" style="margin-right: 4px;">Preview Menu</button>
+          <button class="btn btn-secondary btn-sm btn-open-sub-script">Open in Studio</button>
+        </div>
+      `;
+      pItem.querySelector('.btn-preview-sub-menu').addEventListener('click', () => {
+        selectPreviewWorld(pid);
+        switchGamePreviewTab('menu');
+      });
+      pItem.querySelector('.btn-open-sub-script').addEventListener('click', () => {
+        closeGamePreviewModal();
+        switchView('studio');
+        openFileInStudio(p.script);
+      });
+      gpPlacesContainer.appendChild(pItem);
+    });
+  }
+
+  const linkedTasks = (manifest.tasks || []).filter(t => t.gameId === universeId);
+  gpTasksCount.textContent = `${linkedTasks.length} Tasks`;
+  gpBadgeTaskCount.textContent = `${linkedTasks.length} Tasks`;
+  gpTasksContainer.innerHTML = '';
+
+  if (linkedTasks.length === 0) {
+    gpTasksContainer.innerHTML = `<div class="empty-hint" style="padding: 16px; font-size: 11px;">No active tasks assigned to this game experience</div>`;
+  } else {
+    linkedTasks.forEach(task => {
+      const tItem = document.createElement('div');
+      tItem.className = 'gp-task-item';
+      tItem.innerHTML = `
+        <div class="gp-task-top">
+          <span class="gp-task-id">${task.id}</span>
+          <span class="status-pill st-${task.status}">${task.status}</span>
+        </div>
+        <div class="gp-task-title">${escapeHtml(task.title)}</div>
+        <div class="gp-task-desc">${escapeHtml(task.description || '')}</div>
+      `;
+      gpTasksContainer.appendChild(tItem);
+    });
+  }
+
+  // Load and preview selected world
+  await selectPreviewWorld(initialPlaceKey);
+
+  // Switch to Menu Preview tab by default
+  switchGamePreviewTab('menu');
+
+  gamePreviewModal.style.display = 'flex';
+}
+
+async function selectPreviewWorld(worldKey) {
+  if (!currentPreviewGameData) return;
+
+  // Update chips active state
+  gpWorldChips.querySelectorAll('.gp-world-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.worldKey === worldKey);
+  });
+
+  let scriptPath = '';
+  let worldTitle = '';
+
+  if (worldKey === 'main' || !currentPreviewGameData.places || !currentPreviewGameData.places[worldKey]) {
+    scriptPath = currentPreviewGameData.entry || `games/${slugify(currentPreviewGameData.name)}/main.luau`;
+    worldTitle = 'Main Script';
+  } else {
+    const p = currentPreviewGameData.places[worldKey];
+    scriptPath = p.script || `games/${slugify(currentPreviewGameData.name)}/${worldKey}.luau`;
+    worldTitle = p.name || `Place ${worldKey}`;
+  }
+
+  gpEntryPath.textContent = scriptPath;
+  gpCodePathLabel.textContent = scriptPath;
+  gpCodeContent.textContent = '-- Loading script code...';
+
+  // Load script content from server
+  let scriptContent = '';
+  try {
+    const res = await fetch(`/api/script?path=${encodeURIComponent(scriptPath)}`);
+    if (res.ok) {
+      const data = await res.json();
+      scriptContent = data.content || '';
+      gpCodeContent.textContent = scriptContent;
+    }
+  } catch (err) {
+    gpCodeContent.textContent = `-- Failed to load script: ${err.message}`;
+  }
+
+  // Parse GousseUI Menu Structure
+  currentParsedUi = parseGousseUiScript(scriptContent);
+  gwsWinTitle.textContent = currentParsedUi.window.title || 'Gousse Hub';
+  gwsWinSubtitle.textContent = currentParsedUi.window.subTitle || `${currentPreviewGameData.name} • ${worldTitle}`;
+  gwsKeybindBadge.textContent = `Keybind: ${currentParsedUi.window.keybind || 'RightControl'}`;
+  gpBadgeTabCount.textContent = `${currentParsedUi.tabs.length} Tabs`;
+  gwsStatusMsg.textContent = `Previewing: ${worldTitle} • ${scriptPath}`;
+
+  // Render Tabs in GousseUI Simulated Window
+  gwsTabsList.innerHTML = '';
+  if (currentParsedUi.tabs.length === 0) {
+    gwsTabsList.innerHTML = `<div style="padding: 10px; font-size: 11px; color: var(--text-muted);">No tabs detected</div>`;
+    gwsTabContent.innerHTML = `<div class="empty-hint">Script does not invoke Window:CreateTab</div>`;
+  } else {
+    currentParsedUi.tabs.forEach((tab, idx) => {
+      const tabBtn = document.createElement('button');
+      tabBtn.className = `gws-tab-btn ${idx === 0 ? 'active' : ''}`;
+      tabBtn.innerHTML = `
+        ${getLucideIconSvg(tab.icon)}
+        <span>${escapeHtml(tab.name)}</span>
+      `;
+      tabBtn.addEventListener('click', () => {
+        gwsTabsList.querySelectorAll('.gws-tab-btn').forEach(b => b.classList.remove('active'));
+        tabBtn.classList.add('active');
+        renderSimulatedTabContent(tab);
+      });
+      gwsTabsList.appendChild(tabBtn);
+    });
+
+    // Render first tab by default
+    renderSimulatedTabContent(currentParsedUi.tabs[0]);
+  }
+}
+
+function renderSimulatedTabContent(tabObj) {
+  gwsTabContent.innerHTML = '';
+  if (!tabObj || !tabObj.elements || tabObj.elements.length === 0) {
+    gwsTabContent.innerHTML = `<div class="empty-hint" style="padding: 24px;">No controls added to ${escapeHtml(tabObj.name)} tab</div>`;
+    return;
+  }
+
+  tabObj.elements.forEach(elem => {
+    if (elem.type === 'section') {
+      const sec = document.createElement('div');
+      sec.className = 'gws-section';
+      sec.innerHTML = `<div class="gws-section-title">${escapeHtml(elem.title)}</div>`;
+      gwsTabContent.appendChild(sec);
+      return;
+    }
+
+    if (elem.type === 'toggle') {
+      const card = document.createElement('div');
+      card.className = 'gws-control-card gws-toggle-card';
+      let state = elem.default || false;
+      card.innerHTML = `
+        <div class="gws-label-block">
+          <span class="gws-label">${escapeHtml(elem.name)}</span>
+          ${elem.subTitle ? `<span class="gws-sublabel">${escapeHtml(elem.subTitle)}</span>` : ''}
+        </div>
+        <div class="gws-switch ${state ? 'on' : ''}">
+          <div class="gws-switch-knob"></div>
+        </div>
+      `;
+      card.addEventListener('click', () => {
+        state = !state;
+        const sw = card.querySelector('.gws-switch');
+        sw.classList.toggle('on', state);
+        showToast(`[GousseUI] ${elem.name}: ${state ? 'Enabled' : 'Disabled'}`);
+      });
+      gwsTabContent.appendChild(card);
+      return;
+    }
+
+    if (elem.type === 'slider') {
+      const card = document.createElement('div');
+      card.className = 'gws-control-card gws-slider-card';
+      let val = elem.default || elem.min || 0;
+      card.innerHTML = `
+        <div class="gws-slider-header">
+          <span class="gws-label">${escapeHtml(elem.name)}</span>
+          <span class="gws-slider-val">${val}${escapeHtml(elem.suffix || '')}</span>
+        </div>
+        <input type="range" class="gws-slider-input" min="${elem.min}" max="${elem.max}" value="${val}">
+      `;
+      const input = card.querySelector('input');
+      const valBadge = card.querySelector('.gws-slider-val');
+      input.addEventListener('input', (e) => {
+        val = e.target.value;
+        valBadge.textContent = `${val}${elem.suffix || ''}`;
+      });
+      input.addEventListener('change', () => {
+        showToast(`[GousseUI] ${elem.name} set to ${val}${elem.suffix || ''}`);
+      });
+      gwsTabContent.appendChild(card);
+      return;
+    }
+
+    if (elem.type === 'dropdown') {
+      const card = document.createElement('div');
+      card.className = 'gws-control-card gws-dropdown-card';
+      const optionsHtml = (elem.options || []).map(opt => {
+        const sel = opt === elem.default ? 'selected' : '';
+        return `<option value="${escapeHtml(opt)}" ${sel}>${escapeHtml(opt)}</option>`;
+      }).join('');
+
+      card.innerHTML = `
+        <span class="gws-label">${escapeHtml(elem.name)}</span>
+        <select class="gws-select">${optionsHtml}</select>
+      `;
+      card.querySelector('select').addEventListener('change', (e) => {
+        showToast(`[GousseUI] ${elem.name} set to: ${e.target.value}`);
+      });
+      gwsTabContent.appendChild(card);
+      return;
+    }
+
+    if (elem.type === 'button') {
+      const card = document.createElement('div');
+      card.className = 'gws-control-card gws-toggle-card';
+      card.innerHTML = `
+        <div class="gws-label-block">
+          <span class="gws-label">${escapeHtml(elem.name)}</span>
+          ${elem.subTitle ? `<span class="gws-sublabel">${escapeHtml(elem.subTitle)}</span>` : ''}
+        </div>
+        <button class="gws-btn gws-btn-${elem.variant || 'primary'}">${escapeHtml(elem.buttonText || 'Execute')}</button>
+      `;
+      card.querySelector('button').addEventListener('click', (e) => {
+        e.stopPropagation();
+        showToast(`[GousseUI] Executed: ${elem.name}`);
+      });
+      gwsTabContent.appendChild(card);
+      return;
+    }
+
+    if (elem.type === 'paragraph') {
+      const card = document.createElement('div');
+      card.className = 'gws-paragraph-card';
+      card.innerHTML = `
+        <div class="gws-para-title">${escapeHtml(elem.title)}</div>
+        <div class="gws-para-content">${escapeHtml(elem.content || '')}</div>
+      `;
+      gwsTabContent.appendChild(card);
+      return;
+    }
+  });
+}
+
+function switchGamePreviewTab(tabKey) {
+  document.querySelectorAll('.gp-nav-tab').forEach(t => {
+    t.classList.toggle('active', t.getAttribute('data-gp-tab') === tabKey);
+  });
+  document.querySelectorAll('.gp-pane').forEach(p => {
+    p.classList.toggle('active', p.id === `gp-pane-${tabKey}`);
+  });
+}
+
+document.querySelectorAll('.gp-nav-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tabKey = btn.getAttribute('data-gp-tab');
+    switchGamePreviewTab(tabKey);
+  });
+});
+
+function closeGamePreviewModal() {
+  gamePreviewModal.style.display = 'none';
+  currentPreviewGameId = null;
+  currentParsedUi = null;
+}
+
+btnCloseGamePreview.addEventListener('click', closeGamePreviewModal);
+
+gpBtnOpenStudio.addEventListener('click', () => {
+  if (!currentPreviewGameId) return;
+  const entry = gpEntryPath.textContent.trim();
+  closeGamePreviewModal();
+  switchView('studio');
+  openFileInStudio(entry);
+});
+
+gpBtnEditManifest.addEventListener('click', () => {
+  if (!currentPreviewGameId) return;
+  const uid = currentPreviewGameId;
+  closeGamePreviewModal();
+  openGameModal(uid === 'universal' ? null : uid);
+});
+
+gpBtnCopyCode.addEventListener('click', () => {
+  const code = gpCodeContent.textContent;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(code).then(() => {
+      showToast('Script source copied to clipboard');
+    });
+  }
+});
 
 btnRegisterGame.addEventListener('click', () => openGameModal(null));
 
@@ -1548,7 +2516,7 @@ function openGameModal(universeId) {
     document.getElementById('game-modal-title').textContent = `Edit Game (${universeId})`;
     regGameName.value = g.name || '';
     regUniverseId.value = universeId;
-    regLead.value = g.lead || 'Jexytd';
+    if (regScriptType) regScriptType.value = g.scriptType || 'Modular (modules/)';
     regStatus.value = g.status || 'public';
     regEntryPath.value = g.entry || `games/${slugify(g.name)}/main.luau`;
 
@@ -1559,7 +2527,7 @@ function openGameModal(universeId) {
     document.getElementById('game-modal-title').textContent = 'Register Game Experience';
     regGameName.value = '';
     regUniverseId.value = '';
-    regLead.value = 'Jexytd';
+    if (regScriptType) regScriptType.value = 'Modular (modules/)';
     regStatus.value = 'public';
     regEntryPath.value = 'games/new_game/main.luau';
   }
@@ -1619,7 +2587,8 @@ btnSaveGameReg.addEventListener('click', async () => {
   manifest.games[uid] = {
     name,
     status: regStatus.value,
-    lead: regLead.value,
+    lead: 'Gouang',
+    scriptType: regScriptType ? regScriptType.value : 'Modular (modules/)',
     entry,
     places
   };
@@ -1681,15 +2650,29 @@ btnExecPush.addEventListener('click', async () => {
   btnExecPush.textContent = 'Committing & Pushing...';
 
   try {
+    const payload = {
+      message: msg,
+      target: whSelectTarget ? whSelectTarget.value : 'Blox Fruits • Third Sea',
+      changelog: whTextareaChangelog ? whTextareaChangelog.value.trim() : msg,
+      version: whInputVersion ? whInputVersion.value.trim() : '1.0.1',
+      author: 'Gouang',
+      broadcast: whAutoPush ? whAutoPush.checked : false
+    };
+
     const res = await fetch('/api/git-push', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg })
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
     if (data.success) {
-      showToast('Pushed to GitHub origin/main!');
+      let toastMsg = 'Pushed to GitHub origin/main!';
+      if (data.changelogBroadcast && data.changelogBroadcast.success) {
+        toastMsg += ' (Discord Changelog broadcasted)';
+      }
+      showToast(toastMsg);
       refreshGitStatus();
+      if (whTextareaChangelog) whTextareaChangelog.value = '';
     } else {
       showToast('Push error: ' + (data.error || 'Check terminal'));
     }
@@ -1700,6 +2683,100 @@ btnExecPush.addEventListener('click', async () => {
     btnExecPush.textContent = 'Commit & Push to origin/main';
   }
 });
+
+// Discord Webhook Script Changelog Elements (Owner / Developer)
+const whInputUrl = document.getElementById('wh-input-url');
+const whSelectTarget = document.getElementById('wh-select-target');
+const whInputVersion = document.getElementById('wh-input-version');
+const whTextareaChangelog = document.getElementById('wh-textarea-changelog');
+const whAutoPush = document.getElementById('wh-auto-push');
+const btnSaveWhConfig = document.getElementById('btn-save-wh-config');
+const btnSendScriptChangelog = document.getElementById('btn-send-script-changelog');
+
+async function loadWebhookConfig() {
+  try {
+    const res = await fetch('/api/webhook/config');
+    const data = await res.json();
+    if (data) {
+      if (whInputUrl && data.webhookUrl) whInputUrl.value = data.webhookUrl;
+      if (whAutoPush && data.autoPushChangelog !== undefined) whAutoPush.checked = data.autoPushChangelog;
+      if (whInputVersion && data.version) whInputVersion.value = data.version;
+    }
+  } catch (_) {}
+}
+
+if (btnSaveWhConfig) {
+  btnSaveWhConfig.addEventListener('click', async () => {
+    try {
+      const payload = {
+        webhookUrl: whInputUrl ? whInputUrl.value.trim() : '',
+        autoPushChangelog: whAutoPush ? whAutoPush.checked : true,
+        version: whInputVersion ? whInputVersion.value.trim() : '1.0.1'
+      };
+      const res = await fetch('/api/webhook/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Webhook configuration saved!');
+      } else {
+        showToast('Failed to save config: ' + (data.error || 'Unknown error'));
+      }
+    } catch (err) {
+      showToast('Network error saving config: ' + err.message);
+    }
+  });
+}
+
+if (btnSendScriptChangelog) {
+  btnSendScriptChangelog.addEventListener('click', async () => {
+    const url = whInputUrl ? whInputUrl.value.trim() : '';
+    if (!url) {
+      showToast('Please enter Discord Webhook URL first');
+      return;
+    }
+    const changelog = whTextareaChangelog ? whTextareaChangelog.value.trim() : '';
+    btnSendScriptChangelog.disabled = true;
+    btnSendScriptChangelog.textContent = 'Broadcasting...';
+
+    try {
+      const res = await fetch('/api/webhook/changelog', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          webhookUrl: url,
+          target: whSelectTarget ? whSelectTarget.value : 'Blox Fruits • Third Sea',
+          version: whInputVersion ? whInputVersion.value.trim() : '1.0.1',
+          author: 'Gouang',
+          changelog: changelog || 'Pembaruan script dan peningkatan fungsionalitas.',
+          changedFiles: Array.from(document.querySelectorAll('#git-diff-list .diff-item')).map(el => el.textContent.trim())
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Script changelog broadcasted to Discord!');
+        if (whTextareaChangelog) whTextareaChangelog.value = '';
+      } else {
+        showToast('Broadcast failed: ' + (data.error || 'Check server'));
+      }
+    } catch (err) {
+      showToast('Error sending changelog: ' + err.message);
+    } finally {
+      btnSendScriptChangelog.disabled = false;
+      btnSendScriptChangelog.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: middle;">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+        Broadcast Changelog to Discord
+      `;
+    }
+  });
+}
+
+loadWebhookConfig();
 
 btnQuickLoader.addEventListener('click', () => {
   navigator.clipboard.writeText(LOADER_SNIPPET);
@@ -3356,8 +4433,523 @@ filterGame.addEventListener('change', renderTasks);
 filterPriority.addEventListener('change', renderTasks);
 registrySearch.addEventListener('input', renderRegistry);
 
-// Initialize
+
+
+// ============================================================================
+// 12. STUDIO THEME & BACKGROUND WALLPAPER ENGINE
+// ============================================================================
+
+const THEME_STORAGE_KEY = 'gousse_studio_theme_config';
+
+const THEME_DEFAULTS = {
+  theme: 'obsidian',
+  bgEnabled: false,
+  bgUrl: '',
+  opacity: 88,
+  blur: 3,
+  darkness: 32,
+  accent: '#238636',
+  particlesEnabled: true
+};
+
+const THEME_PRESETS = {
+  obsidian: {
+    name: 'Obsidian Tactical',
+    emoji: '🌙',
+    accent: '#238636',
+    glow: 'rgba(35, 134, 54, 0.4)',
+    bgUrl: '',
+    bgEnabled: false,
+    opacity: 80,
+    blur: 4,
+    darkness: 45
+  },
+  halloween: {
+    name: 'Halloween Night',
+    emoji: '🎃',
+    accent: '#ff7700',
+    glow: 'rgba(255, 119, 0, 0.6)',
+    bgUrl: 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExZTRiZzZ2N3U3YnNwdHF6dnh5Y3Z2eXk5ZXF0bXlkbzF5MnBzNXNiciZlcD12MV9naWZzX3NlYXJjaCZjdD1n/A6aHBCFqlE0Rq/giphy.gif',
+    bgEnabled: true,
+    opacity: 88,
+    blur: 3,
+    darkness: 32
+  },
+  cyberpunk: {
+    name: 'Cyberpunk 2077',
+    emoji: '⚡',
+    accent: '#00f0ff',
+    glow: 'rgba(0, 240, 255, 0.6)',
+    bgUrl: 'https://media.giphy.com/media/26tn33aiTi1jkl6H6/giphy.gif',
+    bgEnabled: true,
+    opacity: 88,
+    blur: 3,
+    darkness: 30
+  },
+  crimson: {
+    name: 'Crimson Blood',
+    emoji: '🩸',
+    accent: '#f43f5e',
+    glow: 'rgba(244, 63, 94, 0.55)',
+    bgUrl: 'https://media.giphy.com/media/sFMuudjB6FgoU/giphy.gif',
+    bgEnabled: true,
+    opacity: 88,
+    blur: 3,
+    darkness: 32
+  },
+  cosmos: {
+    name: 'Deep Cosmos',
+    emoji: '🌌',
+    accent: '#38bdf8',
+    glow: 'rgba(56, 189, 248, 0.6)',
+    bgUrl: 'https://media.giphy.com/media/xThuWcaa4U4XZQDgvm/giphy.gif',
+    bgEnabled: true,
+    opacity: 88,
+    blur: 3,
+    darkness: 30
+  },
+  custom: {
+    name: 'Custom Wallpaper',
+    emoji: '🎨',
+    accent: '#a855f7',
+    glow: 'rgba(168, 85, 247, 0.5)',
+    bgUrl: '',
+    bgEnabled: true,
+    opacity: 88,
+    blur: 3,
+    darkness: 32
+  }
+};
+
+const CURATED_GIFS = {
+  'crimson-blood': 'https://media.giphy.com/media/sFMuudjB6FgoU/giphy.gif',
+  'crimson-moon': 'https://media.giphy.com/media/4DFxYsapDYnIc/giphy.gif',
+  'halloween-bats': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExZTRiZzZ2N3U3YnNwdHF6dnh5Y3Z2eXk5ZXF0bXlkbzF5MnBzNXNiciZlcD12MV9naWZzX3NlYXJjaCZjdD1n/A6aHBCFqlE0Rq/giphy.gif',
+  'halloween-pumpkins': 'https://media.giphy.com/media/3ov9jLcnJ9i2Tz6x2g/giphy.gif',
+  'cyber-rain': 'https://media.giphy.com/media/26tn33aiTi1jkl6H6/giphy.gif',
+  'lofi-room': 'https://media.giphy.com/media/26AHONQ79FdWZhAI0/giphy.gif',
+  'synthwave-grid': 'https://media.giphy.com/media/13HgwGsXF0aiGY/giphy.gif',
+  'pixel-stars': 'https://media.giphy.com/media/xThuWcaa4U4XZQDgvm/giphy.gif',
+  'clear': ''
+};
+
+let currentThemeConfig = Object.assign({}, THEME_DEFAULTS);
+
+function loadThemeConfig() {
+  try {
+    const raw = localStorage.getItem(THEME_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      currentThemeConfig = Object.assign({}, THEME_DEFAULTS, parsed);
+      // Auto-migrate legacy opaque settings so user sees vibrant background
+      if (currentThemeConfig.darkness >= 60) {
+        currentThemeConfig.darkness = 32;
+      }
+      if (currentThemeConfig.blur >= 8) {
+        currentThemeConfig.blur = 3;
+      }
+      if (currentThemeConfig.opacity <= 70) {
+        currentThemeConfig.opacity = 88;
+      }
+      // Upgrade crimson bgUrl if it had the old Arthur meme link
+      if (currentThemeConfig.theme === 'crimson' && (currentThemeConfig.bgUrl?.includes('13HgwGsXF0aiGY') || currentThemeConfig.bgUrl?.includes('3o72F8t9TDi2xVnxOE') || !currentThemeConfig.bgUrl)) {
+        currentThemeConfig.bgUrl = THEME_PRESETS.crimson.bgUrl;
+        currentThemeConfig.bgEnabled = true;
+      }
+      // Upgrade cyberpunk bgUrl if it had the broken link
+      if (currentThemeConfig.theme === 'cyberpunk' && (currentThemeConfig.bgUrl === 'https://media.giphy.com/media/3o7TKTDnUxE0gpnJH2/giphy.gif' || !currentThemeConfig.bgUrl)) {
+        currentThemeConfig.bgUrl = THEME_PRESETS.cyberpunk.bgUrl;
+        currentThemeConfig.bgEnabled = true;
+      }
+    }
+  } catch (_) {
+    currentThemeConfig = Object.assign({}, THEME_DEFAULTS);
+  }
+}
+
+function applyTheme(cfg, save = true) {
+  currentThemeConfig = Object.assign({}, currentThemeConfig, cfg);
+  const themeName = currentThemeConfig.theme || 'obsidian';
+
+  // 1. Set document body theme attribute
+  document.body.dataset.theme = themeName;
+
+  // 2. CSS variables
+  const root = document.documentElement;
+  const accent = currentThemeConfig.accent || THEME_PRESETS[themeName]?.accent || '#238636';
+  const glow = THEME_PRESETS[themeName]?.glow || 'rgba(35, 134, 54, 0.4)';
+  root.style.setProperty('--theme-accent', accent);
+  root.style.setProperty('--theme-accent-glow', glow);
+  root.style.setProperty('--theme-bg-opacity', (currentThemeConfig.opacity / 100).toString());
+  root.style.setProperty('--theme-backdrop-blur', (currentThemeConfig.blur || 3) + 'px');
+  root.style.setProperty('--theme-glass-darkness', (currentThemeConfig.darkness / 100).toString());
+
+  // 3. Background Wallpaper layer
+  if (themeBgLayer && themeOverlayLayer) {
+    if (currentThemeConfig.bgEnabled && currentThemeConfig.bgUrl) {
+      document.body.classList.add('has-custom-bg');
+      themeBgLayer.style.backgroundImage = `url("${currentThemeConfig.bgUrl}")`;
+      themeBgLayer.style.opacity = (currentThemeConfig.opacity / 100).toString();
+      themeOverlayLayer.style.backdropFilter = `blur(${currentThemeConfig.blur || 3}px)`;
+    } else {
+      document.body.classList.remove('has-custom-bg');
+      themeBgLayer.style.backgroundImage = '';
+      themeBgLayer.style.opacity = '0';
+    }
+  }
+
+  // 4. Dynamic Thematic Particles
+  updateThemeParticles(themeName, currentThemeConfig.particlesEnabled !== false);
+
+  // 5. Update Sidebar Pills Active Indicator
+  themePillBtns.forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.themeChoice === themeName);
+  });
+
+  // 6. Update Topbar Theme Icon
+  if (topThemeIcon) {
+    topThemeIcon.textContent = THEME_PRESETS[themeName]?.emoji || '🎨';
+  }
+
+  // 7. Save to localStorage
+  if (save) {
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(currentThemeConfig));
+    } catch (_) {}
+  }
+}
+
+function selectPresetTheme(themeKey) {
+  const preset = THEME_PRESETS[themeKey];
+  if (!preset) return;
+
+  const newConfig = {
+    theme: themeKey,
+    accent: preset.accent,
+    bgEnabled: preset.bgEnabled,
+    bgUrl: preset.bgUrl !== undefined ? preset.bgUrl : currentThemeConfig.bgUrl,
+    opacity: preset.opacity || 88,
+    blur: preset.blur !== undefined ? preset.blur : 3,
+    darkness: preset.darkness !== undefined ? preset.darkness : 32,
+    particlesEnabled: true
+  };
+
+  applyTheme(newConfig, true);
+  showToast(`Switched theme to ${preset.emoji} ${preset.name}`);
+}
+
+function updateThemeParticles(themeName, enabled) {
+  if (!themeParticlesLayer) return;
+
+  themeParticlesLayer.innerHTML = '';
+  if (!enabled || themeName === 'obsidian' || themeName === 'custom') {
+    themeParticlesLayer.style.opacity = '0';
+    return;
+  }
+
+  themeParticlesLayer.style.opacity = '1';
+
+  if (themeName === 'halloween') {
+    const batSvg = `
+      <svg viewBox="0 0 64 36" fill="currentColor">
+        <path d="M32 18 C28 10, 16 4, 2 8 C0 14, 8 26, 20 25 C26 25, 30 20, 32 23 C34 20, 38 25, 44 25 C56 26, 64 14, 62 8 C48 4, 36 10, 32 18 Z" fill="#ff7700"/>
+      </svg>
+    `;
+    for (let i = 0; i < 5; i++) {
+      const bat = document.createElement('div');
+      bat.className = 'spooky-bat';
+      bat.innerHTML = batSvg;
+      bat.style.top = (12 + (i * 18)) + '%';
+      bat.style.animationDuration = (14 + i * 4) + 's';
+      bat.style.animationDelay = (i * 3.5) + 's';
+      themeParticlesLayer.appendChild(bat);
+    }
+    for (let j = 0; j < 14; j++) {
+      const ember = document.createElement('div');
+      ember.className = 'spooky-ember';
+      const size = Math.floor(Math.random() * 5) + 3;
+      const isPurple = Math.random() > 0.5;
+      ember.style.width = size + 'px';
+      ember.style.height = size + 'px';
+      ember.style.left = (Math.random() * 98) + '%';
+      ember.style.background = isPurple ? 'rgba(168, 85, 247, 0.75)' : 'rgba(255, 119, 0, 0.85)';
+      ember.style.boxShadow = isPurple ? '0 0 8px #a855f7' : '0 0 8px #ff7700';
+      ember.style.animationDuration = (8 + Math.random() * 7) + 's';
+      ember.style.animationDelay = (Math.random() * 6) + 's';
+      themeParticlesLayer.appendChild(ember);
+    }
+  } else if (themeName === 'crimson') {
+    // Crimson blood embers & falling scarlet embers
+    for (let j = 0; j < 18; j++) {
+      const ember = document.createElement('div');
+      ember.className = 'spooky-ember';
+      const size = Math.floor(Math.random() * 5) + 3;
+      const isBright = Math.random() > 0.4;
+      ember.style.width = size + 'px';
+      ember.style.height = size + 'px';
+      ember.style.left = (Math.random() * 98) + '%';
+      ember.style.background = isBright ? 'rgba(244, 63, 94, 0.85)' : 'rgba(190, 18, 60, 0.75)';
+      ember.style.boxShadow = '0 0 10px #f43f5e';
+      ember.style.animationDuration = (7 + Math.random() * 8) + 's';
+      ember.style.animationDelay = (Math.random() * 5) + 's';
+      themeParticlesLayer.appendChild(ember);
+    }
+  } else if (themeName === 'cyberpunk') {
+    // Cyberpunk neon digital sparks
+    for (let j = 0; j < 18; j++) {
+      const spark = document.createElement('div');
+      spark.className = 'spooky-ember';
+      const isCyan = Math.random() > 0.5;
+      spark.style.width = '3px';
+      spark.style.height = '7px';
+      spark.style.borderRadius = '1px';
+      spark.style.left = (Math.random() * 98) + '%';
+      spark.style.background = isCyan ? '#00f0ff' : '#ff007f';
+      spark.style.boxShadow = isCyan ? '0 0 8px #00f0ff' : '0 0 8px #ff007f';
+      spark.style.animationDuration = (5 + Math.random() * 6) + 's';
+      spark.style.animationDelay = (Math.random() * 4) + 's';
+      themeParticlesLayer.appendChild(spark);
+    }
+  } else if (themeName === 'cosmos') {
+    // Cosmic stardust
+    for (let j = 0; j < 22; j++) {
+      const star = document.createElement('div');
+      star.className = 'spooky-ember';
+      const size = Math.floor(Math.random() * 4) + 2;
+      star.style.width = size + 'px';
+      star.style.height = size + 'px';
+      star.style.left = (Math.random() * 98) + '%';
+      star.style.background = '#38bdf8';
+      star.style.boxShadow = '0 0 8px #818cf8';
+      star.style.animationDuration = (9 + Math.random() * 9) + 's';
+      star.style.animationDelay = (Math.random() * 6) + 's';
+      themeParticlesLayer.appendChild(star);
+    }
+  }
+}
+
+function openThemeModal() {
+  if (!themeCustomizerModal) return;
+
+  // Sync inputs with current config
+  if (themeToggleBgEnable) themeToggleBgEnable.checked = !!currentThemeConfig.bgEnabled;
+  if (themeInputBgUrl) themeInputBgUrl.value = currentThemeConfig.bgUrl || '';
+  if (sliderThemeOpacity) sliderThemeOpacity.value = currentThemeConfig.opacity || 88;
+  if (sliderThemeBlur) sliderThemeBlur.value = currentThemeConfig.blur !== undefined ? currentThemeConfig.blur : 3;
+  if (sliderThemeDarkness) sliderThemeDarkness.value = currentThemeConfig.darkness !== undefined ? currentThemeConfig.darkness : 32;
+  if (themeColorAccent) themeColorAccent.value = currentThemeConfig.accent || '#ff7700';
+  if (themeTextAccent) themeTextAccent.value = currentThemeConfig.accent || '#ff7700';
+  if (themeToggleSpookyParticles) themeToggleSpookyParticles.checked = currentThemeConfig.particlesEnabled !== false;
+
+  if (labelValOpacity) labelValOpacity.textContent = (currentThemeConfig.opacity || 88) + '%';
+  if (labelValBlur) labelValBlur.textContent = (currentThemeConfig.blur !== undefined ? currentThemeConfig.blur : 3) + 'px';
+  if (labelValDarkness) labelValDarkness.textContent = (currentThemeConfig.darkness !== undefined ? currentThemeConfig.darkness : 32) + '%';
+  if (labelValAccent) labelValAccent.textContent = currentThemeConfig.accent || '#ff7700';
+
+  // Highlight active preset card
+  themePresetCards.forEach(card => {
+    card.classList.toggle('active', card.dataset.preset === currentThemeConfig.theme);
+  });
+
+  themeCustomizerModal.style.display = 'flex';
+}
+
+function closeThemeModal() {
+  if (!themeCustomizerModal) return;
+  themeCustomizerModal.style.display = 'none';
+}
+
+function initThemeEngine() {
+  loadThemeConfig();
+  applyTheme(currentThemeConfig, false);
+
+  if (btnCloseThemeModal) btnCloseThemeModal.addEventListener('click', closeThemeModal);
+  if (btnCancelTheme) btnCancelTheme.addEventListener('click', closeThemeModal);
+
+  // Preset Cards inside Modal
+  themePresetCards.forEach(card => {
+    card.addEventListener('click', () => {
+      const presetKey = card.dataset.preset;
+      themePresetCards.forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+
+      const preset = THEME_PRESETS[presetKey];
+      if (preset) {
+        if (themeToggleBgEnable) themeToggleBgEnable.checked = preset.bgEnabled;
+        if (themeInputBgUrl && preset.bgUrl) themeInputBgUrl.value = preset.bgUrl;
+        if (themeColorAccent) themeColorAccent.value = preset.accent;
+        if (themeTextAccent) themeTextAccent.value = preset.accent;
+        if (labelValAccent) labelValAccent.textContent = preset.accent;
+
+        applyTheme({
+          theme: presetKey,
+          accent: preset.accent,
+          bgEnabled: preset.bgEnabled,
+          bgUrl: preset.bgUrl || (themeInputBgUrl ? themeInputBgUrl.value.trim() : ''),
+          spookyParticles: presetKey === 'halloween'
+        }, false);
+      }
+    });
+  });
+
+  // Wallpaper toggle
+  if (themeToggleBgEnable) {
+    themeToggleBgEnable.addEventListener('change', () => {
+      applyTheme({ bgEnabled: themeToggleBgEnable.checked }, false);
+    });
+  }
+
+  // Wallpaper URL input live preview
+  if (themeInputBgUrl) {
+    themeInputBgUrl.addEventListener('input', () => {
+      const url = themeInputBgUrl.value.trim();
+      if (url) {
+        if (themeToggleBgEnable) themeToggleBgEnable.checked = true;
+        applyTheme({ bgUrl: url, bgEnabled: true }, false);
+      }
+    });
+  }
+
+  // Test Link button
+  if (btnPreviewBgUrl) {
+    btnPreviewBgUrl.addEventListener('click', () => {
+      const url = themeInputBgUrl ? themeInputBgUrl.value.trim() : '';
+      if (!url) {
+        showToast('Please enter an image or GIF link first');
+        return;
+      }
+      btnPreviewBgUrl.textContent = 'Testing...';
+      const img = new Image();
+      img.onload = () => {
+        btnPreviewBgUrl.textContent = 'Test Link';
+        showToast('Wallpaper image loaded successfully!');
+        if (themeToggleBgEnable) themeToggleBgEnable.checked = true;
+        applyTheme({ bgUrl: url, bgEnabled: true }, false);
+      };
+      img.onerror = () => {
+        btnPreviewBgUrl.textContent = 'Test Link';
+        showToast('Link error: could not load image URL');
+      };
+      img.src = url;
+    });
+  }
+
+  // Curated wallpaper preset chips
+  themeGifChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      const key = chip.dataset.gif;
+      if (key === 'clear') {
+        if (themeInputBgUrl) themeInputBgUrl.value = '';
+        if (themeToggleBgEnable) themeToggleBgEnable.checked = false;
+        applyTheme({ bgUrl: '', bgEnabled: false }, false);
+        showToast('Wallpaper cleared');
+      } else {
+        const url = CURATED_GIFS[key];
+        if (url) {
+          if (themeInputBgUrl) themeInputBgUrl.value = url;
+          if (themeToggleBgEnable) themeToggleBgEnable.checked = true;
+          applyTheme({ bgUrl: url, bgEnabled: true }, false);
+          showToast(`Applied wallpaper: ${chip.textContent.trim()}`);
+        }
+      }
+    });
+  });
+
+  // Opacity Slider
+  if (sliderThemeOpacity) {
+    sliderThemeOpacity.addEventListener('input', () => {
+      const val = parseInt(sliderThemeOpacity.value, 10);
+      if (labelValOpacity) labelValOpacity.textContent = val + '%';
+      applyTheme({ opacity: val }, false);
+    });
+  }
+
+  // Blur Slider
+  if (sliderThemeBlur) {
+    sliderThemeBlur.addEventListener('input', () => {
+      const val = parseInt(sliderThemeBlur.value, 10);
+      if (labelValBlur) labelValBlur.textContent = val + 'px';
+      applyTheme({ blur: val }, false);
+    });
+  }
+
+  // Darkness Slider
+  if (sliderThemeDarkness) {
+    sliderThemeDarkness.addEventListener('input', () => {
+      const val = parseInt(sliderThemeDarkness.value, 10);
+      if (labelValDarkness) labelValDarkness.textContent = val + '%';
+      applyTheme({ darkness: val }, false);
+    });
+  }
+
+  // Color picker
+  if (themeColorAccent) {
+    themeColorAccent.addEventListener('input', () => {
+      const color = themeColorAccent.value;
+      if (themeTextAccent) themeTextAccent.value = color;
+      if (labelValAccent) labelValAccent.textContent = color;
+      applyTheme({ accent: color }, false);
+    });
+  }
+
+  if (themeTextAccent) {
+    themeTextAccent.addEventListener('input', () => {
+      const color = themeTextAccent.value.trim();
+      if (/^#[0-9A-Fa-f]{6}$/.test(color)) {
+        if (themeColorAccent) themeColorAccent.value = color;
+        if (labelValAccent) labelValAccent.textContent = color;
+        applyTheme({ accent: color }, false);
+      }
+    });
+  }
+
+  // Spooky particles toggle
+  if (themeToggleSpookyParticles) {
+    themeToggleSpookyParticles.addEventListener('change', () => {
+      applyTheme({ spookyParticles: themeToggleSpookyParticles.checked }, false);
+    });
+  }
+
+  // Save button
+  if (btnSaveTheme) {
+    btnSaveTheme.addEventListener('click', () => {
+      const activeCard = document.querySelector('.theme-card.active');
+      const themeKey = activeCard ? activeCard.dataset.preset : currentThemeConfig.theme;
+      const url = themeInputBgUrl ? themeInputBgUrl.value.trim() : '';
+      const enabled = themeToggleBgEnable ? themeToggleBgEnable.checked : false;
+
+      const finalConfig = {
+        theme: themeKey,
+        bgEnabled: enabled,
+        bgUrl: url,
+        opacity: sliderThemeOpacity ? parseInt(sliderThemeOpacity.value, 10) : 88,
+        blur: sliderThemeBlur ? parseInt(sliderThemeBlur.value, 10) : 3,
+        darkness: sliderThemeDarkness ? parseInt(sliderThemeDarkness.value, 10) : 32,
+        accent: themeColorAccent ? themeColorAccent.value : '#ff7700',
+        particlesEnabled: themeToggleSpookyParticles ? themeToggleSpookyParticles.checked : true
+      };
+
+      applyTheme(finalConfig, true);
+      closeThemeModal();
+      showToast('Theme & wallpaper aesthetic saved successfully!');
+    });
+  }
+
+  // Reset button
+  if (btnResetTheme) {
+    btnResetTheme.addEventListener('click', () => {
+      applyTheme(Object.assign({}, THEME_DEFAULTS), true);
+      openThemeModal(); // refresh fields
+      showToast('Theme reset to default Obsidian tactical');
+    });
+  }
+}
+
+// ============================================================================
+// Main Application Entry Initialization
+// ============================================================================
 loadManifest();
 initMonaco();
 refreshPotassiumStatus();
+initThemeEngine();
 

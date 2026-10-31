@@ -166,6 +166,118 @@ local GousseUI = {
     }
 }
 
+-- Theme Presets for Gousse Hub
+local Themes = {
+    ["default"] = {
+        Background = Color3.fromRGB(11, 14, 20),
+        Sidebar = Color3.fromRGB(15, 19, 27),
+        Surface = Color3.fromRGB(19, 25, 35),
+        SurfaceHover = Color3.fromRGB(26, 35, 50),
+        TooltipBg = Color3.fromRGB(26, 34, 48),
+        Border = Color3.fromRGB(30, 41, 59),
+        BorderLight = Color3.fromRGB(51, 65, 85),
+        WindowOutline = Color3.fromRGB(16, 185, 129),
+        Accent = Color3.fromRGB(16, 185, 129),
+        AccentDark = Color3.fromRGB(5, 150, 105),
+        Primary = Color3.fromRGB(16, 185, 129),
+        Blue = Color3.fromRGB(56, 189, 248),
+        Success = Color3.fromRGB(16, 185, 129),
+        Warning = Color3.fromRGB(245, 158, 11),
+        Danger = Color3.fromRGB(244, 63, 94),
+        TextPrimary = Color3.fromRGB(243, 244, 246),
+        TextSecondary = Color3.fromRGB(148, 163, 184),
+        TextMuted = Color3.fromRGB(100, 116, 139)
+    },
+    ["emerald"] = {
+        Background = Color3.fromRGB(11, 14, 20),
+        Sidebar = Color3.fromRGB(15, 19, 27),
+        Surface = Color3.fromRGB(19, 25, 35),
+        SurfaceHover = Color3.fromRGB(26, 35, 50),
+        TooltipBg = Color3.fromRGB(26, 34, 48),
+        Border = Color3.fromRGB(30, 41, 59),
+        BorderLight = Color3.fromRGB(51, 65, 85),
+        WindowOutline = Color3.fromRGB(16, 185, 129),
+        Accent = Color3.fromRGB(16, 185, 129),
+        AccentDark = Color3.fromRGB(5, 150, 105),
+        Primary = Color3.fromRGB(16, 185, 129),
+        Blue = Color3.fromRGB(56, 189, 248),
+        Success = Color3.fromRGB(16, 185, 129),
+        Warning = Color3.fromRGB(245, 158, 11),
+        Danger = Color3.fromRGB(244, 63, 94),
+        TextPrimary = Color3.fromRGB(243, 244, 246),
+        TextSecondary = Color3.fromRGB(148, 163, 184),
+        TextMuted = Color3.fromRGB(100, 116, 139)
+    },
+    ["halloween"] = {
+        Background = Color3.fromRGB(10, 6, 18),         -- Deep spooky purple-black
+        Sidebar = Color3.fromRGB(14, 8, 25),            -- Elevated dark violet
+        Surface = Color3.fromRGB(20, 10, 36),           -- Dark gothic purple
+        SurfaceHover = Color3.fromRGB(32, 16, 56),      -- Violet interactive highlight
+        TooltipBg = Color3.fromRGB(28, 14, 50),
+        Border = Color3.fromRGB(67, 27, 117),           -- Witch purple border
+        BorderLight = Color3.fromRGB(92, 38, 160),
+        WindowOutline = Color3.fromRGB(255, 119, 0),    -- 🎃 Spooky glowing pumpkin orange
+        Accent = Color3.fromRGB(255, 119, 0),           -- Pumpkin orange
+        AccentDark = Color3.fromRGB(204, 95, 0),
+        Primary = Color3.fromRGB(255, 119, 0),
+        Blue = Color3.fromRGB(192, 132, 252),           -- Violet
+        Success = Color3.fromRGB(34, 197, 94),          -- Toxic slime green
+        Warning = Color3.fromRGB(234, 179, 8),          -- Jack-o'-lantern yellow
+        Danger = Color3.fromRGB(239, 68, 68),           -- Blood red
+        TextPrimary = Color3.fromRGB(255, 244, 229),    -- Warm pumpkin ivory
+        TextSecondary = Color3.fromRGB(192, 132, 252),  -- Lavender purple
+        TextMuted = Color3.fromRGB(139, 92, 246)        -- Deep lavender
+    },
+    ["cyberpunk"] = {
+        Background = Color3.fromRGB(8, 11, 18),
+        Sidebar = Color3.fromRGB(12, 16, 26),
+        Surface = Color3.fromRGB(15, 22, 36),
+        SurfaceHover = Color3.fromRGB(23, 34, 56),
+        TooltipBg = Color3.fromRGB(20, 30, 48),
+        Border = Color3.fromRGB(30, 51, 82),
+        BorderLight = Color3.fromRGB(45, 75, 120),
+        WindowOutline = Color3.fromRGB(0, 240, 255),    -- Neon Cyan
+        Accent = Color3.fromRGB(0, 240, 255),
+        AccentDark = Color3.fromRGB(0, 180, 200),
+        Primary = Color3.fromRGB(0, 240, 255),
+        Blue = Color3.fromRGB(0, 240, 255),
+        Success = Color3.fromRGB(34, 197, 94),
+        Warning = Color3.fromRGB(250, 204, 21),
+        Danger = Color3.fromRGB(244, 63, 94),
+        TextPrimary = Color3.fromRGB(240, 253, 244),
+        TextSecondary = Color3.fromRGB(0, 240, 255),
+        TextMuted = Color3.fromRGB(100, 116, 139)
+    },
+    ["crimson"] = {
+        Background = Color3.fromRGB(12, 4, 7),
+        Sidebar = Color3.fromRGB(18, 6, 11),
+        Surface = Color3.fromRGB(25, 9, 15),
+        SurfaceHover = Color3.fromRGB(38, 14, 24),
+        TooltipBg = Color3.fromRGB(32, 11, 20),
+        Border = Color3.fromRGB(76, 22, 40),
+        BorderLight = Color3.fromRGB(110, 30, 56),
+        WindowOutline = Color3.fromRGB(244, 63, 94),    -- Crimson Ruby
+        Accent = Color3.fromRGB(244, 63, 94),
+        AccentDark = Color3.fromRGB(190, 40, 68),
+        Primary = Color3.fromRGB(244, 63, 94),
+        Blue = Color3.fromRGB(251, 113, 133),
+        Success = Color3.fromRGB(34, 197, 94),
+        Warning = Color3.fromRGB(245, 158, 11),
+        Danger = Color3.fromRGB(225, 29, 72),
+        TextPrimary = Color3.fromRGB(255, 241, 242),
+        TextSecondary = Color3.fromRGB(251, 113, 133),
+        TextMuted = Color3.fromRGB(159, 18, 57)
+    }
+}
+
+function GousseUI:SetTheme(themeName: string)
+    if not themeName then return end
+    local target = Themes[themeName:lower()] or Themes["default"]
+    for k, v in pairs(target) do
+        GousseUI.Theme[k] = v
+    end
+end
+
 function GousseUI:GetIcon(name: string?): string?
     if not name or name == "" then return nil end
     if name:sub(1, 13) == "rbxassetid://" then return name end
@@ -645,6 +757,7 @@ function GousseUI:CreateWindow(config: {
     Size: UDim2?,
     Mobile: boolean?,
     ShowMobileToggle: boolean?,
+    Theme: string?,
     OnUnload: (() -> ())?,
     UnloadPrompt: {
         Title: string?,
@@ -652,6 +765,9 @@ function GousseUI:CreateWindow(config: {
     }?
 })
     config = config or {}
+    if config.Theme and type(config.Theme) == "string" then
+        GousseUI:SetTheme(config.Theme)
+    end
     local toggleKey = config.Keybind or GousseUI.ActiveKeybind
     GousseUI.ActiveKeybind = toggleKey
 

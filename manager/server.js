@@ -1,4 +1,5 @@
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
@@ -7,6 +8,137 @@ const { PotassiumBridge } = require('./potassium.js');
 const PORT = 3456;
 const ROOT_DIR = path.resolve(__dirname, '..');
 const MANIFEST_PATH = path.join(ROOT_DIR, 'games.json');
+const WEBHOOK_CONFIG_PATH = path.join(__dirname, 'webhook-config.json');
+
+function getWebhookConfig() {
+  try {
+    if (fs.existsSync(WEBHOOK_CONFIG_PATH)) {
+      return JSON.parse(fs.readFileSync(WEBHOOK_CONFIG_PATH, 'utf-8'));
+    }
+  } catch (_) {}
+  return {
+    webhookUrl: '',
+    autoPushChangelog: true,
+    author: 'Gouang',
+    version: '1.0.1'
+  };
+}
+
+function saveWebhookConfig(cfg) {
+  try {
+    fs.writeFileSync(WEBHOOK_CONFIG_PATH, JSON.stringify(cfg, null, 2), 'utf-8');
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function sendDiscordWebhook(webhookUrl, payload) {
+  return new Promise((resolve) => {
+    if (!webhookUrl || (!webhookUrl.startsWith('https://discord.com/api/webhooks/') && !webhookUrl.startsWith('https://discordapp.com/api/webhooks/'))) {
+      return resolve({ success: false, error: 'Invalid Discord Webhook URL' });
+    }
+    try {
+      const urlObj = new URL(webhookUrl);
+      const data = JSON.stringify(payload);
+      const options = {
+        hostname: urlObj.hostname,
+        path: urlObj.pathname + urlObj.search,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(data)
+        }
+      };
+
+      const req = https.request(options, (res) => {
+        let body = '';
+        res.on('data', chunk => body += chunk);
+        res.on('end', () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve({ success: true });
+          } else {
+            resolve({ success: false, status: res.statusCode, error: body || `HTTP ${res.statusCode}` });
+          }
+        });
+      });
+
+      req.on('error', (err) => resolve({ success: false, error: err.message }));
+      req.write(data);
+      req.end();
+    } catch (e) {
+      resolve({ success: false, error: e.message });
+    }
+  });
+}
+
+function buildScriptChangelogEmbed({ version, author, target, changelog, changedFiles, commitMsg }) {
+  const fields = [
+    {
+      name: '📦 Script Version',
+      value: `\`v${version || '1.0.0'}\``,
+      inline: true
+    },
+    {
+      name: '👨‍💻 Developer',
+      value: `**${author || 'Gouang'}**`,
+      inline: true
+    },
+    {
+      name: '🎯 Target Module',
+      value: `**${target || 'Blox Fruits • Third Sea'}**`,
+      inline: true
+    }
+  ];
+
+  if (changelog && changelog.trim()) {
+    const lines = changelog.trim().split('\n')
+      .map(l => l.trim())
+      .filter(l => l.length > 0)
+      .map(l => (l.startsWith('•') || l.startsWith('-') || l.startsWith('*') ? l : `• ${l}`));
+    fields.push({
+      name: '📝 Changelogs & Release Notes',
+      value: lines.join('\n') || '*Pembaruan script dan optimasi fitur.*',
+      inline: false
+    });
+  }
+
+  if (commitMsg) {
+    fields.push({
+      name: '🔖 Git Commit',
+      value: `\`${commitMsg}\``,
+      inline: true
+    });
+  }
+
+  if (changedFiles && changedFiles.length > 0) {
+    const cleanList = changedFiles.map(f => typeof f === 'string' ? f.replace(/^[AMD\?\s]+/g, '').trim() : f);
+    const fileList = cleanList.slice(0, 10).map(f => `\`${f}\``).join(', ') + (cleanList.length > 10 ? ` *(+${cleanList.length - 10} more)*` : '');
+    fields.push({
+      name: '📁 Modified Script Files',
+      value: fileList,
+      inline: false
+    });
+  }
+
+  return {
+    username: 'Gousse Studio • Script Changelog',
+    avatar_url: 'https://raw.githubusercontent.com/Jexytd/Gousse/main/manager/icon.png',
+    embeds: [
+      {
+        title: `🚀 [SCRIPT UPDATE & CHANGELOG] ${target || 'Gousse Studio Suite'}`,
+        description: `Pembaruan script telah diterbitkan oleh pengembang ke repository utama Gousse Hub.`,
+        color: 0x6366F1, // Indigo #6366F1
+        fields: fields,
+        footer: {
+          text: 'Gousse Studio Developer Console • Owner Broadcast',
+          icon_url: 'https://raw.githubusercontent.com/Jexytd/Gousse/main/manager/icon.png'
+        },
+        timestamp: new Date().toISOString()
+      }
+    ]
+  };
+}
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -20,6 +152,7 @@ const MIME_TYPES = {
 };
 
 const pendingTreeCallbacks = new Map();
+const robloxThumbnailCache = new Map();
 
 function waitForTreeCallback(queryId, timeoutMs = 4500) {
   return new Promise((resolve) => {
@@ -141,6 +274,47 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // Roblox Game Thumbnails API with memory cache
+  if (pathname === '/api/roblox-thumbnails' && req.method === 'GET') {
+    const universeIdsParam = parsedUrl.searchParams.get('universeIds');
+    if (!universeIdsParam) return sendJson(res, 400, { error: 'Missing universeIds parameter' });
+
+    const uids = universeIdsParam.split(',').map(s => s.trim()).filter(Boolean);
+    const thumbnails = {};
+    const missing = [];
+
+    for (const uid of uids) {
+      if (robloxThumbnailCache.has(uid)) {
+        thumbnails[uid] = robloxThumbnailCache.get(uid);
+      } else {
+        missing.push(uid);
+      }
+    }
+
+    if (missing.length > 0) {
+      try {
+        const apiUrl = `https://thumbnails.roblox.com/v1/games/icons?universeIds=${missing.join(',')}&size=150x150&format=Png&isCircular=false`;
+        const resp = await fetch(apiUrl);
+        if (resp.ok) {
+          const json = await resp.json();
+          if (json && Array.isArray(json.data)) {
+            json.data.forEach(item => {
+              if (item.targetId && item.imageUrl) {
+                const sId = String(item.targetId);
+                robloxThumbnailCache.set(sId, item.imageUrl);
+                thumbnails[sId] = item.imageUrl;
+              }
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Roblox thumbnail fetch error:', err.message);
+      }
+    }
+
+    return sendJson(res, 200, { thumbnails });
+  }
+
   // Files tree and list API with Git status
   if (pathname === '/api/files' && req.method === 'GET') {
     const tree = scanTree(ROOT_DIR);
@@ -239,18 +413,90 @@ const server = http.createServer(async (req, res) => {
   // Git Push API
   if (pathname === '/api/git-push' && req.method === 'POST') {
     try {
-      const { message } = await parseBody(req);
+      const { message, target, changelog, version, author, broadcast } = await parseBody(req);
       const commitMsg = message || 'Update scripts and configuration';
       const cmd = `git add . && git commit -m "${commitMsg.replace(/"/g, '\\"')}" && git push`;
 
-      exec(cmd, { cwd: ROOT_DIR }, (err, stdout, stderr) => {
-        if (err) return sendJson(res, 500, { error: stderr || err.message });
-        return sendJson(res, 200, { success: true, output: stdout });
+      // Get status before pushing so we know modified files
+      exec('git status --porcelain', { cwd: ROOT_DIR }, (statusErr, statusStdout) => {
+        const changedFiles = (!statusErr && statusStdout.trim()) ? statusStdout.trim().split('\n') : [];
+
+        exec(cmd, { cwd: ROOT_DIR }, async (err, stdout, stderr) => {
+          if (err) return sendJson(res, 500, { error: stderr || err.message });
+
+          // Auto-broadcast changelog if enabled or explicitly requested
+          const cfg = getWebhookConfig();
+          let broadcastRes = null;
+          if (cfg.webhookUrl && (broadcast || cfg.autoPushChangelog)) {
+            try {
+              const payload = buildScriptChangelogEmbed({
+                version: version || cfg.version || '1.0.0',
+                author: author || cfg.author || 'Gouang',
+                target: target || 'Gousse Studio Suite',
+                changelog: changelog || commitMsg,
+                changedFiles: changedFiles,
+                commitMsg: commitMsg
+              });
+              broadcastRes = await sendDiscordWebhook(cfg.webhookUrl, payload);
+            } catch (_) {}
+          }
+
+          return sendJson(res, 200, { success: true, output: stdout, changelogBroadcast: broadcastRes });
+        });
       });
     } catch (err) {
       return sendJson(res, 500, { error: err.message });
     }
     return;
+  }
+
+  // ==========================================
+  // Webhook Changelog API Endpoints (Owner Dashboard)
+  // ==========================================
+  if (pathname === '/api/webhook/config' && req.method === 'GET') {
+    return sendJson(res, 200, getWebhookConfig());
+  }
+
+  if (pathname === '/api/webhook/config' && req.method === 'POST') {
+    try {
+      const data = await parseBody(req);
+      const current = getWebhookConfig();
+      const updated = { ...current, ...data };
+      saveWebhookConfig(updated);
+      return sendJson(res, 200, { success: true, config: updated });
+    } catch (err) {
+      return sendJson(res, 500, { error: err.message });
+    }
+  }
+
+  if (pathname === '/api/webhook/changelog' && req.method === 'POST') {
+    try {
+      const body = await parseBody(req);
+      const cfg = getWebhookConfig();
+      const webhookUrl = body.webhookUrl || cfg.webhookUrl;
+
+      if (!webhookUrl) {
+        return sendJson(res, 400, { error: 'Webhook URL belum ditentukan' });
+      }
+
+      const payload = buildScriptChangelogEmbed({
+        version: body.version || cfg.version || '1.0.1',
+        author: body.author || cfg.author || 'Gouang',
+        target: body.target || 'Blox Fruits • Third Sea',
+        changelog: body.changelog || 'Pembaruan script dan optimasi fitur.',
+        changedFiles: body.changedFiles || [],
+        commitMsg: body.commitMsg || 'Update scripts via Gousse Studio'
+      });
+
+      const result = await sendDiscordWebhook(webhookUrl, payload);
+      if (result.success) {
+        return sendJson(res, 200, { success: true, message: 'Changelog script berhasil dikirim ke Discord!' });
+      } else {
+        return sendJson(res, 500, { error: result.error || 'Gagal mengirim webhook Discord' });
+      }
+    } catch (err) {
+      return sendJson(res, 500, { error: err.message });
+    }
   }
 
   // ==========================================
