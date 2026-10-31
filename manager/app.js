@@ -114,6 +114,15 @@ const btnExecPush = document.getElementById('btn-exec-push');
 const btnCopyBox = document.getElementById('btn-copy-box');
 const btnQuickLoader = document.getElementById('btn-quick-loader');
 
+// Discord Webhook Script Changelog Elements (Owner / Developer)
+const whInputUrl = document.getElementById('wh-input-url');
+const whSelectTarget = document.getElementById('wh-select-target');
+const whInputVersion = document.getElementById('wh-input-version');
+const whTextareaChangelog = document.getElementById('wh-textarea-changelog');
+const whAutoPush = document.getElementById('wh-auto-push');
+const btnSaveWhConfig = document.getElementById('btn-save-wh-config');
+const btnSendScriptChangelog = document.getElementById('btn-send-script-changelog');
+
 // Task Modal
 const taskModal = document.getElementById('task-modal');
 const taskInputId = document.getElementById('task-input-id');
@@ -1349,18 +1358,100 @@ function updateNavCounters() {
 }
 
 function populateGameDropdowns() {
-  filterGame.innerHTML = '<option value="all">All Games</option><option value="universal">Universal</option>';
-  taskInputGame.innerHTML = '<option value="universal">Universal</option>';
+  const currentFilterVal = filterGame ? filterGame.value : 'all';
+  const currentTaskGameVal = taskInputGame ? taskInputGame.value : 'universal';
+  const currentWhTarget = whSelectTarget ? whSelectTarget.value : null;
+
+  if (filterGame) {
+    filterGame.innerHTML = '<option value="all">All Games</option><option value="universal">Universal</option>';
+  }
+  if (taskInputGame) {
+    taskInputGame.innerHTML = '<option value="universal">Universal</option>';
+  }
+
+  if (whSelectTarget) {
+    whSelectTarget.innerHTML = '';
+
+    // Core & Universal script options
+    const optUniversal = document.createElement('option');
+    optUniversal.value = 'Universal Game Suite';
+    optUniversal.textContent = 'Universal Script';
+    whSelectTarget.appendChild(optUniversal);
+
+    const optCore = document.createElement('option');
+    optCore.value = 'Gousse Hub (Core Library)';
+    optCore.textContent = 'Core UI Library (v2.2)';
+    whSelectTarget.appendChild(optCore);
+  }
 
   Object.entries(manifest.games || {}).forEach(([uid, g]) => {
-    const opt = document.createElement('option');
-    opt.value = uid;
-    opt.textContent = `${g.name || 'Untitled'} (${uid})`;
-    filterGame.appendChild(opt);
+    const gName = g.name || 'Untitled';
 
-    const taskOpt = opt.cloneNode(true);
-    taskInputGame.appendChild(taskOpt);
+    if (filterGame) {
+      const opt = document.createElement('option');
+      opt.value = uid;
+      opt.textContent = `${gName} (${uid})`;
+      filterGame.appendChild(opt);
+
+      if (taskInputGame) {
+        const taskOpt = opt.cloneNode(true);
+        taskInputGame.appendChild(taskOpt);
+      }
+    }
+
+    if (whSelectTarget) {
+      const places = g.places || {};
+      const placeEntries = Object.entries(places);
+
+      if (placeEntries.length > 0) {
+        // Full suite option for multi-place game
+        const suiteOpt = document.createElement('option');
+        suiteOpt.value = `${gName} (All Seas)`;
+        suiteOpt.textContent = `${gName} (Suite)`;
+        whSelectTarget.appendChild(suiteOpt);
+
+        // Individual place options
+        placeEntries.forEach(([pid, p]) => {
+          const pName = p.name || pid;
+          const opt = document.createElement('option');
+          opt.value = `${gName} • ${pName}`;
+          opt.textContent = `${gName} (${pName})`;
+          whSelectTarget.appendChild(opt);
+        });
+      } else {
+        // Single game without subplaces (e.g. Tycoon Streamer, Arsenal, Bad Business)
+        const opt = document.createElement('option');
+        opt.value = gName;
+        opt.textContent = gName;
+        whSelectTarget.appendChild(opt);
+      }
+    }
   });
+
+  // Restore previous selections
+  if (filterGame && currentFilterVal) filterGame.value = currentFilterVal;
+  if (taskInputGame && currentTaskGameVal) taskInputGame.value = currentTaskGameVal;
+
+  if (whSelectTarget && currentWhTarget) {
+    let matched = false;
+    for (let i = 0; i < whSelectTarget.options.length; i++) {
+      const opt = whSelectTarget.options[i];
+      if (opt.value === currentWhTarget || 
+          opt.textContent === currentWhTarget ||
+          opt.value.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === currentWhTarget.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()) {
+        whSelectTarget.selectedIndex = i;
+        matched = true;
+        break;
+      }
+    }
+    if (!matched && currentWhTarget) {
+      const customOpt = document.createElement('option');
+      customOpt.value = currentWhTarget;
+      customOpt.textContent = currentWhTarget;
+      whSelectTarget.appendChild(customOpt);
+      whSelectTarget.value = currentWhTarget;
+    }
+  }
 }
 
 function getFilteredTasks() {
@@ -2607,6 +2698,9 @@ btnSaveGameReg.addEventListener('click', async () => {
   updateNavCounters();
   populateGameDropdowns();
   renderRegistry();
+  if (typeof loadFileTree === 'function') {
+    loadFileTree();
+  }
   showToast(`Registered ${name}`);
 });
 
@@ -2684,15 +2778,7 @@ btnExecPush.addEventListener('click', async () => {
   }
 });
 
-// Discord Webhook Script Changelog Elements (Owner / Developer)
-const whInputUrl = document.getElementById('wh-input-url');
-const whSelectTarget = document.getElementById('wh-select-target');
-const whInputVersion = document.getElementById('wh-input-version');
-const whTextareaChangelog = document.getElementById('wh-textarea-changelog');
-const whAutoPush = document.getElementById('wh-auto-push');
-const btnSaveWhConfig = document.getElementById('btn-save-wh-config');
-const btnSendScriptChangelog = document.getElementById('btn-send-script-changelog');
-
+// Discord Webhook Script Changelog Handling (Owner / Developer)
 async function loadWebhookConfig() {
   try {
     const res = await fetch('/api/webhook/config');
@@ -2701,6 +2787,17 @@ async function loadWebhookConfig() {
       if (whInputUrl && data.webhookUrl) whInputUrl.value = data.webhookUrl;
       if (whAutoPush && data.autoPushChangelog !== undefined) whAutoPush.checked = data.autoPushChangelog;
       if (whInputVersion && data.version) whInputVersion.value = data.version;
+      if (whSelectTarget && data.defaultTarget) {
+        for (let i = 0; i < whSelectTarget.options.length; i++) {
+          const opt = whSelectTarget.options[i];
+          if (opt.value === data.defaultTarget || 
+              opt.textContent === data.defaultTarget ||
+              opt.value.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === data.defaultTarget.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()) {
+            whSelectTarget.selectedIndex = i;
+            break;
+          }
+        }
+      }
     }
   } catch (_) {}
 }
@@ -2711,7 +2808,8 @@ if (btnSaveWhConfig) {
       const payload = {
         webhookUrl: whInputUrl ? whInputUrl.value.trim() : '',
         autoPushChangelog: whAutoPush ? whAutoPush.checked : true,
-        version: whInputVersion ? whInputVersion.value.trim() : '1.0.1'
+        version: whInputVersion ? whInputVersion.value.trim() : '1.0.1',
+        defaultTarget: whSelectTarget ? whSelectTarget.value : ''
       };
       const res = await fetch('/api/webhook/config', {
         method: 'POST',
@@ -2727,6 +2825,18 @@ if (btnSaveWhConfig) {
     } catch (err) {
       showToast('Network error saving config: ' + err.message);
     }
+  });
+}
+
+if (whSelectTarget) {
+  whSelectTarget.addEventListener('change', async () => {
+    try {
+      await fetch('/api/webhook/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultTarget: whSelectTarget.value })
+      });
+    } catch (_) {}
   });
 }
 

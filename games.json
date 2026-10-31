@@ -36,13 +36,18 @@
       "entry": "games/bad_business/main.luau",
       "places": {}
     },
-    "110838858426924": {
+    "10765145358": {
       "name": "Tycoon Streamer",
       "status": "public",
       "lead": "Gouang",
       "scriptType": "Modular (modules/)",
       "entry": "games/tycoon_streamer/main.luau",
-      "places": {}
+      "places": {
+        "110838858426924": {
+          "name": "Tycoon Streamer",
+          "script": "games/tycoon_streamer/main.luau"
+        }
+      }
     }
   },
   "tasks": [

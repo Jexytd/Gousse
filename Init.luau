@@ -29,6 +29,18 @@ local GITHUB_BASE = ("https://raw.githubusercontent.com/%s/%s/%s/"):format(
 
 -- Local/Global Environment State
 local env = (getgenv and getgenv()) or _G or {}
+
+-- Auto-detect local dev server if running on localhost:3456
+if env.Gousse_DevMode == nil then
+    local testOk, testRes = pcall(function()
+        return game:HttpGet(CONFIG.LocalDevHost .. "/api/manifest")
+    end)
+    if testOk and testRes and testRes:sub(1, 1) == "{" then
+        env.Gousse_DevMode = true
+        print("[Gousse Hub] Local Manager Server detected! Operating in DevMode.")
+    end
+end
+
 local isDevMode = env.Gousse_DevMode == true
 
 -- Notification Helper (Dual mode: GousseUI if ready, StarterGui as fallback)
@@ -94,7 +106,7 @@ end
 
 -- Step 1: Load or Initialize GousseUI Library
 local function EnsureGousseUI()
-    if env.GousseUI then
+    if env.GousseUI and not isDevMode then
         return env.GousseUI
     end
 
@@ -166,13 +178,27 @@ local function Main()
     local placeId = tostring(game.PlaceId)
 
     Loader:SetStatus("Resolving target module for Universe " .. universeId .. "...", 0.65)
-    local gameEntry = manifest.games and manifest.games[universeId]
+    
+    -- Check manifest by Universe ID or Place ID (in case user keyed by Place ID)
+    local gameEntry = manifest.games and (manifest.games[universeId] or manifest.games[placeId])
+    
+    -- Also search within each game's places dictionary
+    if not gameEntry and manifest.games then
+        for uid, g in pairs(manifest.games) do
+            if (g.places and (g.places[placeId] or g.places[universeId])) or uid == placeId or uid == universeId then
+                gameEntry = g
+                universeId = uid
+                break
+            end
+        end
+    end
+
     local targetPath = nil
     local targetName = "Universal Fallback"
 
     if gameEntry then
         -- Check for sub-place specific script (e.g. Sea 1, Sea 2, Dungeon, Lobby)
-        local subPlace = gameEntry.places and gameEntry.places[placeId]
+        local subPlace = gameEntry.places and (gameEntry.places[placeId] or gameEntry.places[universeId])
         if subPlace and subPlace.script then
             targetPath = subPlace.script
             targetName = ("%s - %s"):format(gameEntry.name or "Game", subPlace.name or "Sub-Place")
