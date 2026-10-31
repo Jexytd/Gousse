@@ -122,6 +122,8 @@ const whTextareaChangelog = document.getElementById('wh-textarea-changelog');
 const whAutoPush = document.getElementById('wh-auto-push');
 const btnSaveWhConfig = document.getElementById('btn-save-wh-config');
 const btnSendScriptChangelog = document.getElementById('btn-send-script-changelog');
+const btnAiGenerateChangelog = document.getElementById('btn-ai-generate-changelog');
+const aiChangelogMode = document.getElementById('ai-changelog-mode');
 
 // Task Modal
 const taskModal = document.getElementById('task-modal');
@@ -2837,6 +2839,46 @@ if (whSelectTarget) {
         body: JSON.stringify({ defaultTarget: whSelectTarget.value })
       });
     } catch (_) {}
+  });
+}
+
+if (btnAiGenerateChangelog) {
+  btnAiGenerateChangelog.addEventListener('click', async () => {
+    const target = whSelectTarget ? whSelectTarget.value : '';
+    const mode = aiChangelogMode ? aiChangelogMode.value : 'smart';
+    
+    const originalHtml = btnAiGenerateChangelog.innerHTML;
+    btnAiGenerateChangelog.disabled = true;
+    btnAiGenerateChangelog.innerHTML = `
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a10 10 0 0 1 10 10"></path></svg>
+      <span>Scanning...</span>
+    `;
+
+    try {
+      const res = await fetch('/api/ai/generate-changelog', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target, mode })
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (whTextareaChangelog) {
+          whTextareaChangelog.value = data.changelog;
+        }
+        if (data.suggestedVersion && whInputVersion) {
+          whInputVersion.value = data.suggestedVersion;
+        }
+        const tabsInfo = data.featuresFound ? ` (${data.featuresFound.tabsCount} modules scanned)` : '';
+        showToast(`✨ AI Changelog generated!${tabsInfo}`);
+      } else {
+        showToast('AI Generation failed: ' + (data.error || 'Unknown error'));
+      }
+    } catch (err) {
+      showToast('Network error generating changelog: ' + err.message);
+    } finally {
+      btnAiGenerateChangelog.disabled = false;
+      btnAiGenerateChangelog.innerHTML = originalHtml;
+    }
   });
 }
 

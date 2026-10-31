@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 const { PotassiumBridge } = require('./potassium.js');
+const { generateAiChangelog } = require('./ai-changelog.js');
 
 const PORT = 3456;
 const ROOT_DIR = path.resolve(__dirname, '..');
@@ -171,7 +172,7 @@ function waitForTreeCallback(queryId, timeoutMs = 4500) {
 
 function sendJson(res, statusCode, data) {
   res.writeHead(statusCode, {
-    'Content-Type': 'application/json',
+    'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*'
   });
   res.end(JSON.stringify(data));
@@ -494,6 +495,19 @@ const server = http.createServer(async (req, res) => {
       } else {
         return sendJson(res, 500, { error: result.error || 'Gagal mengirim webhook Discord' });
       }
+    } catch (err) {
+      return sendJson(res, 500, { error: err.message });
+    }
+  }
+
+  // ==========================================
+  // AI Script Changelog & Release Notes Generator
+  // ==========================================
+  if (pathname === '/api/ai/generate-changelog' && req.method === 'POST') {
+    try {
+      const { target, mode } = await parseBody(req);
+      const result = await generateAiChangelog({ target, mode, rootDir: ROOT_DIR });
+      return sendJson(res, 200, result);
     } catch (err) {
       return sendJson(res, 500, { error: err.message });
     }
