@@ -1010,14 +1010,193 @@ local Themes = {
         TextPrimary = Color3.fromRGB(255, 241, 242),
         TextSecondary = Color3.fromRGB(251, 113, 133),
         TextMuted = Color3.fromRGB(159, 18, 57)
+    },
+    ["amethyst"] = {
+        Background = Color3.fromRGB(11, 8, 20),
+        Sidebar = Color3.fromRGB(15, 11, 28),
+        Surface = Color3.fromRGB(21, 16, 38),
+        SurfaceHover = Color3.fromRGB(32, 24, 58),
+        TooltipBg = Color3.fromRGB(27, 20, 50),
+        Border = Color3.fromRGB(56, 38, 95),
+        BorderLight = Color3.fromRGB(80, 54, 132),
+        WindowOutline = Color3.fromRGB(168, 85, 247),  -- #A855F7 Vibrant Amethyst
+        Accent = Color3.fromRGB(168, 85, 247),
+        AccentDark = Color3.fromRGB(147, 51, 234),
+        Primary = Color3.fromRGB(168, 85, 247),
+        Blue = Color3.fromRGB(192, 132, 252),
+        Success = Color3.fromRGB(34, 197, 94),
+        Warning = Color3.fromRGB(245, 158, 11),
+        Danger = Color3.fromRGB(244, 63, 94),
+        TextPrimary = Color3.fromRGB(250, 245, 255),
+        TextSecondary = Color3.fromRGB(216, 180, 254),
+        TextMuted = Color3.fromRGB(147, 112, 196)
+    },
+    ["ocean"] = {
+        Background = Color3.fromRGB(8, 14, 24),
+        Sidebar = Color3.fromRGB(11, 19, 33),
+        Surface = Color3.fromRGB(15, 27, 46),
+        SurfaceHover = Color3.fromRGB(22, 39, 66),
+        TooltipBg = Color3.fromRGB(18, 32, 54),
+        Border = Color3.fromRGB(28, 58, 96),
+        BorderLight = Color3.fromRGB(42, 85, 138),
+        WindowOutline = Color3.fromRGB(56, 189, 248),   -- #38BDF8 Sky Cyan
+        Accent = Color3.fromRGB(56, 189, 248),
+        AccentDark = Color3.fromRGB(2, 132, 199),
+        Primary = Color3.fromRGB(56, 189, 248),
+        Blue = Color3.fromRGB(56, 189, 248),
+        Success = Color3.fromRGB(52, 211, 153),
+        Warning = Color3.fromRGB(251, 191, 36),
+        Danger = Color3.fromRGB(244, 63, 94),
+        TextPrimary = Color3.fromRGB(240, 249, 255),
+        TextSecondary = Color3.fromRGB(186, 230, 253),
+        TextMuted = Color3.fromRGB(103, 155, 196)
+    },
+    ["amber"] = {
+        Background = Color3.fromRGB(18, 13, 8),
+        Sidebar = Color3.fromRGB(25, 18, 11),
+        Surface = Color3.fromRGB(36, 26, 16),
+        SurfaceHover = Color3.fromRGB(52, 38, 23),
+        TooltipBg = Color3.fromRGB(44, 32, 20),
+        Border = Color3.fromRGB(92, 64, 32),
+        BorderLight = Color3.fromRGB(130, 92, 45),
+        WindowOutline = Color3.fromRGB(245, 158, 11),   -- #F59E0B Warm Amber Gold
+        Accent = Color3.fromRGB(245, 158, 11),
+        AccentDark = Color3.fromRGB(217, 119, 6),
+        Primary = Color3.fromRGB(245, 158, 11),
+        Blue = Color3.fromRGB(251, 191, 36),
+        Success = Color3.fromRGB(34, 197, 94),
+        Warning = Color3.fromRGB(245, 158, 11),
+        Danger = Color3.fromRGB(239, 68, 68),
+        TextPrimary = Color3.fromRGB(255, 251, 235),
+        TextSecondary = Color3.fromRGB(253, 230, 138),
+        TextMuted = Color3.fromRGB(180, 145, 85)
+    },
+    ["slate"] = {
+        Background = Color3.fromRGB(15, 17, 21),
+        Sidebar = Color3.fromRGB(20, 23, 29),
+        Surface = Color3.fromRGB(27, 31, 39),
+        SurfaceHover = Color3.fromRGB(38, 44, 55),
+        TooltipBg = Color3.fromRGB(32, 37, 47),
+        Border = Color3.fromRGB(51, 65, 85),
+        BorderLight = Color3.fromRGB(71, 85, 105),
+        WindowOutline = Color3.fromRGB(148, 163, 184), -- #94A3B8 Minimal Titanium Slate
+        Accent = Color3.fromRGB(148, 163, 184),
+        AccentDark = Color3.fromRGB(100, 116, 139),
+        Primary = Color3.fromRGB(148, 163, 184),
+        Blue = Color3.fromRGB(203, 213, 225),
+        Success = Color3.fromRGB(74, 222, 128),
+        Warning = Color3.fromRGB(250, 204, 21),
+        Danger = Color3.fromRGB(248, 113, 113),
+        TextPrimary = Color3.fromRGB(248, 250, 252),
+        TextSecondary = Color3.fromRGB(203, 213, 225),
+        TextMuted = Color3.fromRGB(148, 163, 184)
     }
 }
 
-function GousseUI:SetTheme(themeName: string)
+-- Reactive Theme Subscription Engine
+local ThemeSubscribers = {}
+local ThemeCallbacks = {}
+
+function GousseUI:RegisterThemeElement(element: Instance, propertyName: string, themeKey: string)
+    local sub = { Element = element, Property = propertyName, Key = themeKey }
+    table.insert(ThemeSubscribers, sub)
+    return function()
+        for i = #ThemeSubscribers, 1, -1 do
+            if ThemeSubscribers[i] == sub then
+                table.remove(ThemeSubscribers, i)
+                break
+            end
+        end
+    end
+end
+
+function GousseUI:OnThemeUpdate(cb: (theme: any) -> ())
+    table.insert(ThemeCallbacks, cb)
+    return function()
+        for i = #ThemeCallbacks, 1, -1 do
+            if ThemeCallbacks[i] == cb then
+                table.remove(ThemeCallbacks, i)
+                break
+            end
+        end
+    end
+end
+
+function GousseUI:SetTheme(themeName: string, customColors: { [string]: Color3 }?)
     if not themeName then return end
     local target = Themes[themeName:lower()] or Themes["default"]
     for k, v in pairs(target) do
         GousseUI.Theme[k] = v
+    end
+    if customColors then
+        for k, v in pairs(customColors) do
+            GousseUI.Theme[k] = v
+        end
+    end
+
+    -- Update all subscribed elements reactively
+    for i = #ThemeSubscribers, 1, -1 do
+        local sub = ThemeSubscribers[i]
+        local elem = sub.Element
+        if elem and elem.Parent then
+            local color = GousseUI.Theme[sub.Key]
+            if color then
+                pcall(function()
+                    elem[sub.Property] = color
+                end)
+            end
+        else
+            table.remove(ThemeSubscribers, i)
+        end
+    end
+
+    -- Fire all reactive theme callbacks
+    for i = #ThemeCallbacks, 1, -1 do
+        local cb = ThemeCallbacks[i]
+        pcall(cb, GousseUI.Theme)
+    end
+
+    if GousseUI.OnThemeChanged then
+        pcall(GousseUI.OnThemeChanged, GousseUI.Theme)
+    end
+end
+
+function GousseUI:SetAccentColor(color: Color3)
+    if not color then return end
+    GousseUI.Theme.Accent = color
+    GousseUI.Theme.WindowOutline = color
+    GousseUI.Theme.Primary = color
+    GousseUI.Theme.Success = color
+    GousseUI.Theme.AccentDark = Color3.fromRGB(
+        math.floor(color.R * 255 * 0.75),
+        math.floor(color.G * 255 * 0.75),
+        math.floor(color.B * 255 * 0.75)
+    )
+
+    -- Update elements subscribed to Accent, Primary, WindowOutline
+    for i = #ThemeSubscribers, 1, -1 do
+        local sub = ThemeSubscribers[i]
+        local elem = sub.Element
+        if elem and elem.Parent then
+            local newColor = GousseUI.Theme[sub.Key]
+            if newColor then
+                pcall(function()
+                    elem[sub.Property] = newColor
+                end)
+            end
+        else
+            table.remove(ThemeSubscribers, i)
+        end
+    end
+
+    -- Fire all reactive theme callbacks
+    for i = #ThemeCallbacks, 1, -1 do
+        local cb = ThemeCallbacks[i]
+        pcall(cb, GousseUI.Theme)
+    end
+
+    if GousseUI.OnThemeChanged then
+        pcall(GousseUI.OnThemeChanged, GousseUI.Theme)
     end
 end
 
@@ -1099,6 +1278,35 @@ function GousseUI:GetIcon(name: any): string?
     return nil
 end
 
+-- Utility: Color & Hex Helpers
+local function ColorToHex(color: Color3): string
+    local r = math.clamp(math.floor(color.R * 255 + 0.5), 0, 255)
+    local g = math.clamp(math.floor(color.G * 255 + 0.5), 0, 255)
+    local b = math.clamp(math.floor(color.B * 255 + 0.5), 0, 255)
+    return string.format("#%02X%02X%02X", r, g, b)
+end
+
+local function HexToColor(hex: string): Color3?
+    if not hex then return nil end
+    local clean = hex:gsub("#", ""):gsub("%s+", "")
+    if #clean == 6 then
+        local r = tonumber(clean:sub(1, 2), 16)
+        local g = tonumber(clean:sub(3, 4), 16)
+        local b = tonumber(clean:sub(5, 6), 16)
+        if r and g and b then
+            return Color3.fromRGB(r, g, b)
+        end
+    elseif #clean == 3 then
+        local r = tonumber(clean:sub(1, 1):rep(2), 16)
+        local g = tonumber(clean:sub(2, 2):rep(2), 16)
+        local b = tonumber(clean:sub(3, 3):rep(2), 16)
+        if r and g and b then
+            return Color3.fromRGB(r, g, b)
+        end
+    end
+    return nil
+end
+
 -- Utility: Quick Tween
 local function Tween(instance: Instance, properties: {[string]: any}, duration: number?, style: Enum.EasingStyle?, direction: Enum.EasingDirection?)
     duration = duration or 0.14
@@ -1161,6 +1369,76 @@ local function MakeDraggable(dragHandle: GuiObject, targetFrame: GuiObject)
             local clampedY = math.clamp(startCenter.Y + delta.Y, minY, maxY)
 
             targetFrame.Position = UDim2.new(0, clampedX, 0, clampedY)
+        end
+    end)
+end
+
+-- Utility: Make UI Resizable with Viewport Clamping & Anchor Point Compensation (Mouse & Touch)
+local function MakeResizable(gripHandle: GuiObject, targetFrame: GuiObject, resizeConfig: { MinSize: Vector2?, MaxSize: Vector2?, IsMobile: boolean? }?)
+    local resizing = false
+    local resizeStart, startSize, startPos
+
+    gripHandle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            resizing = true
+            resizeStart = input.Position
+            startSize = targetFrame.AbsoluteSize
+            startPos = targetFrame.Position
+
+            local icon = gripHandle:FindFirstChild("Icon")
+            if icon and icon:IsA("ImageLabel") then
+                Tween(icon, { ImageColor3 = GousseUI.Theme.Accent }, 0.1)
+            end
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    resizing = false
+                    local ic = gripHandle:FindFirstChild("Icon")
+                    if ic and ic:IsA("ImageLabel") then
+                        Tween(ic, { ImageColor3 = GousseUI.Theme.TextMuted }, 0.1)
+                    end
+                end
+            end)
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            if resizing then
+                resizing = false
+                local ic = gripHandle:FindFirstChild("Icon")
+                if ic and ic:IsA("ImageLabel") then
+                    Tween(ic, { ImageColor3 = GousseUI.Theme.TextMuted }, 0.1)
+                end
+            end
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if resizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - resizeStart
+            local cam = workspace.CurrentCamera
+            local vp = cam and cam.ViewportSize or Vector2.new(1920, 1080)
+
+            local isMob = (resizeConfig and resizeConfig.IsMobile) or false
+            local minW = (resizeConfig and resizeConfig.MinSize and resizeConfig.MinSize.X) or (if isMob then 290 else 380)
+            local minH = (resizeConfig and resizeConfig.MinSize and resizeConfig.MinSize.Y) or (if isMob then 230 else 280)
+            local maxW = (resizeConfig and resizeConfig.MaxSize and resizeConfig.MaxSize.X) or math.min(vp.X - 16, 1100)
+            local maxH = (resizeConfig and resizeConfig.MaxSize and resizeConfig.MaxSize.Y) or math.min(vp.Y - 16, 800)
+
+            local newW = math.clamp(startSize.X + delta.X, minW, maxW)
+            local newH = math.clamp(startSize.Y + delta.Y, minH, maxH)
+
+            -- Keep top-left stationary while AnchorPoint is (0.5, 0.5)
+            local anchor = targetFrame.AnchorPoint
+            local shiftX = (newW - startSize.X) * anchor.X
+            local shiftY = (newH - startSize.Y) * anchor.Y
+
+            targetFrame.Size = UDim2.new(0, newW, 0, newH)
+            targetFrame.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + shiftX,
+                startPos.Y.Scale, startPos.Y.Offset + shiftY
+            )
         end
     end)
 end
@@ -1585,7 +1863,11 @@ function GousseUI:CreateWindow(config: {
     local toggleKey = config.Keybind or GousseUI.ActiveKeybind
     GousseUI.ActiveKeybind = toggleKey
 
-    local isMobile = if config.Mobile ~= nil then config.Mobile else (UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled)
+    local cam = workspace.CurrentCamera
+    local viewportSize = cam and cam.ViewportSize or Vector2.new(1920, 1080)
+    local isTouchDevice = UserInputService.TouchEnabled
+    local isSmallScreen = (viewportSize.X < 768 or viewportSize.Y < 500)
+    local isMobile = if config.Mobile ~= nil then config.Mobile else (isTouchDevice and not UserInputService.KeyboardEnabled or isSmallScreen)
 
     -- Header title: game/script name only (no "Gousse Hub")
     local displayTitle: string
@@ -1615,6 +1897,7 @@ function GousseUI:CreateWindow(config: {
     screenGui.Parent = safeParent
 
     local isVisible = true
+    local WindowObj = nil
 
     -- Main Window Outer Frame (CanvasGroup for whole-window alpha fade and animation)
     local okCanvas, canvasInstance = pcall(function()
@@ -1627,10 +1910,22 @@ function GousseUI:CreateWindow(config: {
     mainFrame.Name = "MainFrame"
     mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 
+    -- Responsive Vector Scaling (UIScale)
+    local uiScale = Instance.new("UIScale")
+    uiScale.Name = "WindowScale"
+    local initialScale = 1.0
+    if isMobile and viewportSize.Y < 480 then
+        initialScale = math.clamp(viewportSize.Y / 490, 0.72, 0.95)
+    elseif isMobile and viewportSize.X < 720 then
+        initialScale = math.clamp(viewportSize.X / 740, 0.75, 0.95)
+    end
+    uiScale.Scale = config.Scale or initialScale
+    uiScale.Parent = mainFrame
+
     if config.Size then
         mainFrame.Size = config.Size
     elseif isMobile then
-        mainFrame.Size = UDim2.new(0.92, 0, 0.84, 0)
+        mainFrame.Size = UDim2.new(0.92, 0, 0.86, 0)
     else
         mainFrame.Size = UDim2.new(0, 690, 0, 450)
     end
@@ -1639,11 +1934,12 @@ function GousseUI:CreateWindow(config: {
     mainFrame.BorderSizePixel = 0
     mainFrame.ClipsDescendants = true
     mainFrame.Parent = screenGui
+    GousseUI:RegisterThemeElement(mainFrame, "BackgroundColor3", "Background")
 
     -- Responsive Size Constraint for ultra-wide or compact mobile screens
     local sizeConstraint = Instance.new("UISizeConstraint")
-    sizeConstraint.MinSize = Vector2.new(320, 280)
-    sizeConstraint.MaxSize = Vector2.new(820, 560)
+    sizeConstraint.MinSize = Vector2.new(if isMobile then 280 else 340, if isMobile then 220 else 260)
+    sizeConstraint.MaxSize = Vector2.new(math.min(viewportSize.X - 16, 1100), math.min(viewportSize.Y - 16, 800))
     sizeConstraint.Parent = mainFrame
 
     local mainCorner = Instance.new("UICorner")
@@ -1655,6 +1951,7 @@ function GousseUI:CreateWindow(config: {
     mainStroke.Color = GousseUI.Theme.Border
     mainStroke.Thickness = 1.2
     mainStroke.Parent = mainFrame
+    GousseUI:RegisterThemeElement(mainStroke, "Color", "Border")
 
     -- Signature top emerald accent bar (2px)
     local topAccentBar = Instance.new("Frame")
@@ -1665,6 +1962,7 @@ function GousseUI:CreateWindow(config: {
     topAccentBar.BorderSizePixel = 0
     topAccentBar.ZIndex = 10
     topAccentBar.Parent = mainFrame
+    GousseUI:RegisterThemeElement(topAccentBar, "BackgroundColor3", "Accent")
 
     -- ========================================================================
     -- Global Floating Tooltip System (ScreenGui ZIndex 10000, Clamped Viewport)
@@ -1777,6 +2075,7 @@ function GousseUI:CreateWindow(config: {
     header.BackgroundColor3 = GousseUI.Theme.Sidebar
     header.BorderSizePixel = 0
     header.Parent = mainFrame
+    GousseUI:RegisterThemeElement(header, "BackgroundColor3", "Sidebar")
 
     local headerBottomBorder = Instance.new("Frame")
     headerBottomBorder.Size = UDim2.new(1, 0, 0, 1)
@@ -1784,6 +2083,7 @@ function GousseUI:CreateWindow(config: {
     headerBottomBorder.BackgroundColor3 = GousseUI.Theme.Border
     headerBottomBorder.BorderSizePixel = 0
     headerBottomBorder.Parent = header
+    GousseUI:RegisterThemeElement(headerBottomBorder, "BackgroundColor3", "Border")
 
     -- Left: Collapse / Expand Sidebar Button
     local collapseBtnSize = if isMobile then 34 else 28
@@ -1795,6 +2095,7 @@ function GousseUI:CreateWindow(config: {
     collapseBtn.Text = ""
     collapseBtn.AutoButtonColor = false
     collapseBtn.Parent = header
+    GousseUI:RegisterThemeElement(collapseBtn, "BackgroundColor3", "Surface")
 
     local collapseCorner = Instance.new("UICorner")
     collapseCorner.CornerRadius = UDim.new(0, 6)
@@ -1804,6 +2105,7 @@ function GousseUI:CreateWindow(config: {
     collapseStroke.Color = GousseUI.Theme.Border
     collapseStroke.Thickness = 1
     collapseStroke.Parent = collapseBtn
+    GousseUI:RegisterThemeElement(collapseStroke, "Color", "Border")
 
     local collapseIcon = Instance.new("ImageLabel")
     collapseIcon.Name = "Icon"
@@ -1813,6 +2115,7 @@ function GousseUI:CreateWindow(config: {
     collapseIcon.Image = RawIcons["layout"] or "rbxassetid://10723425376"
     collapseIcon.ImageColor3 = GousseUI.Theme.TextSecondary
     collapseIcon.Parent = collapseBtn
+    GousseUI:RegisterThemeElement(collapseIcon, "ImageColor3", "TextSecondary")
 
     collapseBtn.MouseEnter:Connect(function()
         Tween(collapseBtn, { BackgroundColor3 = GousseUI.Theme.SurfaceHover }, 0.1)
@@ -1825,13 +2128,13 @@ function GousseUI:CreateWindow(config: {
         }, 0.1)
     end)
 
-    -- Window Controls (Minimize & Close)
+    -- Window Controls (Settings, Minimize & Close)
     local controlsFrame = Instance.new("Frame")
     controlsFrame.Name = "Controls"
     local ctrlBtnSize = if isMobile then 34 else 28
     local ctrlIconSize = if isMobile then 16 else 14
     local ctrlGap = if isMobile then 6 else 5
-    local ctrlWidth = (ctrlBtnSize * 2) + ctrlGap
+    local ctrlWidth = (ctrlBtnSize * 3) + (ctrlGap * 2)
     controlsFrame.Size = UDim2.new(0, ctrlWidth, 1, 0)
     controlsFrame.Position = UDim2.new(1, -ctrlWidth - 8, 0, 0)
     controlsFrame.BackgroundTransparency = 1
@@ -1852,15 +2155,58 @@ function GousseUI:CreateWindow(config: {
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.TextYAlignment = Enum.TextYAlignment.Center
     titleLabel.Parent = header
+    GousseUI:RegisterThemeElement(titleLabel, "TextColor3", "TextPrimary")
 
+    -- 1. UI Settings Button
+    local btnSettings = Instance.new("TextButton")
+    btnSettings.Name = "BtnSettings"
+    btnSettings.Size = UDim2.new(0, ctrlBtnSize, 0, ctrlBtnSize)
+    btnSettings.Position = UDim2.new(0, 0, 0.5, -ctrlBtnSize / 2)
+    btnSettings.BackgroundColor3 = GousseUI.Theme.Surface
+    btnSettings.Text = ""
+    btnSettings.AutoButtonColor = false
+    btnSettings.Parent = controlsFrame
+    GousseUI:RegisterThemeElement(btnSettings, "BackgroundColor3", "Surface")
+
+    local setCorner = Instance.new("UICorner")
+    setCorner.CornerRadius = UDim.new(0, 6)
+    setCorner.Parent = btnSettings
+
+    local setStroke = Instance.new("UIStroke")
+    setStroke.Color = GousseUI.Theme.Border
+    setStroke.Thickness = 1
+    setStroke.Parent = btnSettings
+    GousseUI:RegisterThemeElement(setStroke, "Color", "Border")
+
+    local setIcon = Instance.new("ImageLabel")
+    setIcon.Name = "Icon"
+    setIcon.Size = UDim2.new(0, ctrlIconSize, 0, ctrlIconSize)
+    setIcon.Position = UDim2.new(0.5, -ctrlIconSize / 2, 0.5, -ctrlIconSize / 2)
+    setIcon.BackgroundTransparency = 1
+    setIcon.Image = RawIcons["settings"] or "rbxassetid://10734950309"
+    setIcon.ImageColor3 = GousseUI.Theme.TextSecondary
+    setIcon.Parent = btnSettings
+    GousseUI:RegisterThemeElement(setIcon, "ImageColor3", "TextSecondary")
+
+    btnSettings.MouseEnter:Connect(function()
+        Tween(btnSettings, { BackgroundColor3 = GousseUI.Theme.SurfaceHover }, 0.1)
+        Tween(setIcon, { ImageColor3 = GousseUI.Theme.Accent }, 0.1)
+    end)
+    btnSettings.MouseLeave:Connect(function()
+        Tween(btnSettings, { BackgroundColor3 = GousseUI.Theme.Surface }, 0.1)
+        Tween(setIcon, { ImageColor3 = GousseUI.Theme.TextSecondary }, 0.1)
+    end)
+
+    -- 2. Minimize Button
     local btnMinimize = Instance.new("TextButton")
     btnMinimize.Name = "BtnMinimize"
     btnMinimize.Size = UDim2.new(0, ctrlBtnSize, 0, ctrlBtnSize)
-    btnMinimize.Position = UDim2.new(0, 0, 0.5, -ctrlBtnSize / 2)
+    btnMinimize.Position = UDim2.new(0, ctrlBtnSize + ctrlGap, 0.5, -ctrlBtnSize / 2)
     btnMinimize.BackgroundColor3 = GousseUI.Theme.Surface
     btnMinimize.Text = ""
     btnMinimize.AutoButtonColor = false
     btnMinimize.Parent = controlsFrame
+    GousseUI:RegisterThemeElement(btnMinimize, "BackgroundColor3", "Surface")
 
     local minCorner = Instance.new("UICorner")
     minCorner.CornerRadius = UDim.new(0, 6)
@@ -1870,6 +2216,7 @@ function GousseUI:CreateWindow(config: {
     minStroke.Color = GousseUI.Theme.Border
     minStroke.Thickness = 1
     minStroke.Parent = btnMinimize
+    GousseUI:RegisterThemeElement(minStroke, "Color", "Border")
 
     local minIcon = Instance.new("ImageLabel")
     minIcon.Name = "Icon"
@@ -1879,15 +2226,18 @@ function GousseUI:CreateWindow(config: {
     minIcon.Image = RawIcons["minus"] or "rbxassetid://10734896206"
     minIcon.ImageColor3 = GousseUI.Theme.TextSecondary
     minIcon.Parent = btnMinimize
+    GousseUI:RegisterThemeElement(minIcon, "ImageColor3", "TextSecondary")
 
+    -- 3. Close / Unload Button
     local btnClose = Instance.new("TextButton")
     btnClose.Name = "BtnClose"
     btnClose.Size = UDim2.new(0, ctrlBtnSize, 0, ctrlBtnSize)
-    btnClose.Position = UDim2.new(0, ctrlBtnSize + ctrlGap, 0.5, -ctrlBtnSize / 2)
+    btnClose.Position = UDim2.new(0, (ctrlBtnSize + ctrlGap) * 2, 0.5, -ctrlBtnSize / 2)
     btnClose.BackgroundColor3 = GousseUI.Theme.Surface
     btnClose.Text = ""
     btnClose.AutoButtonColor = false
     btnClose.Parent = controlsFrame
+    GousseUI:RegisterThemeElement(btnClose, "BackgroundColor3", "Surface")
 
     local closeCorner = Instance.new("UICorner")
     closeCorner.CornerRadius = UDim.new(0, 6)
@@ -1897,6 +2247,7 @@ function GousseUI:CreateWindow(config: {
     closeStroke.Color = GousseUI.Theme.Border
     closeStroke.Thickness = 1
     closeStroke.Parent = btnClose
+    GousseUI:RegisterThemeElement(closeStroke, "Color", "Border")
 
     local closeIcon = Instance.new("ImageLabel")
     closeIcon.Name = "Icon"
@@ -1906,6 +2257,7 @@ function GousseUI:CreateWindow(config: {
     closeIcon.Image = RawIcons["x"] or "rbxassetid://10747384394"
     closeIcon.ImageColor3 = GousseUI.Theme.TextSecondary
     closeIcon.Parent = btnClose
+    GousseUI:RegisterThemeElement(closeIcon, "ImageColor3", "TextSecondary")
 
     btnMinimize.MouseEnter:Connect(function()
         Tween(btnMinimize, { BackgroundColor3 = GousseUI.Theme.SurfaceHover }, 0.1)
@@ -1925,9 +2277,21 @@ function GousseUI:CreateWindow(config: {
         Tween(closeIcon, { ImageColor3 = GousseUI.Theme.TextSecondary }, 0.1)
     end)
 
+    AttachTooltip(btnSettings, "UI Settings")
     AttachTooltip(btnMinimize, "Minimize Window")
     AttachTooltip(btnClose, "Unload Script")
     AttachTooltip(collapseBtn, "Toggle Sidebar")
+
+    btnSettings.MouseButton1Click:Connect(function()
+        if WindowObj then
+            if WindowObj.SettingsTab then
+                WindowObj.SettingsTab:Activate()
+            elseif WindowObj.CreateSettingsTab then
+                local sTab = WindowObj:CreateSettingsTab()
+                sTab:Activate()
+            end
+        end
+    end)
 
     MakeDraggable(header, mainFrame)
 
@@ -1964,38 +2328,42 @@ function GousseUI:CreateWindow(config: {
     end
 
     -- Mobile Toggle FAB (Draggable & Touch Friendly)
-    local fabBtn = nil
-    local showFab = (config.ShowMobileToggle ~= false) and (isMobile or UserInputService.TouchEnabled)
+    local isTouchOrMobile = isMobile or UserInputService.TouchEnabled
+    local showFab = if config.ShowMobileToggle ~= nil then config.ShowMobileToggle else isTouchOrMobile
 
-    if showFab then
-        fabBtn = Instance.new("TextButton")
-        fabBtn.Name = "MobileToggleFAB"
-        fabBtn.Size = UDim2.new(0, 48, 0, 48)
-        fabBtn.Position = UDim2.new(0, 16, 0.45, 0)
-        fabBtn.BackgroundColor3 = GousseUI.Theme.Surface
-        fabBtn.Text = "G"
-        fabBtn.Font = FontBold
-        fabBtn.TextColor3 = GousseUI.Theme.Accent
-        fabBtn.TextSize = 18
-        fabBtn.AutoButtonColor = false
-        fabBtn.ZIndex = 500
-        fabBtn.Parent = screenGui
+    local fabBtn = Instance.new("TextButton")
+    fabBtn.Name = "MobileToggleFAB"
+    fabBtn.Size = UDim2.new(0, 48, 0, 48)
+    fabBtn.Position = UDim2.new(0, 16, 0.45, 0)
+    fabBtn.BackgroundColor3 = GousseUI.Theme.Surface
+    fabBtn.Text = "G"
+    fabBtn.Font = FontBold
+    fabBtn.TextColor3 = GousseUI.Theme.Accent
+    fabBtn.TextSize = 18
+    fabBtn.AutoButtonColor = false
+    fabBtn.ZIndex = 500
+    fabBtn.Visible = showFab
+    fabBtn.Parent = screenGui
 
-        local fabCorner = Instance.new("UICorner")
-        fabCorner.CornerRadius = UDim.new(1, 0)
-        fabCorner.Parent = fabBtn
+    local fabCorner = Instance.new("UICorner")
+    fabCorner.CornerRadius = UDim.new(1, 0)
+    fabCorner.Parent = fabBtn
 
-        local fabStroke = Instance.new("UIStroke")
-        fabStroke.Color = GousseUI.Theme.Accent
-        fabStroke.Thickness = 1.5
-        fabStroke.Parent = fabBtn
+    local fabStroke = Instance.new("UIStroke")
+    fabStroke.Color = GousseUI.Theme.Accent
+    fabStroke.Thickness = 1.5
+    fabStroke.Parent = fabBtn
+    GousseUI:RegisterThemeElement(fabStroke, "Color", "Accent")
+    GousseUI:RegisterThemeElement(fabBtn, "TextColor3", "Accent")
 
-        MakeDraggable(fabBtn, fabBtn)
+    MakeDraggable(fabBtn, fabBtn)
 
-        fabBtn.MouseButton1Click:Connect(function()
-            ToggleWindow()
+    fabBtn.MouseButton1Click:Connect(function()
+        Tween(fabBtn, { Size = UDim2.new(0, 42, 0, 42) }, 0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out).Completed:Connect(function()
+            Tween(fabBtn, { Size = UDim2.new(0, 48, 0, 48) }, 0.12, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
         end)
-    end
+        ToggleWindow()
+    end)
 
     -- Unload & Confirmation Modal System
     local isUnloaded = false
@@ -2288,6 +2656,7 @@ function GousseUI:CreateWindow(config: {
     sidebar.BorderSizePixel = 0
     sidebar.ClipsDescendants = true
     sidebar.Parent = bodyFrame
+    GousseUI:RegisterThemeElement(sidebar, "BackgroundColor3", "Sidebar")
 
     local sidebarBorder = Instance.new("Frame")
     sidebarBorder.Size = UDim2.new(0, 1, 1, 0)
@@ -2295,6 +2664,7 @@ function GousseUI:CreateWindow(config: {
     sidebarBorder.BackgroundColor3 = GousseUI.Theme.Border
     sidebarBorder.BorderSizePixel = 0
     sidebarBorder.Parent = sidebar
+    GousseUI:RegisterThemeElement(sidebarBorder, "BackgroundColor3", "Border")
 
     local tabListContainer = Instance.new("ScrollingFrame")
     tabListContainer.Name = "TabList"
@@ -2307,26 +2677,47 @@ function GousseUI:CreateWindow(config: {
     tabListContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
     tabListContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
     tabListContainer.Parent = sidebar
+    GousseUI:RegisterThemeElement(tabListContainer, "ScrollBarImageColor3", "BorderLight")
 
     local tabLayout = Instance.new("UIListLayout")
     tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
     tabLayout.Padding = UDim.new(0, 4)
     tabLayout.Parent = tabListContainer
 
-    -- Single animated emerald active indicator bar for sidebar (Glides smoothly between tabs)
-    local activeIndicator = Instance.new("Frame")
-    activeIndicator.Name = "ActiveIndicator"
-    activeIndicator.Size = UDim2.new(0, 3, 0, 20)
-    activeIndicator.Position = UDim2.new(0, 4, 0, 6)
-    activeIndicator.BackgroundColor3 = GousseUI.Theme.Accent
-    activeIndicator.BorderSizePixel = 0
-    activeIndicator.ZIndex = 10
-    activeIndicator.Visible = false
-    activeIndicator.Parent = sidebar
+    -- Interactive Bottom-Right Corner Resize Grip (Mouse & Mobile Touch)
+    local resizeGrip = Instance.new("TextButton")
+    resizeGrip.Name = "ResizeGrip"
+    local gripBtnSize = if isMobile then 26 else 20
+    resizeGrip.Size = UDim2.new(0, gripBtnSize, 0, gripBtnSize)
+    resizeGrip.Position = UDim2.new(1, -gripBtnSize, 1, -gripBtnSize)
+    resizeGrip.BackgroundTransparency = 1
+    resizeGrip.Text = ""
+    resizeGrip.AutoButtonColor = false
+    resizeGrip.ZIndex = 250
+    resizeGrip.Parent = mainFrame
 
-    local indicatorCorner = Instance.new("UICorner")
-    indicatorCorner.CornerRadius = UDim.new(1, 0)
-    indicatorCorner.Parent = activeIndicator
+    local gripIcon = Instance.new("ImageLabel")
+    gripIcon.Name = "Icon"
+    gripIcon.Size = UDim2.new(0, 13, 0, 13)
+    gripIcon.Position = UDim2.new(0.5, -6, 0.5, -6)
+    gripIcon.BackgroundTransparency = 1
+    gripIcon.Image = RawIcons["move"] or "rbxassetid://10734900011"
+    gripIcon.ImageColor3 = GousseUI.Theme.TextMuted
+    gripIcon.ZIndex = 251
+    gripIcon.Parent = resizeGrip
+    GousseUI:RegisterThemeElement(gripIcon, "ImageColor3", "TextMuted")
+
+    MakeResizable(resizeGrip, mainFrame, {
+        MinSize = Vector2.new(if isMobile then 280 else 340, if isMobile then 220 else 260),
+        IsMobile = isMobile
+    })
+
+    resizeGrip.MouseEnter:Connect(function()
+        Tween(gripIcon, { ImageColor3 = GousseUI.Theme.Accent }, 0.1)
+    end)
+    resizeGrip.MouseLeave:Connect(function()
+        Tween(gripIcon, { ImageColor3 = GousseUI.Theme.TextMuted }, 0.1)
+    end)
 
     -- Right Content Area (Expands to 100% when sidebar is collapsed)
     local contentArea = Instance.new("Frame")
@@ -2354,10 +2745,6 @@ function GousseUI:CreateWindow(config: {
         Tween(collapseIcon, {
             ImageColor3 = isSidebarCollapsed and GousseUI.Theme.Accent or GousseUI.Theme.TextSecondary
         }, 0.16)
-
-        if activeIndicator then
-            activeIndicator.Visible = not isSidebarCollapsed and (WindowObj and WindowObj.ActiveTab ~= nil)
-        end
     end
 
     collapseBtn.MouseButton1Click:Connect(function()
@@ -2365,7 +2752,6 @@ function GousseUI:CreateWindow(config: {
     end)
 
     -- Window Object Definition
-    local WindowObj
     WindowObj = {
         ScreenGui = screenGui,
         MainFrame = mainFrame,
@@ -2407,6 +2793,7 @@ function GousseUI:CreateWindow(config: {
     searchContainer.BackgroundColor3 = GousseUI.Theme.Surface
     searchContainer.BorderSizePixel = 0
     searchContainer.Parent = contentArea
+    GousseUI:RegisterThemeElement(searchContainer, "BackgroundColor3", "Surface")
 
     local searchCorner = Instance.new("UICorner")
     searchCorner.CornerRadius = UDim.new(0, 6)
@@ -2416,6 +2803,7 @@ function GousseUI:CreateWindow(config: {
     searchStroke.Color = GousseUI.Theme.Border
     searchStroke.Thickness = 1
     searchStroke.Parent = searchContainer
+    GousseUI:RegisterThemeElement(searchStroke, "Color", "Border")
 
     local searchIcon = Instance.new("ImageLabel")
     searchIcon.Name = "SearchIcon"
@@ -2425,6 +2813,7 @@ function GousseUI:CreateWindow(config: {
     searchIcon.Image = RawIcons["search"] or "rbxassetid://10734943674"
     searchIcon.ImageColor3 = GousseUI.Theme.TextMuted
     searchIcon.Parent = searchContainer
+    GousseUI:RegisterThemeElement(searchIcon, "ImageColor3", "TextMuted")
 
     local searchInput = Instance.new("TextBox")
     searchInput.Name = "SearchInput"
@@ -2440,6 +2829,8 @@ function GousseUI:CreateWindow(config: {
     searchInput.ClearTextOnFocus = false
     searchInput.TextXAlignment = Enum.TextXAlignment.Left
     searchInput.Parent = searchContainer
+    GousseUI:RegisterThemeElement(searchInput, "TextColor3", "TextPrimary")
+    GousseUI:RegisterThemeElement(searchInput, "PlaceholderColor3", "TextMuted")
 
     local clearSearchBtn = Instance.new("TextButton")
     clearSearchBtn.Name = "ClearSearchBtn"
@@ -2452,6 +2843,7 @@ function GousseUI:CreateWindow(config: {
     clearSearchBtn.TextSize = 11
     clearSearchBtn.Visible = false
     clearSearchBtn.Parent = searchContainer
+    GousseUI:RegisterThemeElement(clearSearchBtn, "TextColor3", "TextMuted")
 
     local function FilterPageItems(page: ScrollingFrame, query: string)
         if not page then return end
@@ -2524,6 +2916,7 @@ function GousseUI:CreateWindow(config: {
         label.TextXAlignment = Enum.TextXAlignment.Left
         label.LayoutOrder = 1
         label.Parent = titleContainer
+        GousseUI:RegisterThemeElement(label, "TextColor3", "TextPrimary")
 
         local infoBtn = nil
         if subTitle and subTitle ~= "" then
@@ -2538,6 +2931,7 @@ function GousseUI:CreateWindow(config: {
             infoBtn.AutoButtonColor = false
             infoBtn.LayoutOrder = 2
             infoBtn.Parent = titleContainer
+            GousseUI:RegisterThemeElement(infoBtn, "TextColor3", "TextSecondary")
 
             local infoCorner = Instance.new("UICorner")
             infoCorner.CornerRadius = UDim.new(1, 0)
@@ -2547,6 +2941,7 @@ function GousseUI:CreateWindow(config: {
             infoStroke.Color = GousseUI.Theme.BorderLight
             infoStroke.Thickness = 0.8
             infoStroke.Parent = infoBtn
+            GousseUI:RegisterThemeElement(infoStroke, "Color", "BorderLight")
 
             parentFrame:SetAttribute("Tooltip", subTitle)
             AttachTooltip(infoBtn, subTitle)
@@ -2560,33 +2955,6 @@ function GousseUI:CreateWindow(config: {
     -- ========================================================================
     local currentTransitionToken = 0
 
-    local function GetIndicatorTargetY(btn: GuiButton): number
-        local btnAbsY = btn.AbsolutePosition.Y
-        local sideAbsY = sidebar.AbsolutePosition.Y
-        if btnAbsY == 0 and sideAbsY == 0 then
-            local tabIndex = 1
-            for idx, t in ipairs(WindowObj.Tabs) do
-                if t.Button == btn then
-                    tabIndex = idx
-                    break
-                end
-            end
-            local h = if isMobile then 40 else 36
-            return 6 + (tabIndex - 1) * (h + 4) + (h - 20) / 2
-        end
-        local relY = btnAbsY - sideAbsY
-        local btnHeight = btn.AbsoluteSize.Y
-        if btnHeight == 0 then btnHeight = if isMobile then 40 else 36 end
-        return relY + (btnHeight - 20) / 2
-    end
-
-    tabListContainer:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
-        if WindowObj and WindowObj.ActiveTab and WindowObj.ActiveTab.Button and activeIndicator.Visible and not isSidebarCollapsed then
-            local targetY = GetIndicatorTargetY(WindowObj.ActiveTab.Button)
-            activeIndicator.Position = UDim2.new(0, 4, 0, targetY)
-        end
-    end)
-
     function WindowObj:CreateTab(tabConfig: { Name: string, Icon: string? })
         tabConfig = tabConfig or {}
         local tabName = tabConfig.Name or "Tab"
@@ -2596,6 +2964,7 @@ function GousseUI:CreateWindow(config: {
         local tabHeight = if isMobile then 40 else 36
         local tabBtn = Instance.new("TextButton")
         tabBtn.Name = "TabBtn_" .. tabName
+        tabBtn.LayoutOrder = if tabConfig.IsSettings then 9999 else (#WindowObj.Tabs + 1)
         tabBtn.Size = UDim2.new(1, 0, 0, tabHeight)
         tabBtn.BackgroundColor3 = GousseUI.Theme.Surface
         tabBtn.BackgroundTransparency = 1
@@ -2703,8 +3072,30 @@ function GousseUI:CreateWindow(config: {
             Page = tabPage
         }
 
+        -- Per-Tab Active Pill Indicator (100% vertically centered via AnchorPoint 0.5)
+        local activeBar = Instance.new("Frame")
+        activeBar.Name = "ActiveBar"
+        activeBar.Size = UDim2.new(0, 3, 0, 0)
+        activeBar.Position = UDim2.new(0, 1, 0.5, 0)
+        activeBar.AnchorPoint = Vector2.new(0, 0.5)
+        activeBar.BackgroundColor3 = GousseUI.Theme.Accent
+        activeBar.BorderSizePixel = 0
+        activeBar.Visible = false
+        activeBar.Parent = tabBtn
+
+        local barCorner = Instance.new("UICorner")
+        barCorner.CornerRadius = UDim.new(1, 0)
+        barCorner.Parent = activeBar
+        GousseUI:RegisterThemeElement(activeBar, "BackgroundColor3", "Accent")
+
+        TabObj.ActiveBar = activeBar
+
         local function ActivateTab()
             if WindowObj.ActiveTab == TabObj then return end
+
+            if isMobile and workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize.X < 640 then
+                ToggleSidebar(true)
+            end
 
             currentTransitionToken += 1
             local transitionToken = currentTransitionToken
@@ -2713,25 +3104,34 @@ function GousseUI:CreateWindow(config: {
             WindowObj.ActiveTab = TabObj
 
             -- 1. Deactivate Previous Tab Button
-            if prevTab and prevTab.Button then
-                Tween(prevTab.Button, { BackgroundTransparency = 1 }, 0.16)
-                Tween(prevTab.Button.Label, {
-                    TextColor3 = GousseUI.Theme.TextSecondary,
-                    Position = UDim2.new(0, 32, 0, 0)
-                }, 0.16)
-                if prevTab.Button:FindFirstChild("Icon") then
-                    if prevTab.Button.Icon:IsA("ImageLabel") then
-                        Tween(prevTab.Button.Icon, {
-                            ImageColor3 = GousseUI.Theme.TextSecondary,
-                            Position = UDim2.new(0, 9, 0.5, -9)
+            if prevTab then
+                if prevTab.ActiveBar then
+                    Tween(prevTab.ActiveBar, { Size = UDim2.new(0, 3, 0, 0), BackgroundTransparency = 1 }, 0.15)
+                end
+                if prevTab.Button then
+                    Tween(prevTab.Button, { BackgroundTransparency = 1 }, 0.16)
+                    if prevTab.Button:FindFirstChild("Label") then
+                        Tween(prevTab.Button.Label, {
+                            TextColor3 = GousseUI.Theme.TextSecondary,
+                            Position = UDim2.new(0, 32, 0, 0)
                         }, 0.16)
-                    elseif prevTab.Button.Icon:IsA("TextLabel") then
-                        prevTab.Button.Icon.TextColor3 = GousseUI.Theme.TextSecondary
+                    end
+                    if prevTab.Button:FindFirstChild("Icon") then
+                        if prevTab.Button.Icon:IsA("ImageLabel") then
+                            Tween(prevTab.Button.Icon, {
+                                ImageColor3 = GousseUI.Theme.TextSecondary,
+                                Position = UDim2.new(0, 9, 0.5, -9)
+                            }, 0.16)
+                        elseif prevTab.Button.Icon:IsA("TextLabel") then
+                            prevTab.Button.Icon.TextColor3 = GousseUI.Theme.TextSecondary
+                        end
                     end
                 end
             end
 
-            -- 2. Activate Current Tab Button
+            -- 2. Activate Current Tab Button (Vertically Centered Active Pill Expands)
+            activeBar.Visible = true
+            Tween(activeBar, { Size = UDim2.new(0, 3, 0, 20), BackgroundTransparency = 0 }, 0.18)
             Tween(tabBtn, { BackgroundTransparency = 0, BackgroundColor3 = GousseUI.Theme.Surface }, 0.18)
             Tween(tabTextLabel, {
                 TextColor3 = GousseUI.Theme.TextPrimary,
@@ -2747,20 +3147,7 @@ function GousseUI:CreateWindow(config: {
                 iconLabel.TextColor3 = GousseUI.Theme.Accent
             end
 
-            -- 3. Animated Active Indicator Glide (Smooth Y Tween)
-            local targetIndY = GetIndicatorTargetY(tabBtn)
-            if not activeIndicator.Visible then
-                activeIndicator.Position = UDim2.new(0, 4, 0, targetIndY)
-                activeIndicator.BackgroundTransparency = 1
-                activeIndicator.Visible = true
-                Tween(activeIndicator, { BackgroundTransparency = 0 }, 0.18)
-            else
-                Tween(activeIndicator, {
-                    Position = UDim2.new(0, 4, 0, targetIndY)
-                }, 0.24, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-            end
-
-            -- 4. Sequential Page Transition (Old Tab Fades Out -> New Tab Fades In)
+            -- 3. Sequential Page Transition (Old Tab Fades Out -> New Tab Fades In)
             local restingPos = UDim2.new(0, 8, 0, pageTopOffset)
             local slideLeftPos = UDim2.new(0, 8 - 10, 0, pageTopOffset)
             local slideRightPos = UDim2.new(0, 8 + 10, 0, pageTopOffset)
@@ -2805,6 +3192,32 @@ function GousseUI:CreateWindow(config: {
             end
         end
 
+        -- Reactive Theme Subscription for Sidebar Tab
+        GousseUI:OnThemeUpdate(function(th)
+            if not tabBtn or not tabBtn.Parent then return end
+            activeBar.BackgroundColor3 = th.Accent
+            if WindowObj.ActiveTab == TabObj then
+                tabBtn.BackgroundColor3 = th.Surface
+                tabBtn.BackgroundTransparency = 0
+                tabTextLabel.TextColor3 = th.TextPrimary
+                if iconLabel:IsA("ImageLabel") then
+                    iconLabel.ImageColor3 = th.Accent
+                elseif iconLabel:IsA("TextLabel") then
+                    iconLabel.TextColor3 = th.Accent
+                end
+            else
+                tabBtn.BackgroundColor3 = th.Surface
+                tabBtn.BackgroundTransparency = 1
+                tabTextLabel.TextColor3 = th.TextSecondary
+                if iconLabel:IsA("ImageLabel") then
+                    iconLabel.ImageColor3 = th.TextSecondary
+                elseif iconLabel:IsA("TextLabel") then
+                    iconLabel.TextColor3 = th.TextSecondary
+                end
+            end
+            tabPage.ScrollBarImageColor3 = th.BorderLight
+        end)
+
         tabBtn.MouseButton1Click:Connect(ActivateTab)
 
         tabBtn.MouseButton1Down:Connect(function()
@@ -2824,7 +3237,13 @@ function GousseUI:CreateWindow(config: {
             end
         end)
 
-        if #WindowObj.Tabs == 0 then
+        TabObj.IsSettings = tabConfig.IsSettings or false
+
+        if #WindowObj.Tabs == 0 and not tabConfig.IsSettings then
+            ActivateTab()
+        elseif WindowObj.ActiveTab and WindowObj.ActiveTab.IsSettings and not tabConfig.IsSettings then
+            ActivateTab()
+        elseif #WindowObj.Tabs == 0 then
             ActivateTab()
         end
 
@@ -2852,6 +3271,7 @@ function GousseUI:CreateWindow(config: {
             label.TextSize = 11.5
             label.TextXAlignment = Enum.TextXAlignment.Left
             label.Parent = sectionHeader
+            GousseUI:RegisterThemeElement(label, "TextColor3", "TextMuted")
 
             local divider = Instance.new("Frame")
             divider.Name = "Divider"
@@ -2860,6 +3280,7 @@ function GousseUI:CreateWindow(config: {
             divider.BackgroundColor3 = GousseUI.Theme.Border
             divider.BorderSizePixel = 0
             divider.Parent = sectionHeader
+            GousseUI:RegisterThemeElement(divider, "BackgroundColor3", "Border")
 
             label:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
                 local w = label.AbsoluteSize.X + 8
@@ -2892,6 +3313,7 @@ function GousseUI:CreateWindow(config: {
             btnFrame.BackgroundColor3 = GousseUI.Theme.Surface
             btnFrame.BorderSizePixel = 0
             btnFrame.Parent = tabPage
+            GousseUI:RegisterThemeElement(btnFrame, "BackgroundColor3", "Surface")
 
             local corner = Instance.new("UICorner")
             corner.CornerRadius = UDim.new(0, 8)
@@ -2901,6 +3323,7 @@ function GousseUI:CreateWindow(config: {
             stroke.Color = GousseUI.Theme.Border
             stroke.Thickness = 1
             stroke.Parent = btnFrame
+            GousseUI:RegisterThemeElement(stroke, "Color", "Border")
 
             local btnWidth = if isMobile then 86 else 78
             local rightPadding = btnWidth + 18
@@ -2925,20 +3348,27 @@ function GousseUI:CreateWindow(config: {
             actStroke.Thickness = 1
             actStroke.Parent = actionBtn
 
-            -- Matte appearance variants
-            if variant == "primary" then
-                actionBtn.BackgroundColor3 = GousseUI.Theme.Accent
-                actionBtn.TextColor3 = GousseUI.Theme.Background
-                actStroke.Color = GousseUI.Theme.AccentDark
-            elseif variant == "danger" then
-                actionBtn.BackgroundColor3 = Color3.fromRGB(225, 29, 72)
-                actionBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-                actStroke.Color = Color3.fromRGB(244, 63, 94)
-            else -- secondary
-                actionBtn.BackgroundColor3 = Color3.fromRGB(26, 35, 48)
-                actionBtn.TextColor3 = GousseUI.Theme.TextPrimary
-                actStroke.Color = GousseUI.Theme.BorderLight
+            local function ApplyVariantStyle(th)
+                if variant == "primary" then
+                    actionBtn.BackgroundColor3 = th.Accent
+                    actionBtn.TextColor3 = th.Background
+                    actStroke.Color = th.AccentDark
+                elseif variant == "danger" then
+                    actionBtn.BackgroundColor3 = Color3.fromRGB(225, 29, 72)
+                    actionBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    actStroke.Color = Color3.fromRGB(244, 63, 94)
+                else -- secondary
+                    actionBtn.BackgroundColor3 = Color3.fromRGB(26, 35, 48)
+                    actionBtn.TextColor3 = th.TextPrimary
+                    actStroke.Color = th.BorderLight
+                end
             end
+            ApplyVariantStyle(GousseUI.Theme)
+
+            GousseUI:OnThemeUpdate(function(th)
+                if not actionBtn or not actionBtn.Parent then return end
+                ApplyVariantStyle(th)
+            end)
 
             actionBtn.MouseButton1Click:Connect(function()
                 Tween(actionBtn, { BackgroundColor3 = GousseUI.Theme.SurfaceHover }, 0.08)
@@ -2974,6 +3404,7 @@ function GousseUI:CreateWindow(config: {
             toggleBtn.Text = ""
             toggleBtn.AutoButtonColor = false
             toggleBtn.Parent = tabPage
+            GousseUI:RegisterThemeElement(toggleBtn, "BackgroundColor3", "Surface")
 
             local corner = Instance.new("UICorner")
             corner.CornerRadius = UDim.new(0, 8)
@@ -2983,6 +3414,7 @@ function GousseUI:CreateWindow(config: {
             stroke.Color = GousseUI.Theme.Border
             stroke.Thickness = 1
             stroke.Parent = toggleBtn
+            GousseUI:RegisterThemeElement(stroke, "Color", "Border")
 
             local _, infoBtn = BuildTitleRow(toggleBtn, toggleName, subTitle, 70, rowHeight)
 
@@ -3009,6 +3441,12 @@ function GousseUI:CreateWindow(config: {
             local knobCorner = Instance.new("UICorner")
             knobCorner.CornerRadius = UDim.new(1, 0)
             knobCorner.Parent = switchKnob
+
+            GousseUI:OnThemeUpdate(function(th)
+                if not toggleBtn or not toggleBtn.Parent then return end
+                switchTrack.BackgroundColor3 = state and th.Accent or th.Border
+                switchKnob.BackgroundColor3 = state and th.Background or th.TextSecondary
+            end)
 
             local function SetState(newState: boolean)
                 state = newState
@@ -3083,6 +3521,7 @@ function GousseUI:CreateWindow(config: {
             sliderFrame.BackgroundColor3 = GousseUI.Theme.Surface
             sliderFrame.BorderSizePixel = 0
             sliderFrame.Parent = tabPage
+            GousseUI:RegisterThemeElement(sliderFrame, "BackgroundColor3", "Surface")
 
             local corner = Instance.new("UICorner")
             corner.CornerRadius = UDim.new(0, 8)
@@ -3092,6 +3531,7 @@ function GousseUI:CreateWindow(config: {
             stroke.Color = GousseUI.Theme.Border
             stroke.Thickness = 1
             stroke.Parent = sliderFrame
+            GousseUI:RegisterThemeElement(stroke, "Color", "Border")
 
             -- Title with info button on top line
             local topRowHeight = 22
@@ -3121,6 +3561,7 @@ function GousseUI:CreateWindow(config: {
             label.TextXAlignment = Enum.TextXAlignment.Left
             label.LayoutOrder = 1
             label.Parent = titleContainer
+            GousseUI:RegisterThemeElement(label, "TextColor3", "TextPrimary")
 
             if subTitle and subTitle ~= "" then
                 local infoBtn = Instance.new("TextButton")
@@ -3134,6 +3575,7 @@ function GousseUI:CreateWindow(config: {
                 infoBtn.AutoButtonColor = false
                 infoBtn.LayoutOrder = 2
                 infoBtn.Parent = titleContainer
+                GousseUI:RegisterThemeElement(infoBtn, "TextColor3", "TextSecondary")
 
                 local infoCorner = Instance.new("UICorner")
                 infoCorner.CornerRadius = UDim.new(1, 0)
@@ -3143,6 +3585,7 @@ function GousseUI:CreateWindow(config: {
                 infoStroke.Color = GousseUI.Theme.BorderLight
                 infoStroke.Thickness = 0.8
                 infoStroke.Parent = infoBtn
+                GousseUI:RegisterThemeElement(infoStroke, "Color", "BorderLight")
 
                 sliderFrame:SetAttribute("Tooltip", subTitle)
                 AttachTooltip(infoBtn, subTitle)
@@ -3158,6 +3601,7 @@ function GousseUI:CreateWindow(config: {
             valueLabel.TextSize = 13
             valueLabel.TextXAlignment = Enum.TextXAlignment.Right
             valueLabel.Parent = sliderFrame
+            GousseUI:RegisterThemeElement(valueLabel, "TextColor3", "Accent")
 
             -- Slider Track
             local track = Instance.new("TextButton")
@@ -3180,6 +3624,7 @@ function GousseUI:CreateWindow(config: {
             fill.BackgroundColor3 = GousseUI.Theme.Accent
             fill.BorderSizePixel = 0
             fill.Parent = track
+            GousseUI:RegisterThemeElement(fill, "BackgroundColor3", "Accent")
 
             local fillCorner = Instance.new("UICorner")
             fillCorner.CornerRadius = UDim.new(1, 0)
@@ -3260,6 +3705,7 @@ function GousseUI:CreateWindow(config: {
             dropFrame.BackgroundColor3 = GousseUI.Theme.Surface
             dropFrame.BorderSizePixel = 0
             dropFrame.Parent = tabPage
+            GousseUI:RegisterThemeElement(dropFrame, "BackgroundColor3", "Surface")
 
             local corner = Instance.new("UICorner")
             corner.CornerRadius = UDim.new(0, 8)
@@ -3269,6 +3715,7 @@ function GousseUI:CreateWindow(config: {
             stroke.Color = GousseUI.Theme.Border
             stroke.Thickness = 1
             stroke.Parent = dropFrame
+            GousseUI:RegisterThemeElement(stroke, "Color", "Border")
 
             -- Title & Info Button stay permanently anchored at top-left
             BuildTitleRow(dropFrame, dropName, subTitle, 150, baseHeight)
@@ -3285,6 +3732,8 @@ function GousseUI:CreateWindow(config: {
             triggerBtn.AutoButtonColor = false
             triggerBtn.ZIndex = 5
             triggerBtn.Parent = dropFrame
+            GousseUI:RegisterThemeElement(triggerBtn, "BackgroundColor3", "Sidebar")
+            GousseUI:RegisterThemeElement(triggerBtn, "TextColor3", "TextPrimary")
 
             local trigCorner = Instance.new("UICorner")
             trigCorner.CornerRadius = UDim.new(0, 6)
@@ -3294,6 +3743,7 @@ function GousseUI:CreateWindow(config: {
             trigStroke.Color = GousseUI.Theme.Border
             trigStroke.Thickness = 1
             trigStroke.Parent = triggerBtn
+            GousseUI:RegisterThemeElement(trigStroke, "Color", "Border")
 
             -- Popover references
             local popoverFrame: Frame? = nil
@@ -3509,6 +3959,7 @@ function GousseUI:CreateWindow(config: {
             inputFrame.BackgroundColor3 = GousseUI.Theme.Surface
             inputFrame.BorderSizePixel = 0
             inputFrame.Parent = tabPage
+            GousseUI:RegisterThemeElement(inputFrame, "BackgroundColor3", "Surface")
 
             local corner = Instance.new("UICorner")
             corner.CornerRadius = UDim.new(0, 8)
@@ -3518,6 +3969,7 @@ function GousseUI:CreateWindow(config: {
             stroke.Color = GousseUI.Theme.Border
             stroke.Thickness = 1
             stroke.Parent = inputFrame
+            GousseUI:RegisterThemeElement(stroke, "Color", "Border")
 
             BuildTitleRow(inputFrame, inputName, subTitle, 150, rowHeight)
 
@@ -3534,6 +3986,9 @@ function GousseUI:CreateWindow(config: {
             textBox.TextSize = 12.5
             textBox.ClearTextOnFocus = false
             textBox.Parent = inputFrame
+            GousseUI:RegisterThemeElement(textBox, "BackgroundColor3", "Sidebar")
+            GousseUI:RegisterThemeElement(textBox, "TextColor3", "TextPrimary")
+            GousseUI:RegisterThemeElement(textBox, "PlaceholderColor3", "TextMuted")
 
             local boxCorner = Instance.new("UICorner")
             boxCorner.CornerRadius = UDim.new(0, 6)
@@ -3543,6 +3998,7 @@ function GousseUI:CreateWindow(config: {
             boxStroke.Color = GousseUI.Theme.Border
             boxStroke.Thickness = 1
             boxStroke.Parent = textBox
+            GousseUI:RegisterThemeElement(boxStroke, "Color", "Border")
 
             textBox.FocusLost:Connect(function()
                 pcall(callback, textBox.Text)
@@ -3569,6 +4025,7 @@ function GousseUI:CreateWindow(config: {
             card.BackgroundColor3 = GousseUI.Theme.Surface
             card.BorderSizePixel = 0
             card.Parent = tabPage
+            GousseUI:RegisterThemeElement(card, "BackgroundColor3", "Surface")
 
             local corner = Instance.new("UICorner")
             corner.CornerRadius = UDim.new(0, 8)
@@ -3578,6 +4035,7 @@ function GousseUI:CreateWindow(config: {
             stroke.Color = GousseUI.Theme.Border
             stroke.Thickness = 1
             stroke.Parent = card
+            GousseUI:RegisterThemeElement(stroke, "Color", "Border")
 
             local title = Instance.new("TextLabel")
             title.Name = "ItemTitle"
@@ -3590,6 +4048,7 @@ function GousseUI:CreateWindow(config: {
             title.TextSize = 13.5
             title.TextXAlignment = Enum.TextXAlignment.Left
             title.Parent = card
+            GousseUI:RegisterThemeElement(title, "TextColor3", "TextPrimary")
 
             local content = Instance.new("TextLabel")
             content.Size = UDim2.new(1, -24, 0, 0)
@@ -3604,13 +4063,890 @@ function GousseUI:CreateWindow(config: {
             content.TextXAlignment = Enum.TextXAlignment.Left
             content.TextYAlignment = Enum.TextYAlignment.Top
             content.Parent = card
+            GousseUI:RegisterThemeElement(content, "TextColor3", "TextSecondary")
 
             local pad = Instance.new("UIPadding")
             pad.PaddingBottom = UDim.new(0, 10)
             pad.Parent = card
         end
 
+        -- ====================================================================
+        -- 8. Keybind Row: Interactive Key Selector with Listening State
+        -- ====================================================================
+        function TabObj:CreateKeybind(keyConfig: {
+            Name: string,
+            SubTitle: string?,
+            Default: Enum.KeyCode?,
+            Callback: ((Enum.KeyCode) -> ())?
+        })
+            keyConfig = keyConfig or {}
+            local bindName = keyConfig.Name or "Keybind"
+            local subTitle = keyConfig.SubTitle
+            local currentKey = keyConfig.Default or Enum.KeyCode.RightControl
+            local callback = keyConfig.Callback or function() end
+            local isListening = false
+
+            local rowHeight = if isMobile then 46 else 42
+            local keyFrame = Instance.new("Frame")
+            keyFrame.Name = "KeybindItem_" .. bindName
+            keyFrame.Size = UDim2.new(1, 0, 0, rowHeight)
+            keyFrame.BackgroundColor3 = GousseUI.Theme.Surface
+            keyFrame.BorderSizePixel = 0
+            keyFrame.Parent = tabPage
+            GousseUI:RegisterThemeElement(keyFrame, "BackgroundColor3", "Surface")
+
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(0, 8)
+            corner.Parent = keyFrame
+
+            local stroke = Instance.new("UIStroke")
+            stroke.Color = GousseUI.Theme.Border
+            stroke.Thickness = 1
+            stroke.Parent = keyFrame
+            GousseUI:RegisterThemeElement(stroke, "Color", "Border")
+
+            BuildTitleRow(keyFrame, bindName, subTitle, 140, rowHeight)
+
+            local bindBtn = Instance.new("TextButton")
+            bindBtn.Name = "BindButton"
+            local btnW = if isMobile then 120 else 105
+            local btnH = if isMobile then 30 else 26
+            bindBtn.Size = UDim2.new(0, btnW, 0, btnH)
+            bindBtn.Position = UDim2.new(1, -btnW - 12, 0.5, -btnH / 2)
+            bindBtn.BackgroundColor3 = GousseUI.Theme.Sidebar
+            bindBtn.Font = FontCode
+            bindBtn.Text = currentKey.Name
+            bindBtn.TextColor3 = GousseUI.Theme.TextPrimary
+            bindBtn.TextSize = 12
+            bindBtn.AutoButtonColor = false
+            bindBtn.Parent = keyFrame
+            GousseUI:RegisterThemeElement(bindBtn, "BackgroundColor3", "Sidebar")
+            GousseUI:RegisterThemeElement(bindBtn, "TextColor3", "TextPrimary")
+
+            local btnCorner = Instance.new("UICorner")
+            btnCorner.CornerRadius = UDim.new(0, 6)
+            btnCorner.Parent = bindBtn
+
+            local btnStroke = Instance.new("UIStroke")
+            btnStroke.Color = GousseUI.Theme.BorderLight
+            btnStroke.Thickness = 1
+            btnStroke.Parent = bindBtn
+            GousseUI:RegisterThemeElement(btnStroke, "Color", "BorderLight")
+
+            bindBtn.MouseButton1Click:Connect(function()
+                if isListening then return end
+                isListening = true
+                bindBtn.Text = "..."
+                bindBtn.TextColor3 = GousseUI.Theme.Accent
+                Tween(btnStroke, { Color = GousseUI.Theme.Accent }, 0.15)
+
+                local connection
+                connection = UserInputService.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.Keyboard then
+                        local chosenKey = input.KeyCode
+                        if chosenKey ~= Enum.KeyCode.Unknown and chosenKey ~= Enum.KeyCode.Escape then
+                            currentKey = chosenKey
+                            bindBtn.Text = currentKey.Name
+                            pcall(callback, currentKey)
+                        else
+                            bindBtn.Text = currentKey.Name
+                        end
+                        bindBtn.TextColor3 = GousseUI.Theme.TextPrimary
+                        Tween(btnStroke, { Color = GousseUI.Theme.BorderLight }, 0.15)
+                        isListening = false
+                        if connection then
+                            connection:Disconnect()
+                            connection = nil
+                        end
+                    end
+                end)
+            end)
+
+            return {
+                Set = function(k)
+                    currentKey = k
+                    bindBtn.Text = k.Name
+                    pcall(callback, k)
+                end,
+                Get = function() return currentKey end
+            }
+        end
+
+        -- ====================================================================
+        -- 9. Color Picker Row: Interactive SV Canvas, Spectrum Bar & Presets
+        -- ====================================================================
+        function TabObj:CreateColorPicker(colorConfig: {
+            Name: string,
+            SubTitle: string?,
+            Default: Color3?,
+            Callback: ((Color3) -> ())?
+        })
+            colorConfig = colorConfig or {}
+            local colorName = colorConfig.Name or "Color Picker"
+            local subTitle = colorConfig.SubTitle
+            local currentColor = colorConfig.Default or GousseUI.Theme.Accent
+            local callback = colorConfig.Callback or function() end
+
+            local currentH, currentS, currentV = currentColor:ToHSV()
+            local isOpen = false
+
+            local rowHeight = if isMobile then 46 else 42
+            local colorFrame = Instance.new("Frame")
+            colorFrame.Name = "ColorItem_" .. colorName
+            colorFrame.Size = UDim2.new(1, 0, 0, rowHeight)
+            colorFrame.BackgroundColor3 = GousseUI.Theme.Surface
+            colorFrame.BorderSizePixel = 0
+            colorFrame.Parent = tabPage
+            GousseUI:RegisterThemeElement(colorFrame, "BackgroundColor3", "Surface")
+
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(0, 8)
+            corner.Parent = colorFrame
+
+            local stroke = Instance.new("UIStroke")
+            stroke.Color = GousseUI.Theme.Border
+            stroke.Thickness = 1
+            stroke.Parent = colorFrame
+            GousseUI:RegisterThemeElement(stroke, "Color", "Border")
+
+            BuildTitleRow(colorFrame, colorName, subTitle, 115, rowHeight)
+
+            -- Swatch Trigger Button on the right
+            local triggerBtn = Instance.new("TextButton")
+            local trigHeight = if isMobile then 28 else 24
+            local trigWidth = 92
+            triggerBtn.Size = UDim2.new(0, trigWidth, 0, trigHeight)
+            triggerBtn.Position = UDim2.new(1, -trigWidth - 12, 0.5, -trigHeight / 2)
+            triggerBtn.BackgroundColor3 = GousseUI.Theme.Sidebar
+            triggerBtn.Text = ""
+            triggerBtn.AutoButtonColor = false
+            triggerBtn.Parent = colorFrame
+            GousseUI:RegisterThemeElement(triggerBtn, "BackgroundColor3", "Sidebar")
+
+            local trigCorner = Instance.new("UICorner")
+            trigCorner.CornerRadius = UDim.new(0, 6)
+            trigCorner.Parent = triggerBtn
+
+            local trigStroke = Instance.new("UIStroke")
+            trigStroke.Color = GousseUI.Theme.Border
+            trigStroke.Thickness = 1
+            trigStroke.Parent = triggerBtn
+            GousseUI:RegisterThemeElement(trigStroke, "Color", "Border")
+
+            local swatchPreview = Instance.new("Frame")
+            swatchPreview.Name = "Swatch"
+            swatchPreview.Size = UDim2.new(0, 16, 0, 16)
+            swatchPreview.Position = UDim2.new(0, 6, 0.5, -8)
+            swatchPreview.BackgroundColor3 = currentColor
+            swatchPreview.BorderSizePixel = 0
+            swatchPreview.Parent = triggerBtn
+
+            local swatchCorner = Instance.new("UICorner")
+            swatchCorner.CornerRadius = UDim.new(0, 4)
+            swatchCorner.Parent = swatchPreview
+
+            local hexLabel = Instance.new("TextLabel")
+            hexLabel.Name = "HexLabel"
+            hexLabel.Size = UDim2.new(1, -28, 1, 0)
+            hexLabel.Position = UDim2.new(0, 26, 0, 0)
+            hexLabel.BackgroundTransparency = 1
+            hexLabel.Font = FontCode
+            hexLabel.Text = ColorToHex(currentColor)
+            hexLabel.TextColor3 = GousseUI.Theme.TextPrimary
+            hexLabel.TextSize = 11.5
+            hexLabel.TextXAlignment = Enum.TextXAlignment.Center
+            hexLabel.Parent = triggerBtn
+            GousseUI:RegisterThemeElement(hexLabel, "TextColor3", "TextPrimary")
+
+            triggerBtn.MouseEnter:Connect(function()
+                Tween(triggerBtn, { BackgroundColor3 = GousseUI.Theme.SurfaceHover }, 0.1)
+            end)
+            triggerBtn.MouseLeave:Connect(function()
+                Tween(triggerBtn, { BackgroundColor3 = GousseUI.Theme.Sidebar }, 0.1)
+            end)
+
+            -- Popover state references
+            local popoverFrame: Frame? = nil
+            local overlayBtn: TextButton? = nil
+            local activeConnections: { [string]: RBXScriptConnection } = {}
+
+            local function DisconnectConnections()
+                for k, conn in pairs(activeConnections) do
+                    if conn then
+                        conn:Disconnect()
+                    end
+                end
+                activeConnections = {}
+            end
+
+            local function ClosePicker()
+                if not isOpen then return end
+                isOpen = false
+                DisconnectConnections()
+                tabPage.ScrollingEnabled = true
+
+                if popoverFrame then
+                    local target = popoverFrame
+                    popoverFrame = nil
+                    local tw = Tween(target, {
+                        Size = UDim2.new(0, target.AbsoluteSize.X, 0, 0)
+                    }, 0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+                    tw.Completed:Connect(function()
+                        target:Destroy()
+                    end)
+                end
+
+                if overlayBtn then
+                    overlayBtn:Destroy()
+                    overlayBtn = nil
+                end
+            end
+
+            local function OpenPicker()
+                if isOpen then return end
+                isOpen = true
+                tabPage.ScrollingEnabled = false
+
+                -- Transparent full overlay inside contentArea
+                overlayBtn = Instance.new("TextButton")
+                overlayBtn.Name = "ColorPickerOverlay"
+                overlayBtn.Size = UDim2.new(1, 0, 1, 0)
+                overlayBtn.Position = UDim2.new(0, 0, 0, 0)
+                overlayBtn.BackgroundTransparency = 1
+                overlayBtn.Text = ""
+                overlayBtn.AutoButtonColor = false
+                overlayBtn.ZIndex = 65
+                overlayBtn.Parent = contentArea
+
+                overlayBtn.MouseButton1Click:Connect(ClosePicker)
+
+                -- Calculate Popover dimensions & positioning
+                local popWidth = if isMobile then 220 else 236
+                local popHeight = 212
+
+                local colAbs = colorFrame.AbsolutePosition
+                local contentAbs = contentArea.AbsolutePosition
+                local relX = math.clamp(colAbs.X - contentAbs.X + colorFrame.AbsoluteSize.X - popWidth, 8, math.max(8, contentArea.AbsoluteSize.X - popWidth - 8))
+                local relY = colAbs.Y - contentAbs.Y + rowHeight + 4
+
+                if relY + popHeight > contentArea.AbsoluteSize.Y - 6 then
+                    relY = math.max(4, colAbs.Y - contentAbs.Y - popHeight - 4)
+                end
+
+                popoverFrame = Instance.new("Frame")
+                popoverFrame.Name = "ColorPickerPopover_" .. colorName
+                popoverFrame.Size = UDim2.new(0, popWidth, 0, 0)
+                popoverFrame.Position = UDim2.new(0, relX, 0, relY)
+                popoverFrame.BackgroundColor3 = GousseUI.Theme.Surface
+                popoverFrame.BorderSizePixel = 0
+                popoverFrame.ClipsDescendants = true
+                popoverFrame.ZIndex = 75
+                popoverFrame.Parent = contentArea
+                GousseUI:RegisterThemeElement(popoverFrame, "BackgroundColor3", "Surface")
+
+                local popCorner = Instance.new("UICorner")
+                popCorner.CornerRadius = UDim.new(0, 8)
+                popCorner.Parent = popoverFrame
+
+                local popStroke = Instance.new("UIStroke")
+                popStroke.Color = GousseUI.Theme.BorderLight
+                popStroke.Thickness = 1
+                popStroke.Parent = popoverFrame
+                GousseUI:RegisterThemeElement(popStroke, "Color", "BorderLight")
+
+                -- 1. Saturation & Value Box
+                local svBoxHeight = 100
+                local svBox = Instance.new("TextButton")
+                svBox.Name = "SVCanvas"
+                svBox.Size = UDim2.new(1, -16, 0, svBoxHeight)
+                svBox.Position = UDim2.new(0, 8, 0, 8)
+                svBox.BackgroundColor3 = Color3.fromHSV(currentH, 1, 1)
+                svBox.Text = ""
+                svBox.AutoButtonColor = false
+                svBox.ZIndex = 76
+                svBox.ClipsDescendants = true
+                svBox.Parent = popoverFrame
+
+                local svCorner = Instance.new("UICorner")
+                svCorner.CornerRadius = UDim.new(0, 6)
+                svCorner.Parent = svBox
+
+                -- White saturation gradient (Horizontal)
+                local satGradFrame = Instance.new("Frame")
+                satGradFrame.Size = UDim2.new(1, 0, 1, 0)
+                satGradFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                satGradFrame.BorderSizePixel = 0
+                satGradFrame.ZIndex = 77
+                satGradFrame.Parent = svBox
+
+                local satGrad = Instance.new("UIGradient")
+                satGrad.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(255, 255, 255))
+                satGrad.Transparency = NumberSequence.new({
+                    NumberSequenceKeypoint.new(0, 0),
+                    NumberSequenceKeypoint.new(1, 1)
+                })
+                satGrad.Rotation = 0
+                satGrad.Parent = satGradFrame
+
+                -- Black value gradient (Vertical)
+                local valGradFrame = Instance.new("Frame")
+                valGradFrame.Size = UDim2.new(1, 0, 1, 0)
+                valGradFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+                valGradFrame.BorderSizePixel = 0
+                valGradFrame.ZIndex = 78
+                valGradFrame.Parent = svBox
+
+                local valGrad = Instance.new("UIGradient")
+                valGrad.Color = ColorSequence.new(Color3.fromRGB(0, 0, 0), Color3.fromRGB(0, 0, 0))
+                valGrad.Transparency = NumberSequence.new({
+                    NumberSequenceKeypoint.new(0, 1),
+                    NumberSequenceKeypoint.new(1, 0)
+                })
+                valGrad.Rotation = 90
+                valGrad.Parent = valGradFrame
+
+                -- SV Cursor Ring
+                local svCursor = Instance.new("Frame")
+                svCursor.Name = "SVCursor"
+                svCursor.Size = UDim2.new(0, 12, 0, 12)
+                svCursor.AnchorPoint = Vector2.new(0.5, 0.5)
+                svCursor.Position = UDim2.new(currentS, 0, 1 - currentV, 0)
+                svCursor.BackgroundTransparency = 1
+                svCursor.ZIndex = 79
+                svCursor.Parent = svBox
+
+                local curCorner = Instance.new("UICorner")
+                curCorner.CornerRadius = UDim.new(1, 0)
+                curCorner.Parent = svCursor
+
+                local curStroke = Instance.new("UIStroke")
+                curStroke.Color = Color3.fromRGB(255, 255, 255)
+                curStroke.Thickness = 1.8
+                curStroke.Parent = svCursor
+
+                -- 2. Hue Spectrum Bar
+                local hueBar = Instance.new("TextButton")
+                hueBar.Name = "HueBar"
+                hueBar.Size = UDim2.new(1, -16, 0, 12)
+                hueBar.Position = UDim2.new(0, 8, 0, 114)
+                hueBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                hueBar.Text = ""
+                hueBar.AutoButtonColor = false
+                hueBar.ZIndex = 76
+                hueBar.Parent = popoverFrame
+
+                local hueCorner = Instance.new("UICorner")
+                hueCorner.CornerRadius = UDim.new(0, 6)
+                hueCorner.Parent = hueBar
+
+                local hueGrad = Instance.new("UIGradient")
+                hueGrad.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 0, 0)),
+                    ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
+                    ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
+                    ColorSequenceKeypoint.new(0.50, Color3.fromRGB(0, 255, 255)),
+                    ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
+                    ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
+                    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 0, 0))
+                })
+                hueGrad.Parent = hueBar
+
+                -- Hue Knob Cursor
+                local hueKnob = Instance.new("Frame")
+                hueKnob.Name = "HueKnob"
+                hueKnob.Size = UDim2.new(0, 6, 1, 4)
+                hueKnob.AnchorPoint = Vector2.new(0.5, 0.5)
+                hueKnob.Position = UDim2.new(currentH, 0, 0.5, 0)
+                hueKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                hueKnob.ZIndex = 79
+                hueKnob.Parent = hueBar
+
+                local knobCorner = Instance.new("UICorner")
+                knobCorner.CornerRadius = UDim.new(0, 3)
+                knobCorner.Parent = hueKnob
+
+                local knobStroke = Instance.new("UIStroke")
+                knobStroke.Color = Color3.fromRGB(15, 23, 42)
+                knobStroke.Thickness = 1
+                knobStroke.Parent = hueKnob
+
+                -- 3. Preset Quick Swatches
+                local presetsFrame = Instance.new("Frame")
+                presetsFrame.Name = "Presets"
+                presetsFrame.Size = UDim2.new(1, -16, 0, 18)
+                presetsFrame.Position = UDim2.new(0, 8, 0, 134)
+                presetsFrame.BackgroundTransparency = 1
+                presetsFrame.ZIndex = 76
+                presetsFrame.Parent = popoverFrame
+
+                local presetLayout = Instance.new("UIListLayout")
+                presetLayout.FillDirection = Enum.FillDirection.Horizontal
+                presetLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+                presetLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+                presetLayout.Padding = UDim.new(0, 6)
+                presetLayout.Parent = presetsFrame
+
+                -- Forward declaration for update functions
+                local UpdateColorFromHSV: (h: number, s: number, v: number, triggerCb: boolean?) -> ()
+                local hexBox: TextBox
+
+                local presetColors = {
+                    Color3.fromRGB(239, 68, 68),   -- Red
+                    Color3.fromRGB(245, 158, 11),  -- Amber
+                    Color3.fromRGB(16, 185, 129),  -- Emerald
+                    Color3.fromRGB(6, 182, 212),   -- Cyan
+                    Color3.fromRGB(59, 130, 246),  -- Blue
+                    Color3.fromRGB(168, 85, 247),  -- Purple
+                    Color3.fromRGB(236, 72, 153),  -- Pink
+                    Color3.fromRGB(248, 250, 252), -- White
+                }
+
+                for _, pColor in ipairs(presetColors) do
+                    local pBtn = Instance.new("TextButton")
+                    pBtn.Name = "Preset_" .. ColorToHex(pColor)
+                    pBtn.Size = UDim2.new(0, 16, 0, 16)
+                    pBtn.BackgroundColor3 = pColor
+                    pBtn.Text = ""
+                    pBtn.AutoButtonColor = false
+                    pBtn.ZIndex = 77
+                    pBtn.Parent = presetsFrame
+
+                    local pCorner = Instance.new("UICorner")
+                    pCorner.CornerRadius = UDim.new(1, 0)
+                    pCorner.Parent = pBtn
+
+                    local pStroke = Instance.new("UIStroke")
+                    pStroke.Color = Color3.fromRGB(51, 65, 85)
+                    pStroke.Thickness = 0.8
+                    pStroke.Parent = pBtn
+
+                    pBtn.MouseButton1Click:Connect(function()
+                        local ph, ps, pv = pColor:ToHSV()
+                        UpdateColorFromHSV(ph, ps, pv, true)
+                    end)
+                end
+
+                -- 4. Preview Swatch & Hex Input Row
+                local hexRow = Instance.new("Frame")
+                hexRow.Name = "HexRow"
+                hexRow.Size = UDim2.new(1, -16, 0, 26)
+                hexRow.Position = UDim2.new(0, 8, 0, 160)
+                hexRow.BackgroundTransparency = 1
+                hexRow.ZIndex = 76
+                hexRow.Parent = popoverFrame
+
+                local liveSwatch = Instance.new("Frame")
+                liveSwatch.Name = "LiveSwatch"
+                liveSwatch.Size = UDim2.new(0, 32, 1, 0)
+                liveSwatch.BackgroundColor3 = currentColor
+                liveSwatch.BorderSizePixel = 0
+                liveSwatch.ZIndex = 77
+                liveSwatch.Parent = hexRow
+
+                local liveCorner = Instance.new("UICorner")
+                liveCorner.CornerRadius = UDim.new(0, 6)
+                liveCorner.Parent = liveSwatch
+
+                local liveStroke = Instance.new("UIStroke")
+                liveStroke.Color = GousseUI.Theme.Border
+                liveStroke.Thickness = 1
+                liveStroke.Parent = liveSwatch
+                GousseUI:RegisterThemeElement(liveStroke, "Color", "Border")
+
+                hexBox = Instance.new("TextBox")
+                hexBox.Name = "HexInput"
+                hexBox.Size = UDim2.new(1, -40, 1, 0)
+                hexBox.Position = UDim2.new(0, 40, 0, 0)
+                hexBox.BackgroundColor3 = GousseUI.Theme.Sidebar
+                hexBox.Font = FontCode
+                hexBox.Text = ColorToHex(currentColor)
+                hexBox.TextColor3 = GousseUI.Theme.TextPrimary
+                hexBox.TextSize = 12
+                hexBox.ClearTextOnFocus = false
+                hexBox.ZIndex = 77
+                hexBox.Parent = hexRow
+                GousseUI:RegisterThemeElement(hexBox, "BackgroundColor3", "Sidebar")
+                GousseUI:RegisterThemeElement(hexBox, "TextColor3", "TextPrimary")
+
+                local hexBoxCorner = Instance.new("UICorner")
+                hexBoxCorner.CornerRadius = UDim.new(0, 6)
+                hexBoxCorner.Parent = hexBox
+
+                local hexBoxStroke = Instance.new("UIStroke")
+                hexBoxStroke.Color = GousseUI.Theme.Border
+                hexBoxStroke.Thickness = 1
+                hexBoxStroke.Parent = hexBox
+                GousseUI:RegisterThemeElement(hexBoxStroke, "Color", "Border")
+
+                hexBox.FocusLost:Connect(function()
+                    local parsed = HexToColor(hexBox.Text)
+                    if parsed then
+                        local ph, ps, pv = parsed:ToHSV()
+                        UpdateColorFromHSV(ph, ps, pv, true)
+                    else
+                        hexBox.Text = ColorToHex(currentColor)
+                    end
+                end)
+
+                -- Function to apply changes and update visuals
+                UpdateColorFromHSV = function(h: number, s: number, v: number, triggerCb: boolean?)
+                    currentH = math.clamp(h, 0, 1)
+                    currentS = math.clamp(s, 0, 1)
+                    currentV = math.clamp(v, 0, 1)
+                    currentColor = Color3.fromHSV(currentH, currentS, currentV)
+
+                    svBox.BackgroundColor3 = Color3.fromHSV(currentH, 1, 1)
+                    svCursor.Position = UDim2.new(currentS, 0, 1 - currentV, 0)
+                    hueKnob.Position = UDim2.new(currentH, 0, 0.5, 0)
+
+                    swatchPreview.BackgroundColor3 = currentColor
+                    liveSwatch.BackgroundColor3 = currentColor
+
+                    local hexStr = ColorToHex(currentColor)
+                    hexLabel.Text = hexStr
+                    hexBox.Text = hexStr
+
+                    if triggerCb ~= false then
+                        pcall(callback, currentColor)
+                    end
+                end
+
+                -- Interactive Drag Handling for SV Box & Hue Slider
+                local isDraggingSV = false
+                local isDraggingHue = false
+
+                local function HandleSVInput(input)
+                    local abs = svBox.AbsolutePosition
+                    local sz = svBox.AbsoluteSize
+                    if sz.X > 0 and sz.Y > 0 then
+                        local s = math.clamp((input.Position.X - abs.X) / sz.X, 0, 1)
+                        local v = math.clamp(1 - ((input.Position.Y - abs.Y) / sz.Y), 0, 1)
+                        UpdateColorFromHSV(currentH, s, v, true)
+                    end
+                end
+
+                local function HandleHueInput(input)
+                    local abs = hueBar.AbsolutePosition
+                    local sz = hueBar.AbsoluteSize
+                    if sz.X > 0 then
+                        local h = math.clamp((input.Position.X - abs.X) / sz.X, 0, 1)
+                        UpdateColorFromHSV(h, currentS, currentV, true)
+                    end
+                end
+
+                svBox.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        isDraggingSV = true
+                        HandleSVInput(input)
+                    end
+                end)
+
+                hueBar.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        isDraggingHue = true
+                        HandleHueInput(input)
+                    end
+                end)
+
+                activeConnections["InputChanged"] = UserInputService.InputChanged:Connect(function(input)
+                    if isDraggingSV and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                        HandleSVInput(input)
+                    elseif isDraggingHue and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                        HandleHueInput(input)
+                    end
+                end)
+
+                activeConnections["InputEnded"] = UserInputService.InputEnded:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        isDraggingSV = false
+                        isDraggingHue = false
+                    end
+                end)
+
+                -- Smooth Opening Tween
+                Tween(popoverFrame, { Size = UDim2.new(0, popWidth, 0, popHeight) }, 0.16, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+            end
+
+            triggerBtn.MouseButton1Click:Connect(function()
+                if isOpen then
+                    ClosePicker()
+                else
+                    OpenPicker()
+                end
+            end)
+
+            tabPage:GetPropertyChangedSignal("Visible"):Connect(function()
+                if not tabPage.Visible then
+                    ClosePicker()
+                end
+            end)
+
+            local function SetColor(newColor: Color3, triggerCb: boolean?)
+                currentColor = newColor
+                currentH, currentS, currentV = currentColor:ToHSV()
+                swatchPreview.BackgroundColor3 = currentColor
+                hexLabel.Text = ColorToHex(currentColor)
+                if isOpen and popoverFrame then
+                    local svBox = popoverFrame:FindFirstChild("SVCanvas")
+                    if svBox then
+                        svBox.BackgroundColor3 = Color3.fromHSV(currentH, 1, 1)
+                        local cur = svBox:FindFirstChild("SVCursor")
+                        if cur then cur.Position = UDim2.new(currentS, 0, 1 - currentV, 0) end
+                    end
+                    local hueBar = popoverFrame:FindFirstChild("HueBar")
+                    if hueBar then
+                        local knob = hueBar:FindFirstChild("HueKnob")
+                        if knob then knob.Position = UDim2.new(currentH, 0, 0.5, 0) end
+                    end
+                    local hexRow = popoverFrame:FindFirstChild("HexRow")
+                    if hexRow then
+                        local lSwatch = hexRow:FindFirstChild("LiveSwatch")
+                        if lSwatch then lSwatch.BackgroundColor3 = currentColor end
+                        local hBox = hexRow:FindFirstChild("HexInput")
+                        if hBox then hBox.Text = ColorToHex(currentColor) end
+                    end
+                end
+                if triggerCb ~= false then
+                    pcall(callback, currentColor)
+                end
+            end
+
+            return {
+                Set = SetColor,
+                Get = function() return currentColor end
+            }
+        end
+
+        TabObj.Activate = ActivateTab
         return TabObj
+    end
+
+    -- ========================================================================
+    -- Window Object Utility Methods
+    -- ========================================================================
+    function WindowObj:SetScale(scale: number)
+        if uiScale then
+            uiScale.Scale = math.clamp(scale, 0.5, 1.8)
+        end
+    end
+
+    function WindowObj:SetTheme(themeName: string)
+        GousseUI:SetTheme(themeName)
+    end
+
+    function WindowObj:SetAccentColor(color: Color3)
+        GousseUI:SetAccentColor(color)
+    end
+
+    function WindowObj:SetMobileToggle(visible: boolean)
+        if fabBtn then
+            fabBtn.Visible = visible
+        end
+    end
+
+    function WindowObj:OpenSettings()
+        if WindowObj.SettingsTab then
+            WindowObj.SettingsTab:Activate()
+        else
+            local sTab = WindowObj:CreateSettingsTab()
+            if sTab then
+                sTab:Activate()
+            end
+        end
+    end
+
+    -- ========================================================================
+    -- Built-in UI Settings Tab (Theme Colors, Window Resizing, Mobile Controls)
+    -- ========================================================================
+    function WindowObj:CreateSettingsTab(settingsConfig)
+        if WindowObj.SettingsTab then
+            return WindowObj.SettingsTab
+        end
+
+        local settingsTab = WindowObj:CreateTab({
+            Name = "Settings",
+            Icon = "settings",
+            IsSettings = true
+        })
+        WindowObj.SettingsTab = settingsTab
+
+        -- Section 1: Themes & Accent Colors
+        settingsTab:CreateSection("Appearance & Theme")
+
+        local themeOptions = {
+            "Emerald (Default)",
+            "Cyber Cyan",
+            "Amethyst Violet",
+            "Crimson Ruby",
+            "Amber Gold",
+            "Ocean Blue",
+            "Midnight Slate",
+            "Halloween Spooky"
+        }
+
+        local themeKeyMap = {
+            ["Emerald (Default)"] = "emerald",
+            ["Cyber Cyan"] = "cyberpunk",
+            ["Amethyst Violet"] = "amethyst",
+            ["Crimson Ruby"] = "crimson",
+            ["Amber Gold"] = "amber",
+            ["Ocean Blue"] = "ocean",
+            ["Midnight Slate"] = "slate",
+            ["Halloween Spooky"] = "halloween"
+        }
+
+        settingsTab:CreateDropdown({
+            Name = "Theme Preset",
+            SubTitle = "Select interface color theme and glowing accent highlights",
+            Options = themeOptions,
+            Default = "Emerald (Default)",
+            Callback = function(sel)
+                local key = themeKeyMap[sel] or "default"
+                GousseUI:SetTheme(key)
+                GousseUI:Notify({ Title = "Theme Changed", Content = "Active theme: " .. sel, Duration = 2.5 })
+            end
+        })
+
+        -- Custom Accent Color Picker
+        local accentPicker = settingsTab:CreateColorPicker({
+            Name = "Custom Accent Color",
+            SubTitle = "Choose any custom glowing accent color for headers, toggles, and highlights",
+            Default = GousseUI.Theme.Accent,
+            Callback = function(col)
+                GousseUI:SetAccentColor(col)
+            end
+        })
+
+        GousseUI:OnThemeUpdate(function(th)
+            if accentPicker and accentPicker.Set then
+                accentPicker.Set(th.Accent, false)
+            end
+        end)
+
+        -- Section 2: Window Sizing & UI Scale
+        settingsTab:CreateSection("Window Sizing & Scale")
+
+        settingsTab:CreateSlider({
+            Name = "UI Scale",
+            SubTitle = "Scale entire interface for mobile phones, tablets, or 4K monitors",
+            Min = 0.70,
+            Max = 1.30,
+            Default = uiScale.Scale or 1.0,
+            Suffix = "x",
+            Decimals = 2,
+            Callback = function(val)
+                if uiScale then
+                    uiScale.Scale = val
+                end
+            end
+        })
+
+        settingsTab:CreateSlider({
+            Name = "Background Transparency",
+            SubTitle = "Adjust glass acrylic transparency for sleek visual layering",
+            Min = 0,
+            Max = 0.40,
+            Default = 0,
+            Suffix = "",
+            Decimals = 2,
+            Callback = function(val)
+                if mainFrame then
+                    mainFrame.BackgroundTransparency = val
+                end
+            end
+        })
+
+        local sizePresets = { "Default (690x450)", "Compact (560x380)", "Spacious (800x520)" }
+        settingsTab:CreateDropdown({
+            Name = "Window Size Preset",
+            SubTitle = "Quick snap window dimensions",
+            Options = sizePresets,
+            Default = "Default (690x450)",
+            Callback = function(sel)
+                if sel:find("Compact") then
+                    Tween(mainFrame, { Size = UDim2.new(0, 560, 0, 380) }, 0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+                elseif sel:find("Spacious") then
+                    Tween(mainFrame, { Size = UDim2.new(0, 800, 0, 520) }, 0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+                else
+                    Tween(mainFrame, { Size = UDim2.new(0, 690, 0, 450) }, 0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+                end
+            end
+        })
+
+        settingsTab:CreateButton({
+            Name = "Reset Window Position & Size",
+            SubTitle = "Re-centers window on screen and restores default dimensions",
+            ButtonText = "Reset",
+            Callback = function()
+                local defSize = if isMobile then UDim2.new(0.92, 0, 0.86, 0) else UDim2.new(0, 690, 0, 450)
+                Tween(mainFrame, {
+                    Position = UDim2.new(0.5, 0, 0.5, 0),
+                    Size = defSize
+                }, 0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+                if uiScale then
+                    uiScale.Scale = if isMobile and initialScale then initialScale else 1.0
+                end
+                GousseUI:Notify({ Title = "Window Reset", Content = "Interface repositioned to center.", Duration = 2 })
+            end
+        })
+
+        -- Section 3: Mobile & Touch Controls
+        settingsTab:CreateSection("Mobile & Touch Controls")
+
+        settingsTab:CreateToggle({
+            Name = "Mobile Floating Toggle (FAB)",
+            SubTitle = "Show draggable 'G' button on screen to easily toggle menu on mobile devices",
+            Default = if fabBtn then fabBtn.Visible else showFab,
+            Callback = function(val)
+                if fabBtn then
+                    fabBtn.Visible = val
+                end
+            end
+        })
+
+        if fabBtn then
+            settingsTab:CreateSlider({
+                Name = "FAB Button Size",
+                SubTitle = "Adjust floating toggle button touch target size",
+                Min = 36,
+                Max = 64,
+                Default = 48,
+                Suffix = "px",
+                Decimals = 0,
+                Callback = function(val)
+                    fabBtn.Size = UDim2.new(0, val, 0, val)
+                end
+            })
+        end
+
+        -- Section 4: Hotkeys & Lifecycle
+        settingsTab:CreateSection("Hotkeys & Lifecycle")
+
+        settingsTab:CreateKeybind({
+            Name = "Menu Keybind",
+            SubTitle = "Keyboard shortcut to toggle window visibility",
+            Default = toggleKey,
+            Callback = function(newKey)
+                toggleKey = newKey
+                GousseUI.ActiveKeybind = newKey
+                GousseUI:Notify({ Title = "Keybind Updated", Content = "Hotkey set to: " .. newKey.Name, Duration = 2.5 })
+            end
+        })
+
+        settingsTab:CreateButton({
+            Name = "Unload Script",
+            SubTitle = "Completely terminate script execution and remove GUI",
+            Callback = function()
+                ShowUnloadConfirmation()
+            end
+        })
+
+        return settingsTab
+    end
+
+    -- Auto-initialize Settings Tab unless explicitly disabled
+    if config.ShowSettings ~= false and config.AutoSettings ~= false then
+        WindowObj:CreateSettingsTab()
     end
 
     GousseUI:Notify({ Title = displayTitle, Content = "Loaded. Toggle hotkey: " .. toggleKey.Name, Duration = 3 })
