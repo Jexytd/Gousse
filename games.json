@@ -4,15 +4,17 @@
   "games": {
     "111958650": {
       "name": "Arsenal",
-      "status": "review",
-      "lead": "Jexytd",
+      "status": "development",
+      "lead": "Gouang",
+      "scriptType": "Modular (modules/)",
       "entry": "games/arsenal/main.luau",
       "places": {}
     },
     "994732206": {
       "name": "Blox Fruits",
-      "status": "public",
-      "lead": "Jexytd",
+      "status": "development",
+      "lead": "Gouang",
+      "scriptType": "Modular (modules/)",
       "entry": "games/blox_fruits/main.luau",
       "places": {
         "2753915549": {
@@ -33,6 +35,7 @@
       "name": "Bad Business",
       "status": "development",
       "lead": "Gouang",
+      "scriptType": "Modular (modules/)",
       "entry": "games/bad_business/main.luau",
       "places": {}
     },

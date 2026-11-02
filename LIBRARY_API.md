@@ -176,7 +176,7 @@ local isRunning = myToggle.Get()
 
 ### 5.2 `CreateSlider`
 
-Compact slider with monospace numeric display and mouse/touch drag support.
+Compact slider with dual-mode interaction: smooth mouse/touch dragging track and a direct interactive numeric badge allowing users to click and type values manually.
 
 ```luau
 local mySlider = Tab:CreateSlider({
@@ -185,7 +185,8 @@ local mySlider = Tab:CreateSlider({
     Min = 0.1,
     Max = 2.0,
     Default = 0.1,
-    Decimals = 1,
+    Decimals = 1, -- Optional (Auto-detected from Min/Max/Default/Step if omitted)
+    Step = 0.1,   -- Optional (or Increment)
     Suffix = "s",
     Callback = function(val: number)
         print("Delay:", val)
@@ -195,6 +196,19 @@ local mySlider = Tab:CreateSlider({
 mySlider.Set(0.5)
 local delay = mySlider.Get()
 ```
+
+- **Configuration Fields**:
+  - `Min` / `Max` (`number?`): Lower and upper bounds (defaults: `0` and `100`).
+  - `Default` (`number?`): Initial value (clamped to `[Min, Max]`).
+  - `Decimals` (`number?`): Decimal precision `0..4`. If omitted, automatically detected from `Min`, `Max`, `Default`, or `Step`.
+  - `Step` / `Increment` (`number?`): Step increment for discrete snapping.
+  - `Suffix` (`string?`): Appended unit string (e.g., `"s"`, `"x"`, `"%"`).
+  - `Callback` (`(number) -> ()`): Invoked whenever the slider changes.
+- **Direct Manual Input**:
+  - The numeric pill badge on the top right functions as an interactive `TextBox`.
+  - Clicking/tapping the badge focuses it and removes the suffix for fast numeric entry.
+  - Pressing Enter or tapping away commits the value, clamps it to `[Min, Max]`, synchronizes the fill track, and triggers the callback.
+  - Invalid inputs safely revert without crashing or mutating state.
 
 ---
 

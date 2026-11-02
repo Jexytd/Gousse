@@ -3499,6 +3499,8 @@ function GousseUI:CreateWindow(config: {
             Max: number?,
             Default: number?,
             Decimals: number?,
+            Step: number?,
+            Increment: number?,
             Suffix: string?,
             Callback: ((number) -> ())?
         })
@@ -3507,12 +3509,71 @@ function GousseUI:CreateWindow(config: {
             local subTitle = sliderConfig.SubTitle
             local minVal = sliderConfig.Min or 0
             local maxVal = sliderConfig.Max or 100
-            local defaultVal = math.clamp(sliderConfig.Default or minVal, minVal, maxVal)
-            local decimals = sliderConfig.Decimals or 0
+            local range = math.max(maxVal - minVal, 0.0001)
+
+            -- Auto-detect decimal precision if not explicitly provided
+            local function CountDecimals(n: number?): number
+                if not n or type(n) ~= "number" or n == math.floor(n) then return 0 end
+                local s = string.format("%.6f", n):gsub("0+$", "")
+                if s:sub(-1) == "." then return 0 end
+                local dot = s:find("%.")
+                return if dot then math.clamp(#s - dot, 0, 4) else 0
+            end
+
+            local step = sliderConfig.Step or sliderConfig.Increment
+            local decimals: number
+            if sliderConfig.Decimals ~= nil then
+                decimals = math.clamp(sliderConfig.Decimals, 0, 4)
+            elseif step and step > 0 then
+                decimals = CountDecimals(step)
+            else
+                local autoDec = math.max(
+                    CountDecimals(minVal),
+                    CountDecimals(maxVal),
+                    CountDecimals(sliderConfig.Default)
+                )
+                if autoDec == 0 and minVal < 1 and maxVal <= 1 and (maxVal - minVal) > 0 then
+                    autoDec = 2
+                end
+                decimals = autoDec
+            end
+
+            if not step or step <= 0 then
+                if decimals > 0 then
+                    step = 10 ^ (-decimals)
+                else
+                    step = 1
+                end
+            end
+
             local suffix = sliderConfig.Suffix or ""
             local callback = sliderConfig.Callback or function() end
 
+            local function SnapValue(raw: number): number
+                local val = math.clamp(raw, minVal, maxVal)
+                if step and step > 0 then
+                    val = minVal + math.floor(((val - minVal) / step) + 0.5) * step
+                end
+                if decimals > 0 then
+                    local mult = 10 ^ decimals
+                    val = math.floor(val * mult + 0.5) / mult
+                else
+                    val = math.floor(val + 0.5)
+                end
+                return math.clamp(val, minVal, maxVal)
+            end
+
+            local function FormatValue(val: number): string
+                if decimals > 0 then
+                    return string.format("%." .. decimals .. "f", val) .. suffix
+                else
+                    return tostring(math.floor(val + 0.5)) .. suffix
+                end
+            end
+
+            local defaultVal = SnapValue(sliderConfig.Default or minVal)
             local currentVal = defaultVal
+            local fill: Frame
 
             local rowHeight = if isMobile then 52 else 46
             local sliderFrame = Instance.new("Frame")
@@ -3537,7 +3598,7 @@ function GousseUI:CreateWindow(config: {
             local topRowHeight = 22
             local titleContainer = Instance.new("Frame")
             titleContainer.Name = "TitleContainer"
-            titleContainer.Size = UDim2.new(0.65, 0, 0, topRowHeight)
+            titleContainer.Size = UDim2.new(1, -125, 0, topRowHeight)
             titleContainer.Position = UDim2.new(0, 12, 0, 5)
             titleContainer.BackgroundTransparency = 1
             titleContainer.Parent = sliderFrame
@@ -3591,17 +3652,107 @@ function GousseUI:CreateWindow(config: {
                 AttachTooltip(infoBtn, subTitle)
             end
 
-            local valueLabel = Instance.new("TextLabel")
-            valueLabel.Size = UDim2.new(0.35, -20, 0, topRowHeight)
-            valueLabel.Position = UDim2.new(0.65, 8, 0, 5)
-            valueLabel.BackgroundTransparency = 1
-            valueLabel.Font = FontCode
-            valueLabel.Text = tostring(currentVal) .. suffix
-            valueLabel.TextColor3 = GousseUI.Theme.Accent
-            valueLabel.TextSize = 13
-            valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-            valueLabel.Parent = sliderFrame
-            GousseUI:RegisterThemeElement(valueLabel, "TextColor3", "Accent")
+            -- Interactive Value Box (Badge with direct numeric input support)
+            local valueContainer = Instance.new("Frame")
+            valueContainer.Name = "ValueContainer"
+            valueContainer.AnchorPoint = Vector2.new(1, 0)
+            valueContainer.Position = UDim2.new(1, -12, 0, 5)
+            valueContainer.Size = UDim2.new(0, 48, 0, topRowHeight)
+            valueContainer.AutomaticSize = Enum.AutomaticSize.X
+            valueContainer.BackgroundColor3 = GousseUI.Theme.Sidebar
+            valueContainer.BorderSizePixel = 0
+            valueContainer.Parent = sliderFrame
+            GousseUI:RegisterThemeElement(valueContainer, "BackgroundColor3", "Sidebar")
+
+            local vcCorner = Instance.new("UICorner")
+            vcCorner.CornerRadius = UDim.new(0, 5)
+            vcCorner.Parent = valueContainer
+
+            local vcStroke = Instance.new("UIStroke")
+            vcStroke.Color = GousseUI.Theme.Border
+            vcStroke.Thickness = 0.8
+            vcStroke.Parent = valueContainer
+            GousseUI:RegisterThemeElement(vcStroke, "Color", "Border")
+
+            local vcPadding = Instance.new("UIPadding")
+            vcPadding.PaddingLeft = UDim.new(0, 7)
+            vcPadding.PaddingRight = UDim.new(0, 7)
+            vcPadding.Parent = valueContainer
+
+            local vcConstraint = Instance.new("UISizeConstraint")
+            vcConstraint.MinSize = Vector2.new(46, topRowHeight)
+            vcConstraint.MaxSize = Vector2.new(105, topRowHeight)
+            vcConstraint.Parent = valueContainer
+
+            local valueInput = Instance.new("TextBox")
+            valueInput.Name = "ValueInput"
+            valueInput.Size = UDim2.new(0, 0, 1, 0)
+            valueInput.AutomaticSize = Enum.AutomaticSize.X
+            valueInput.BackgroundTransparency = 1
+            valueInput.Font = FontCode
+            valueInput.Text = FormatValue(currentVal)
+            valueInput.TextColor3 = GousseUI.Theme.Accent
+            valueInput.TextSize = 12
+            valueInput.TextXAlignment = Enum.TextXAlignment.Center
+            valueInput.ClearTextOnFocus = false
+            valueInput.ClipsDescendants = false
+            valueInput.Parent = valueContainer
+            GousseUI:RegisterThemeElement(valueInput, "TextColor3", "Accent")
+
+            valueContainer.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    valueInput:CaptureFocus()
+                end
+            end)
+
+            valueContainer.MouseEnter:Connect(function()
+                if not valueInput:IsFocused() then
+                    Tween(vcStroke, { Color = GousseUI.Theme.BorderLight }, 0.15)
+                end
+            end)
+
+            valueContainer.MouseLeave:Connect(function()
+                if not valueInput:IsFocused() then
+                    Tween(vcStroke, { Color = GousseUI.Theme.Border }, 0.15)
+                end
+            end)
+
+            valueInput.Focused:Connect(function()
+                Tween(vcStroke, { Color = GousseUI.Theme.Accent }, 0.15)
+                Tween(valueContainer, { BackgroundColor3 = GousseUI.Theme.SurfaceAlt }, 0.15)
+                if decimals > 0 then
+                    valueInput.Text = string.format("%." .. decimals .. "f", currentVal)
+                else
+                    valueInput.Text = tostring(math.floor(currentVal + 0.5))
+                end
+            end)
+
+            valueInput.FocusLost:Connect(function()
+                Tween(vcStroke, { Color = GousseUI.Theme.Border }, 0.15)
+                Tween(valueContainer, { BackgroundColor3 = GousseUI.Theme.Sidebar }, 0.15)
+
+                local rawText = valueInput.Text:gsub("%s+", "")
+                local matchNum = rawText:match("^[+-]?%d*%.?%d+")
+                local num = matchNum and tonumber(matchNum)
+
+                if num then
+                    if sliderConfig.Decimals == nil then
+                        local inputDec = CountDecimals(num)
+                        if inputDec > decimals then
+                            decimals = math.clamp(inputDec, 0, 4)
+                            step = 10 ^ (-decimals)
+                        end
+                    end
+                    currentVal = SnapValue(num)
+                    local visualRatio = math.clamp((currentVal - minVal) / range, 0, 1)
+                    if fill then
+                        fill.Size = UDim2.new(visualRatio, 0, 1, 0)
+                    end
+                    pcall(callback, currentVal)
+                end
+
+                valueInput.Text = FormatValue(currentVal)
+            end)
 
             -- Slider Track
             local track = Instance.new("TextButton")
@@ -3617,9 +3768,9 @@ function GousseUI:CreateWindow(config: {
             trackCorner.CornerRadius = UDim.new(1, 0)
             trackCorner.Parent = track
 
-            local fill = Instance.new("Frame")
+            fill = Instance.new("Frame")
             fill.Name = "Fill"
-            local initialRatio = (currentVal - minVal) / (maxVal - minVal)
+            local initialRatio = math.clamp((currentVal - minVal) / range, 0, 1)
             fill.Size = UDim2.new(initialRatio, 0, 1, 0)
             fill.BackgroundColor3 = GousseUI.Theme.Accent
             fill.BorderSizePixel = 0
@@ -3635,14 +3786,17 @@ function GousseUI:CreateWindow(config: {
             local function UpdateSlider(inputX: number)
                 local trackPos = track.AbsolutePosition.X
                 local trackWidth = track.AbsoluteSize.X
+                if trackWidth <= 0 then return end
                 local ratio = math.clamp((inputX - trackPos) / trackWidth, 0, 1)
 
-                local rawVal = minVal + (maxVal - minVal) * ratio
-                local mult = 10 ^ decimals
-                currentVal = math.floor(rawVal * mult + 0.5) / mult
+                local rawVal = minVal + range * ratio
+                currentVal = SnapValue(rawVal)
 
-                fill.Size = UDim2.new(ratio, 0, 1, 0)
-                valueLabel.Text = tostring(currentVal) .. suffix
+                local visualRatio = math.clamp((currentVal - minVal) / range, 0, 1)
+                fill.Size = UDim2.new(visualRatio, 0, 1, 0)
+                if not valueInput:IsFocused() then
+                    valueInput.Text = FormatValue(currentVal)
+                end
 
                 pcall(callback, currentVal)
             end
@@ -3668,11 +3822,13 @@ function GousseUI:CreateWindow(config: {
 
             return {
                 Set = function(newVal)
-                    currentVal = math.clamp(newVal, minVal, maxVal)
-                    local ratio = (currentVal - minVal) / (maxVal - minVal)
-                    fill.Size = UDim2.new(ratio, 0, 1, 0)
-                    valueLabel.Text = tostring(currentVal) .. suffix
-                    pcall(callback, currentVal)
+                    if typeof(newVal) == "number" then
+                        currentVal = SnapValue(newVal)
+                        local ratio = math.clamp((currentVal - minVal) / range, 0, 1)
+                        fill.Size = UDim2.new(ratio, 0, 1, 0)
+                        valueInput.Text = FormatValue(currentVal)
+                        pcall(callback, currentVal)
+                    end
                 end,
                 Get = function() return currentVal end
             }

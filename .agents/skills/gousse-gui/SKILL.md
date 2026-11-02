@@ -188,7 +188,7 @@ local isEnabled = myToggle.Get()
 ---
 
 ### 5.2 Slider
-Compact slider featuring live value readout in monospace font and mouse/touch drag tracking.
+Compact slider featuring live value readout in monospace font, responsive mouse/touch drag tracking, and an interactive numeric badge allowing direct manual text input.
 
 ```luau
 local mySlider = Tab:CreateSlider({
@@ -197,7 +197,8 @@ local mySlider = Tab:CreateSlider({
     Min = 16,
     Max = 250,
     Default = 16,
-    Decimals = 0,         -- 0 for integer, 1 or 2 for floats
+    Decimals = 0,         -- Optional (auto-detected if omitted: 0 for int, 1-4 for floats)
+    Step = 1,             -- Optional: step snapping increment (or Increment)
     Suffix = " studs/s",  -- Optional string appended to value display
     Callback = function(val: number)
         print("WalkSpeed:", val)
