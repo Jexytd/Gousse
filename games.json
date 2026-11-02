@@ -48,6 +48,19 @@
           "script": "games/tycoon_streamer/main.luau"
         }
       }
+    },
+    "10284380969": {
+      "name": "Sell Ice Cream",
+      "status": "public",
+      "lead": "Gouang",
+      "scriptType": "Modular (modules/)",
+      "entry": "games/sell_ice_cream/main.luau",
+      "places": {
+        "110793563946846": {
+          "name": "Sell Ice Cream",
+          "script": "games/sell_ice_cream/main.luau"
+        }
+      }
     }
   },
   "tasks": [
