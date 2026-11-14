@@ -64,6 +64,19 @@
           "script": "games/sell_ice_cream/main.luau"
         }
       }
+    },
+    "7158496266": {
+      "name": "Burger Planet: Fast Food Simulator",
+      "status": "public",
+      "lead": "Gouang",
+      "scriptType": "Modular (modules/)",
+      "entry": "games/burger_planet/main.luau",
+      "places": {
+        "101107153774667": {
+          "name": "Burger Planet: Fast Food Simulator",
+          "script": "games/burger_planet/main.luau"
+        }
+      }
     }
   },
   "tasks": [
