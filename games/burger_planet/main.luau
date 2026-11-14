@@ -1,5 +1,5 @@
--- Burger Planet: Fast Food Simulator — v5 (full unified source)
--- Executor: Synapse / Krnl / Delta / Fluxus / any with getreg + getfenv
+-- Burger Planet: Fast Food Simulator — v5.1 (full unified source)
+-- Executor: Potassium / Synapse / Krnl / Delta / Fluxus / any modern executor
 -- Built against the shipped FastFoodClient source + instance dump.
 -- Modules: Session, Litter, Register, Handoff, Farm, Cook (grill/fryer/warmer),
 --          Assembly (build + serve), DriveThru, Orders watcher, Tools, State.
@@ -28,15 +28,56 @@ end
 if not GousseUI then error("[Burger Planet] GousseUI failed to load") end
 GousseUI:SetTheme("emerald")
 
-for _, fn in ipairs({ "getreg", "getfenv" }) do
-    if not _G[fn] and not debug[fn] then
-        GousseUI:Notify({
-            Title = "Burger Planet",
-            Content = "Missing executor fn: " .. fn,
-            Type = "error", Duration = 6,
-        })
-        return
+-- ============================================================
+-- EXECUTOR CHECK (soft — Potassium + Synapse/Krnl/Delta/Fluxus OK)
+-- ============================================================
+local function hasFn(name)
+    return (_G and rawget(_G, name))
+        or (debug and rawget(debug, name))
+        or (getgenv and rawget(getgenv(), name))
+end
+
+local EXEC_FNS = {
+    required = {},
+    optional = {
+        "getgenv", "getfenv", "getreg", "setreadonly",
+        "getrawmetatable", "hookfunction", "newcclosure",
+        "cloneref", "firetouchinterest", "firesignal",
+    },
+}
+
+local missingRequired, missingOptional = {}, {}
+for _, n in ipairs(EXEC_FNS.required) do
+    if not hasFn(n) then table.insert(missingRequired, n) end
+end
+for _, n in ipairs(EXEC_FNS.optional) do
+    if not hasFn(n) then table.insert(missingOptional, n) end
+end
+
+local execName, execVer = "unknown", "?"
+pcall(function()
+    if identifyexecutor then
+        local a, b = identifyexecutor()
+        execName, execVer = tostring(a), tostring(b)
     end
+end)
+
+if #missingRequired > 0 then
+    GousseUI:Notify({
+        Title = "Burger Planet",
+        Content = "Missing required executor fn: "
+            .. table.concat(missingRequired, ", "),
+        Type = "error", Duration = 8,
+    })
+    return
+end
+
+if #missingOptional > 0 then
+    print(("[Burger Planet] executor=%s v%s — soft-missing: %s")
+        :format(execName, execVer, table.concat(missingOptional, ", ")))
+else
+    print(("[Burger Planet] executor=%s v%s — all optional fns present")
+        :format(execName, execVer))
 end
 
 -- ============================================================
@@ -174,7 +215,7 @@ end
 -- ============================================================
 local Loader = GousseUI:CreateLoader({
     Title = "Gousse Hub",
-    SubTitle = "Burger Planet • v5 (full bench)",
+    SubTitle = "Burger Planet • v5.1 (full bench)",
     GameName = "Burger Planet: Fast Food Simulator",
     Status = "Reading state...",
 })
@@ -545,9 +586,6 @@ end
 
 -- ============================================================
 -- MODULE: COOK (grill slots, fryer baskets, warmer bays)
--- Per the dump: Grill/Grill2 have Slot1..Slot6, Fryer/Fryer2 have
--- BasketHit1..4 + Basket1..4 Root, Warmer has FriesHit/HashBrownsHit/
--- NuggetsHit/OnionRingsHit + Pan objects.
 -- ============================================================
 local CookMod = {
     interval = 0.4, teleport = true,
@@ -586,8 +624,6 @@ local function fireInteract(part, action, pos)
     return true
 end
 
--- Grill: click each Slot when empty; the server interaction handles
--- load/unload via the same Interact remote used elsewhere.
 function CookMod.grillTick()
     if not CookMod.grill then return 0 end
     local grill = findFirstStation("^grill")
@@ -614,7 +650,6 @@ function CookMod.grillTick()
     return n
 end
 
--- Fryer: each BasketHit fires load/unload. Basket Root is the model.
 function CookMod.fryerTick()
     if not CookMod.fryer then return 0 end
     local fryers = { findFirstStation("^fryer") }
@@ -640,7 +675,6 @@ function CookMod.fryerTick()
     return n
 end
 
--- Warmer: hit parts for fries/hashbrowns/nuggets/onion rings.
 function CookMod.warmerTick()
     if not CookMod.warmer then return 0 end
     local warmer = findFirstStation("^warmer")
@@ -672,8 +706,6 @@ end
 
 -- ============================================================
 -- MODULE: ASSEMBLY (build order at island A/B)
--- Per the dump: AssemblyA/B have IslandZone + OrderMonitor.
--- The Interact hits on IslandZone/OrderMonitor drive building.
 -- ============================================================
 local AssemblyMod = { interval = 0.5, teleport = true }
 
@@ -707,9 +739,9 @@ function AssemblyMod.sweep()
 end
 
 -- ============================================================
--- MODULE: DRIVETHRU (register 3 + window hit + drive path)
+-- MODULE: DRIVETHRU (register 3 + window hit)
 -- ============================================================
-local DriveMod = { interval = 0.5, teleport = true, windowHit = nil }
+local DriveMod = { interval = 0.5, teleport = true }
 
 local function findDriveStation()
     if not WStations then return nil end
@@ -887,7 +919,7 @@ end)
 Loader:SetStatus("Building GUI...", 0.7)
 local Window = GousseUI:CreateWindow({
     Title = "Burger Planet",
-    SubTitle = "v5 • full bench",
+    SubTitle = "v5.1 • full bench",
     Keybind = Enum.KeyCode.RightControl,
     Size = UDim2.new(0, 780, 0, 540),
     Scale = 1.0,
@@ -1290,10 +1322,10 @@ ToolsTab:CreateButton({
 -- INFO TAB ----------------------------------------------------
 InfoTab:CreateParagraph({
     Title = "Build",
-    Content = "v5 — full bench.\n" ..
+    Content = "v5.1 — full bench.\n" ..
               "Session / Litter / Register / Handoff / Farm / Cook /\n" ..
               "Assembly / DriveThru / Tools in one.\n" ..
-              "Cook + Drive wired off the instance dump.",
+              "Soft executor probe — no getreg gate.",
 })
 InfoTab:CreateButton({
     Name = "Refresh",
@@ -1324,13 +1356,14 @@ InfoTab:CreateButton({
 Loader:SetStatus("Ready", 1.0)
 Loader:Finish(function()
     GousseUI:Notify({
-        Title = "Burger Planet v5",
+        Title = "Burger Planet v5.1",
         Content = "Full bench loaded. Cook + Register + Drive are the new rails.",
         Type = "success", Duration = 5,
     })
 end)
 
-print("[Burger Planet v5] loaded")
+print("[Burger Planet v5.1] loaded")
+print("  executor :", execName, execVer)
 print("  Session  :", tostring(R.Session))
 print("  POS      :", tostring(R.POS))
 print("  Cook     :", tostring(CookMod ~= nil))
