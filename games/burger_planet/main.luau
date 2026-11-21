@@ -63,6 +63,23 @@ if type(previousBP) == "table" and type(previousBP.Shutdown) == "function" then
     pcall(previousBP.Shutdown)
 end
 
+-- _G.BP only remembers the *last* load. A load that failed before assigning it,
+-- or an older executor tab, leaves an instance that still owns worker loops and
+-- keeps driving the character -- the new copy then fights it for the register,
+-- the grill and the hands. Retire every live instance we can still reach.
+if type(getgc) == "function" then
+    pcall(function()
+        for _, t in getgc(true) do
+            if type(t) == "table" and t.running == true
+                and type(t.enabled) == "table" and type(t.job) == "table"
+                and type(t.prep) == "table" and t.prep.sweep ~= nil then
+                t.running = false
+                for k in pairs(t.enabled) do t.enabled[k] = false end
+            end
+        end
+    end)
+end
+
 -- ============================================================
 -- EXECUTOR CHECK (soft — Potassium + Synapse/Krnl/Delta/Fluxus OK)
 -- ============================================================
@@ -190,7 +207,17 @@ local function safe(fn, ...)
     return ok, err
 end
 
-local function teleportTo(pos)
+-- Every module used to call this with a station part and it dropped the
+-- character 4 studs above that part -- on top of the register, on the
+-- stove, on the bench. It now forwards to the floor-aware standNear (set
+-- up further down once that function exists), so a "teleport" is always
+-- a real standing spot on a floor level.
+local standNearRef, settleRef
+local function teleportTo(pos, node)
+    if standNearRef then
+        standNearRef(pos, node)
+        return
+    end
     local r = root()
     if not r or not pos then return end
     safe(function()
@@ -252,6 +279,95 @@ local function snapshot()
         s[attr] = State:GetAttribute(attr)
     end
     return s
+end
+
+-- ============================================================
+-- ONE JOB AT A TIME
+--
+-- Every module walks the character and touches items with the same two
+-- hands, so two of them running together just drag the character back
+-- and forth (register <-> grill). A single owner is kept here; a module
+-- that does not own it does nothing this tick.
+--
+-- Cooking is the one exception: while a grill or fryer is passively
+-- waiting, the register may still click the POS, because that is a
+-- remote call from where we already stand and costs no walking.
+-- ============================================================
+API.job = { owner = nil, since = 0, cook = false }
+
+function API.job.busy(name)
+    return API.job.owner ~= nil and API.job.owner ~= name
+end
+
+function API.job.mayRun(name)
+    if API.job.owner == nil or API.job.owner == name then return true end
+    if name == "register" and API.job.cook then return true end
+    return false
+end
+
+function API.job.take(name)
+    if API.job.owner == nil or API.job.owner == name then
+        API.job.owner, API.job.since = name, os.clock()
+        return true
+    end
+    return false
+end
+
+function API.job.free(name)
+    if API.job.owner == name then
+        API.job.owner, API.job.cook = nil, false
+    end
+end
+
+-- the passive part of a cook: let the register take an order meanwhile
+function API.job.cookOn(on)
+    local o = API.job.owner
+    if o == "pack" or o == "prep" then API.job.cook = on and true or false end
+end
+
+-- run one module's sweep under the lock. `fn` may return a number or nil.
+function API.job.run(name, fn)
+    if not API.job.mayRun(name) then return 0 end
+    local took = false
+    if API.job.owner == nil then took = API.job.take(name) end
+    local ok, res = pcall(fn)
+    if took then API.job.free(name) end
+    if not ok then error(res, 0) end
+    return res or 0
+end
+
+-- ============================================================
+-- ANTI-AFK
+--
+-- Everything here is driven through remotes, so the real mouse never
+-- moves and Roblox eventually marks the account idle and drops the
+-- session in the middle of a shift. Synthesise a harmless right-click
+-- at the corner of the screen when the engine says Idled, plus a slow
+-- backup in case that signal never fires in this experience.
+-- ============================================================
+API.afk = { enabled = true, pings = 0, last = 0, vu = nil }
+
+pcall(function() API.afk.vu = game:GetService("VirtualUser") end)
+
+API.afk.ping = function()
+    local vu = API.afk.vu
+    if not API.afk.enabled or not vu then return end
+    local cam = Workspace.CurrentCamera
+    local cf = cam and cam.CFrame or CFrame.new()
+    local at = Vector2.new(0, 0)
+    local ok = pcall(function()
+        vu:Button2Down(at, cf)
+        task.wait(0.05)
+        vu:Button2Up(at, cf)
+    end)
+    if ok then
+        API.afk.pings += 1
+        API.afk.last = os.clock()
+    end
+end
+
+if API.afk.vu then
+    conn(LP.Idled, function() task.defer(API.afk.ping) end)
 end
 
 -- ============================================================
@@ -476,6 +592,13 @@ end
 
 function LitterMod.sweep()
     if LP:GetAttribute("Holding") then
+        -- a trash bag belongs to the bin run, not to the litter cycle
+        local hay = (tostring(LP:GetAttribute("Holding")) .. "|"
+            .. tostring(LP:GetAttribute("HeldKind") or "")):lower()
+        if hay:find("bag", 1, true) or hay:find("trash", 1, true) then
+            LitterMod.state = "trash bag in hand"
+            return false
+        end
         LitterMod.state = "depositing"
         return depositLitter()
     end
@@ -1112,11 +1235,65 @@ local function findWaitingRegisters()
     return out
 end
 
+-- The POS only accepts a click from behind the counter ("Use the
+-- register from behind the counter"). The customer stands in front of
+-- it, so stand on the side away from the nearest customer; that is the
+-- staff side at both sites without needing to know the layout.
+RegisterMod.standSpot = function(reg)
+    local p = reg.part.Position
+    local npcs = WNPCs()
+    local away, bestD
+    if npcs then
+        for _, npc in ipairs(npcs:GetChildren()) do
+            local tag = npc:GetAttribute("Interact")
+            if tag == "Customer" or tag == "DeliveryCustomer" then
+                local np = nodePos(npc)
+                if np then
+                    local d = (np - p).Magnitude
+                    if d < 22 and (not bestD or d < bestD) then away, bestD = np, d end
+                end
+            end
+        end
+    end
+    local dir
+    if away then
+        dir = (p - away) * Vector3.new(1, 0, 1)
+    else
+        dir = reg.part.CFrame.LookVector * Vector3.new(1, 0, 1)
+    end
+    if dir.Magnitude < 0.2 then dir = Vector3.new(1, 0, 0) end
+    return p + dir.Unit * 3.0
+end
+
 local function clickRegister(reg)
-    if RegisterMod.teleport then teleportTo(reg.part.Position) end
+    local r = root()
+    local p = reg.part.Position
+    -- the server silently ignores a register click from ~13 studs away, so
+    -- walk in well before that. standSpot is the staff side (away from the
+    -- customer). standNear/settle are defined further down, so use the
+    -- forward refs -- calling the locals here would be nil at this point.
+    if RegisterMod.teleport and (not r or (r.Position - p).Magnitude > 5) then
+        if standNearRef then standNearRef(RegisterMod.standSpot(reg)) end
+        if settleRef then settleRef() end
+    end
     safe(function()
-        R.Interact:FireServer(reg.part, "Primary", reg.part.Position)
+        R.Interact:FireServer(reg.part, "Primary", p)
     end)
+    -- if the server says we were on the wrong side, step behind the
+    -- counter and click once more instead of leaving the customer waiting
+    if RegisterMod.teleport then
+        task.wait(0.5)
+        local lr = RegisterMod.lastResult
+        if lr and (os.clock() - lr.at) < 0.6 and not lr.ok
+            and tostring(lr.msg):lower():find("behind", 1, true) then
+            if standNearRef then standNearRef(RegisterMod.standSpot(reg)) end
+            if settleRef then settleRef() end
+            safe(function()
+                R.Interact:FireServer(reg.part, "Primary", p)
+            end)
+            task.wait(0.3)
+        end
+    end
 end
 
 local function findReadyOrders()
@@ -1185,7 +1362,7 @@ function RegisterMod.sweep()
         end
     end
 
-    if RegisterMod.handoff and LP:GetAttribute("Holding") ~= nil then
+    if RegisterMod.handoff and not API.job.cook and LP:GetAttribute("Holding") ~= nil then
         for _, ready in ipairs(findReadyOrders()) do
             handoffReady(ready)
             task.wait(0.15)
@@ -1394,38 +1571,2846 @@ function CookMod.sweep()
 end
 
 -- ============================================================
--- MODULE: ASSEMBLY (build order at island A/B)
+-- MODULE: PACK (paper bag -> receipt -> food -> seal -> serve)
+--
+-- The whole "complete the order" chain, verified against the live
+-- server (Restaurant + Truck share the same protocol):
+--
+--   Interact:FireServer(node, "Primary"|"Secondary", position)
+--       Primary   = left click  (take / pick up / place item in)
+--       Secondary = right click (pick the whole stack up)
+--
+--   Drop:FireServer(surfacePosition, yaw, "Left")
+--       places whatever is in hand on that surface.
+--
+--   Describe:InvokeServer(node) -> { Title, Info, Primary, Secondary, List }
+--       Info carries the live requirement text ("still needs 1x Fries"),
+--       List carries the same thing structured. Both are read here.
+--
+--   Computer:InvokeServer("Order", { Cart = { Bags = 1 } })
+--       restocks a supply box (arrives ~25s later).
+--
+-- Flow: bag stack -> bag on the hatch counter -> printer receipt ->
+-- click bag with receipt -> feed each missing item -> seal -> serve.
 -- ============================================================
-local AssemblyMod = { interval = 0.5, teleport = true }
+local PackMod = {
+    interval = 0.4,
+    teleport = true,
+    restock = true,
+    autoStock = true,
+    autoServe = true,
+    hatchYaw = math.pi / 2,
+    -- hatch spot, relative to the register hit part (calibrated live
+    -- from the server's own Drop payload: forward/right/down in studs)
+    hatch = { forward = 0.6, right = -4.62, down = 0.95 },
+    stats = { placed = 0, receipts = 0, fed = 0, served = 0, restocks = 0 },
+    step = "idle",
+    -- the feed/warehouse loops compare this against _runEpoch. Leaving it
+    -- nil made `nil ~= 0` abort every run before a single item was fed.
+    epoch = 0,
+}
 
-local function findAssemblyZones()
+local function heldId() return LP:GetAttribute("HeldId") end
+local function heldKind() return LP:GetAttribute("HeldKind") end
+
+-- A trash bag is nobody else's to touch: the order run waits for it and
+-- the mop never swaps it for a mop. Only rubbish counts here -- a paper
+-- order bag reads as "Empty paper bag" and must not freeze the whole
+-- script as if the bin run owned the hands.
+local function carryingBag()
+    for _, v in ipairs({ heldKind(), LP:GetAttribute("Holding"), LP:GetAttribute("Held") }) do
+        local s = tostring(v or ""):lower()
+        if s ~= "" and s:find("trash", 1, true) then
+            return true
+        end
+    end
+    return false
+end
+
+local function clearHands()
+    if heldId() == nil then return true end
+    -- the drop is asynchronous: reporting success without checking left a
+    -- wrapper in our hands, and the next refill then "picked up" a piece it
+    -- never actually took. Verify, and try again once before giving up.
+    for _ = 1, 3 do
+        safe(function() R.Drop:FireServer(nil) end)
+        task.wait(0.2)
+        if heldId() == nil then return true end
+    end
+    return heldId() == nil
+end
+
+-- Describe only answers when we are standing next to the thing we ask
+-- about; otherwise the server quietly returns nothing. That silence is
+-- indistinguishable from "this bag needs nothing", so walk into range
+-- first. (standNear/settle are defined further down; forward declared.)
+local standNearFwd, settleFwd
+
+local describeCache = setmetatable({}, { __mode = "k" })
+local function describe(node, ttl)
+    if not node or not R.Describe then return nil end
+    local now = os.clock()
+    local hit = describeCache[node]
+    if hit and (now - hit.t) < (ttl or 0.6) then return hit.v end
+
+    -- step into range if we are too far away to be answered
+    local target = node:IsA("BasePart") and node.Position
+        or (primaryPart(node) and primaryPart(node).Position)
+    local char = LP.Character
+    local rp = char and char:FindFirstChild("HumanoidRootPart")
+    if target and rp and (rp.Position - target).Magnitude > 3.5 then
+        if standNearFwd then standNearFwd(target) end
+        if settleFwd then settleFwd() end
+    end
+
+    local ok, res = pcall(function() return R.Describe:InvokeServer(node) end)
+    local value = (ok and type(res) == "table") and res or nil
+    describeCache[node] = { t = now, v = value }
+    return value
+end
+
+local function stationParts(kind)
     local out = {}
     local stations = WStations()
     if not stations then return out end
-    for _, child in ipairs(stations:GetChildren()) do
-        if child:IsA("Model") and child.Name:lower():find("assembly") then
-            for _, part in ipairs(child:GetChildren()) do
-                if part:IsA("BasePart") and part:GetAttribute("Interact") then
-                    table.insert(out, part)
-                end
-            end
+    for _, d in ipairs(stations:GetDescendants()) do
+        if d:IsA("BasePart") and d:GetAttribute("Interact") == kind then
+            out[#out + 1] = d
         end
     end
     return out
 end
 
-function AssemblyMod.sweep()
-    if not R.Interact then return 0 end
-    local n = 0
-    for _, zone in ipairs(findAssemblyZones()) do
-        if AssemblyMod.teleport then teleportTo(zone.Position) end
-        safe(function()
-            R.Interact:FireServer(zone, "Primary", zone.Position)
+local function mainRegister()
+    local parts = stationParts("Register")
+    for _, part in ipairs(parts) do
+        if part.Name == "RegisterHit" and not part:FindFirstAncestor("DriveThruStation") then
+            return part
+        end
+    end
+    for _, part in ipairs(parts) do
+        if part.Name == "Screen" and not part:FindFirstAncestor("DriveThruStation") then
+            return part
+        end
+    end
+    return parts[1]
+end
+
+local function hatchSpot()
+    local reg = mainRegister()
+    if not reg then return nil end
+    local cf = reg.CFrame
+    local h = PackMod.hatch
+    return reg.Position
+        + cf.LookVector * h.forward
+        + cf.RightVector * h.right
+        - Vector3.new(0, h.down, 0)
+end
+
+-- Which order is in our hand? The server labels a held receipt "Receipt #7"
+-- and a held bag "Bag #7 (2 items)". That label is the only place the order
+-- id shows while the item is still in hand, and it is exactly what the
+-- printer-binding path needs.
+PackMod.heldOrderId = function()
+    local s = tostring(LP:GetAttribute("Holding") or "")
+    return tonumber(s:match("#(%d+)"))
+end
+
+-- Where the game itself puts a finished bag: a free pad on the counter
+-- beside the register, stepping sideways from RegisterSpot towards
+-- CustomerSpot until a 0.9x0.8x0.9 box is empty. The customer then picks
+-- the bag up from there -- clicking the customer does nothing.
+PackMod.counterSpot = function()
+    local truck = Workspace:FindFirstChild("FoodTruck")
+    local root = truck and truck:FindFirstChild("Root")
+    local regSpot = root and root:FindFirstChild("RegisterSpot")
+    local custSpot = root and root:FindFirstChild("CustomerSpot")
+    if not (regSpot and custSpot) then return nil end
+    local wp = regSpot.WorldPosition
+    local d = custSpot.WorldPosition - wp
+    d = Vector3.new(d.X, 0, d.Z)
+    if d.Magnitude < 0.1 then return nil end
+    local side = d.Unit:Cross(Vector3.new(0, 1, 0))
+    local params = OverlapParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    local ignore = {}
+    if LP.Character then table.insert(ignore, LP.Character) end
+    if WItems() then table.insert(ignore, WItems()) end
+    params.FilterDescendantsInstances = ignore
+    for _, v in ipairs({ 1.4, 2.7, 4, 5.3, 6.6, 7.9, -1.4 }) do
+        local p = wp + side * v
+        local hits = Workspace:GetPartBoundsInBox(
+            CFrame.new(p + Vector3.new(0, 0.55, 0)), Vector3.new(0.9, 0.8, 0.9), params)
+        if #hits == 0 then return p + Vector3.new(0, 0.03, 0) end
+    end
+    return nil
+end
+
+-- world item scan, cached briefly (a full Workspace walk is expensive)
+local itemCache = { t = -1, list = {} }
+local function items()
+    local now = os.clock()
+    if (now - itemCache.t) < 0.35 then return itemCache.list end
+    local list = {}
+    for _, d in ipairs(Workspace:GetDescendants()) do
+        if d:IsA("Model") and d:GetAttribute("Item") ~= nil then
+            list[#list + 1] = d
+        end
+    end
+    itemCache.list, itemCache.t = list, now
+    return list
+end
+
+local function findBagFor(orderId)
+    for _, m in ipairs(items()) do
+        if m:GetAttribute("Item") == "Bag" and m:GetAttribute("OrderId") == orderId then
+            -- a bag stamped to an ended order reads as "complete" and made
+            -- the bot serve it over and over. Never select one.
+            if not API.staleBag or not API.staleBag(m) then return m end
+        end
+    end
+    return nil
+end
+
+-- Where a fresh bag comes from. On a real server bags are not loose
+-- models: they sit inside a supply box (Item=Box, Supply="Bags",
+-- Amount=N). Primary on the box takes ONE bag into your hand. A loose
+-- Bag model can also be picked up directly. Both end with HeldKind=Bag.
+local function findBagSource()
+    local fallback
+    for _, m in ipairs(items()) do
+        local item = m:GetAttribute("Item")
+        if item == "Bag"
+            and m:GetAttribute("OrderId") == nil
+            and m:GetAttribute("Sealed") ~= true then
+            return m
+        elseif item == "Box"
+            and m:GetAttribute("Supply") == "Bags"
+            and (tonumber(m:GetAttribute("Amount")) or 0) > 0 then
+            fallback = fallback or m
+        end
+    end
+    return fallback
+end
+
+local function findOrderById(id)
+    if id == nil then return nil end
+    for _, o in ipairs(Orders:GetChildren()) do
+        if tonumber(o.Name) == tonumber(id) or o:GetAttribute("Id") == id then
+            return o
+        end
+    end
+    return nil
+end
+
+local function orderIsLive(o)
+    if not o then return false end
+    local status = tostring(o:GetAttribute("Status") or "")
+    local dl = tonumber(o:GetAttribute("Deadline")) or 0
+    return o:GetAttribute("Complete") ~= true
+        and status ~= "Done"
+        and dl > os.time()
+end
+
+-- a bag is stale when its ticket belongs to an order the game has already
+-- ended. Describe then reports no needs, which used to be read as "ready to
+-- serve" and produced endless fake serves that never credited DayServed.
+API.staleBag = function(bag)
+    if not bag then return false end
+    local id = bag:GetAttribute("OrderId")
+    if id == nil then return false end
+    return not orderIsLive(findOrderById(id))
+end
+
+-- an order that already has a bag bound to it wins: finishing it is
+-- always cheaper than starting another one
+local function liveOrder()
+    local pick, pickDl
+    for _, o in ipairs(Orders:GetChildren()) do
+        if orderIsLive(o) then
+            local id = tonumber(o.Name) or o:GetAttribute("Id")
+            if findBagFor(id) then return o end
+            local dl = tonumber(o:GetAttribute("Deadline")) or 0
+            if not pickDl or dl < pickDl then pick, pickDl = o, dl end
+        end
+    end
+    return pick
+end
+
+-- strip the "1x  " / "2× " quantity prefix the game puts in front of
+-- every requirement line. Lua patterns are byte-based, so the
+-- multiplication sign has to be matched as a whole sequence rather
+-- than inside a character class.
+local function stripCount(text)
+    local s = tostring(text)
+    s = s:gsub("^%s*%d+%s*×%s*", "")
+    s = s:gsub("^%s*%d+%s*[xX]%s*", "")
+    return (s:gsub("%s+$", ""))
+end
+
+-- what the bag still wants, from Describe's List, falling back to Info text.
+-- Real shape seen live:
+--   List = { { "1×  Planet Burger", false }, { "1×  Cola", false } }
+-- where [1] is the label and [2] is true once that line is satisfied.
+local function needsOf(bag)
+    local d = describe(bag, 0.15)
+    -- nil = "could not read the bag", which is NOT the same as "empty".
+    -- Describe answers a bag whose order has ended with "no longer active",
+    -- and answers any bag at all with "Hands full" when we are still holding
+    -- something. Both come back with no List; treating that as "complete"
+    -- made the bot serve stale bags over and over without ever finishing an
+    -- order. Fail closed instead.
+    if not d then return nil, nil end
+    local info = tostring(d.Info or ""):lower()
+    if info:find("no longer active", 1, true)
+        or info:find("hands full", 1, true)
+        or info:find("set down what", 1, true) then
+        return nil, d
+    end
+    local list = {}
+    if type(d.List) == "table" then
+        for _, v in ipairs(d.List) do
+            local name, done
+            if type(v) == "table" then
+                name = v[1] or v.Name or v.Item or v.Label
+                done = v[2]
+            elseif type(v) == "string" then
+                name = v
+            end
+            if name ~= nil then
+                name = stripCount(name)
+                if name ~= "" and done ~= true then
+                    list[#list + 1] = name
+                end
+            end
+        end
+    end
+    if #list == 0 and type(d.Info) == "string" then
+        local tail = d.Info:match("still needs (.+)$")
+        if tail then
+            for piece in tail:gmatch("[^,]+") do
+                local name = stripCount(piece)
+                if name ~= "" then list[#list + 1] = name end
+            end
+        end
+    end
+    return list, d
+end
+
+local DRINK_IDS = {
+    { "cola", "Cola" }, { "orange soda", "Orange" }, { "orange", "Orange" },
+    { "lemon", "LemonLime" }, { "grape", "Grape" }, { "milk coffee", "MilkCoffee" },
+    { "coffee", "Coffee" }, { "juice", "OrangeJuice" }, { "vanilla", "Vanilla" },
+    { "chocolate", "Chocolate" }, { "strawberry", "Strawberry" },
+}
+
+local function drinkFor(name)
+    local lower = name:lower()
+    for _, pair in ipairs(DRINK_IDS) do
+        if lower:find(pair[1], 1, true) then return pair[2] end
+    end
+    return nil
+end
+
+-- map a requirement string onto a real item model in the world
+local function findFood(name)
+    local lower = name:lower()
+    local drink = drinkFor(name)
+    local wantDrink = lower:find("soda", 1, true) or lower:find("drink", 1, true)
+    for _, m in ipairs(items()) do
+        local item = m:GetAttribute("Item")
+        if item == "Bag" or item == "Tray" then
+            -- not food
+        elseif lower:find("burger", 1, true) and item == "Burger" then
+            return m
+        elseif lower:find("fries", 1, true) and item == "Fries" then
+            return m
+        elseif lower:find("nugget", 1, true) and item == "Nuggets" then
+            return m
+        elseif lower:find("onion", 1, true) and item == "OnionRings" then
+            return m
+        elseif lower:find("hash", 1, true) and item == "HashBrowns" then
+            return m
+        elseif lower:find("ice cream", 1, true) and item == "IceCream" then
+            return m
+        elseif (wantDrink or lower:find("soda", 1, true))
+            and item == "Cup"
+            and (drink == nil or m:GetAttribute("Drink") == drink) then
+            return m
+        end
+    end
+    return nil
+end
+
+-- ============================================================
+-- PRODUCTION HELPERS
+--   One order at a time. Each helper walks to the station, fires
+--   the game's own remote, then waits for the attribute change
+--   that proves the action landed.
+-- ============================================================
+
+-- teleporting can drop the character in a "getting up" state for a
+-- frame; the server ignores every remote fired while we are not
+-- standing, so wait until the humanoid is actually on its feet again
+local function settle(maxWait)
+    local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+    if not hum then return false end
+    local t, limit = 0, maxWait or 3
+    while t < limit do
+        local s = hum:GetState()
+        if s == Enum.HumanoidStateType.Running
+            or s == Enum.HumanoidStateType.Landed
+            or s == Enum.HumanoidStateType.RunningNoPhysics then
+            return true
+        end
+        task.wait(0.08)
+        t = t + 0.08
+    end
+    -- still wedged: nudge it back onto its feet and give it one more go
+    safe(function() hum:ChangeState(Enum.HumanoidStateType.Running) end)
+    task.wait(0.2)
+    local s = hum:GetState()
+    return s == Enum.HumanoidStateType.Running
+        or s == Enum.HumanoidStateType.Landed
+        or s == Enum.HumanoidStateType.RunningNoPhysics
+end
+settleRef = settle
+
+local function nodePos(node)
+    if not node then return nil end
+    if node:IsA("BasePart") then return node.Position end
+    local pp = primaryPart(node)
+    if pp then return pp.Position end
+    local ok, pivot = pcall(function() return node:GetPivot().Position end)
+    return ok and pivot or nil
+end
+
+-- how far the root sits above the floor. An R15 character stands about
+-- 3.75 studs over it; the value is re-learned from the character itself
+-- whenever it is standing somewhere sensible.
+local standOffset = 3.75
+
+-- every walkable level we have stood on so far. The truck has a raised
+-- kitchen floor and a lower forecourt, so "the floor" is not one number.
+-- The list belongs to one site: the truck's 4.40 and the restaurant's
+-- 1.00 are not the same world, so a site switch starts it over.
+local floors = {}
+local floorsGen = SiteMod.generation
+
+-- Containers whose contents are furniture or stock. A surface inside one
+-- of these is something you reach over, never something you stand on.
+local NOT_FLOOR = {
+    Stations = true, Tables = true, ArtFixtures = true, Items = true,
+    Spills = true, Nav = true, Runtime = true, UpgradeArt = true,
+}
+
+local function isFurniture(inst)
+    if not inst then return true end
+    if inst:GetAttribute("Interact") ~= nil then return true end
+    local node, depth = inst, 0
+    while node and node ~= Workspace and depth < 14 do
+        if NOT_FLOOR[node.Name] or node:GetAttribute("Item") ~= nil then
+            return true
+        end
+        -- The truck's serving counter (TruckCounters, 12.6 x 3 x 23) is
+        -- not under Stations and it is wide enough to pass the "open
+        -- floor" test, so shape alone reads it as a floor -- which is how
+        -- the character ended up standing on the register. Anything
+        -- called a counter is something you reach over, not stand on.
+        if node.Name:lower():find("counter", 1, true) then
+            return true
+        end
+        node = node.Parent
+        depth += 1
+    end
+    return false
+end
+
+-- A floor is a broad slab. The truck's collision hull is full of parts
+-- that are not floors (the grill body is 2.9 x 2.65 x 4.2 and its top
+-- sits at 7.05) but that a downward ray cannot tell apart from one by
+-- name, so shape is what we trust: anything too small in footprint or
+-- too tall to be a floor is skipped and the ray keeps going down.
+-- (The restaurant floor is the top of a 2.2-thick foundation slab, so
+-- thickness alone cannot be the test -- footprint area can.)
+local function isWalkable(part)
+    if not part or not part:IsA("BasePart") then return false end
+    local size = part.Size
+    if size.Y > 3.0 then return false end
+    if size.X * size.Z < 20 then return false end
+    return true
+end
+
+-- A floor keeps going. A counter top, a ledge or the grill body is a
+-- narrow surface: step a few studs to the side and there is nothing at
+-- the same height. A real floor is still under the probe in every
+-- direction. This is what stops the ring search from parking the
+-- character on the serving counter (top 7.40 in the truck).
+local function isOpenFloor(x, z, y)
+    local ignore = {}
+    if LP.Character then table.insert(ignore, LP.Character) end
+    if WItems() then table.insert(ignore, WItems()) end
+    local hits = 0
+    for _, d in ipairs({ { 5.5, 0 }, { -5.5, 0 }, { 0, 5.5 }, { 0, -5.5 } }) do
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Exclude
+        params.FilterDescendantsInstances = ignore
+        local result = Workspace:Raycast(
+            Vector3.new(x + d[1], y + 0.4, z + d[2]),
+            Vector3.new(0, -0.9, 0), params)
+        if result and math.abs(result.Position.Y - y) < 0.35 then
+            hits += 1
+        end
+    end
+    return hits >= 3
+end
+
+-- the walkable floor under (x, z). Furniture and non-floor shapes are
+-- added to the ignore list and the ray is cast again, so a probe that
+-- starts above a counter still finds the floor underneath it. With
+-- `loose` the openness test is skipped: only the last-resort pass in
+-- standNear uses that, so a tight corner never leaves us with no spot.
+local function groundAt(x, z, fromY, loose)
+    local ignore = LP.Character and { LP.Character } or {}
+    for _ = 1, 10 do
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Exclude
+        params.FilterDescendantsInstances = ignore
+        local result = Workspace:Raycast(Vector3.new(x, fromY, z), Vector3.new(0, -80, 0), params)
+        if not result then return nil end
+        if not isFurniture(result.Instance) and isWalkable(result.Instance) then
+            if loose or isOpenFloor(x, z, result.Position.Y) then
+                return result.Position.Y
+            end
+        end
+        table.insert(ignore, result.Instance)
+    end
+    return nil
+end
+
+-- What are we standing on right now? The first thing under our feet is
+-- whatever supports us; if that is furniture (a counter, a table, the
+-- grill body) the character has been dropped somewhere it must not stay.
+-- A real floor answers false, so this only ever fires on a bad landing.
+-- (Kept on the module table: the file is at the 200-local limit.)
+PackMod.onFurniture = function()
+    local r = root()
+    if not r then return false end
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = LP.Character and { LP.Character } or {}
+    local origin = r.Position
+    local dir = Vector3.new(0, -(standOffset + 2.5), 0)
+    -- A wrapper, a dropped bun or a receipt lying on the floor is under our
+    -- feet as well, but it is not what holds us up. Look past loose items
+    -- and past any level already known to be a floor, and judge the first
+    -- real surface left.
+    for _ = 1, 5 do
+        local res = Workspace:Raycast(origin, dir, params)
+        if not res then return false end
+        local skip = res.Instance:GetAttribute("Item") ~= nil
+        if not skip then
+            for _, f in ipairs(floors) do
+                if math.abs(res.Position.Y - f) < 0.8 then skip = true break end
+            end
+        end
+        if not skip then
+            return (r.Position.Y - res.Position.Y) < (standOffset + 1.2)
+                and isFurniture(res.Instance)
+        end
+        origin = res.Position - Vector3.new(0, 0.05, 0)
+        dir = dir + Vector3.new(0, 0.05, 0)
+    end
+    return false
+end
+
+local function rememberFloor(y)
+    if not y then return end
+    for _, v in ipairs(floors) do
+        if math.abs(v - y) < 0.7 then return end
+    end
+    floors[#floors + 1] = y
+end
+
+-- The floor under our own feet, and the only place a level is ever
+-- learned from. A counter we were dropped onto gives an implausible drop
+-- (six-plus studs), so it can never be mistaken for a walkable floor.
+local function learnStand()
+    -- a new site is a new set of floors; old levels would send the ring
+    -- search looking for a kitchen floor that does not exist here
+    if SiteMod.generation ~= floorsGen then
+        floorsGen = SiteMod.generation
+        table.clear(floors)
+    end
+    local r = root()
+    local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+    if not r or not hum then return end
+    if hum.FloorMaterial == Enum.Material.Air then return end
+    local y = groundAt(r.Position.X, r.Position.Z, r.Position.Y + 0.5)
+    if not y then return end
+    local drop = r.Position.Y - y
+    if drop < 2.2 or drop > 4.4 then return end
+    standOffset = math.clamp(drop, 2.6, 4.2)
+    rememberFloor(y)
+end
+
+-- the floor a station or table is built on: the bottom of its bounding
+-- box. Used for levels the character has never stood on (the mop pad
+-- sits two studs below the truck's kitchen floor).
+local function baseOf(node)
+    if not node then return nil end
+    local inst, depth = node, 0
+    while inst and inst.Parent and inst.Parent ~= Workspace and depth < 8 do
+        local parent = inst.Parent
+        if parent.Name == "Stations" or parent.Name == "Tables" then
+            local ok, cf, size = pcall(function()
+                local c, s = inst:GetBoundingBox()
+                return c, s
+            end)
+            if ok and cf and size then return cf.Position.Y - size.Y / 2 end
+            return nil
+        end
+        inst = parent
+        depth += 1
+    end
+    return nil
+end
+
+-- levels worth trying for a target, nearest to the target first. Only
+-- floors we have stood on (plus the base of the furniture the target
+-- belongs to) can appear here, so "stand on the stove" is not an option.
+local function standLevels(pos, node)
+    local list = {}
+    local function add(y)
+        if not y then return end
+        for _, v in ipairs(list) do
+            if math.abs(v - y) < 0.7 then return end
+        end
+        list[#list + 1] = y
+    end
+    for _, f in ipairs(floors) do add(f) end
+    add(baseOf(node))
+    table.sort(list, function(a, b)
+        return math.abs(a - pos.Y) < math.abs(b - pos.Y)
+    end)
+    return list
+end
+
+-- a spot on the ring around `pos` whose floor is exactly `level`.
+-- Starting the probe ray just above the counter tops means a slot that
+-- is covered by a counter reports no floor at all, so we never pick a
+-- standing place on top of the stove.
+local standFan = { 0, 25, -25, 50, -50, 75, -75, 100, -100, 130, -130, 160, -160, 180 }
+
+local function ringSpot(pos, level, off, loose)
+    local r = root()
+    if not r then return nil end
+    local base = (r.Position - pos) * Vector3.new(1, 0, 1)
+    if base.Magnitude < 0.5 then base = Vector3.new(-1, 0, 0) end
+    local a0 = math.atan2(base.Z, base.X)
+    local ignore = {}
+    if LP.Character then table.insert(ignore, LP.Character) end
+    if WItems() then table.insert(ignore, WItems()) end
+    -- a character is not a point: sample the column at the centre and
+    -- at the edge of the body, so a spot that merely touches the side
+    -- of the grill is rejected instead of teleporting us into it
+    local ring = { { 0, 0 }, { 0.85, 0 }, { -0.85, 0 }, { 0, 0.85 }, { 0, -0.85 } }
+    local function clearColumn(x, y, z)
+        for _, o in ipairs(ring) do
+            local params = RaycastParams.new()
+            params.FilterType = Enum.RaycastFilterType.Exclude
+            params.FilterDescendantsInstances = ignore
+            local blocked = Workspace:Raycast(
+                Vector3.new(x + o[1], y + 0.15, z + o[2]),
+                Vector3.new(0, off + 1.7, 0), params)
+            if blocked then return false end
+        end
+        return true
+    end
+    -- start on the side we walked in from, then fan out both ways. Keep
+    -- the first ring tight: the server ignores an interaction fired from
+    -- too far away, and 1.9 studs matches a normal player's reach.
+    for _, radius in ipairs({ 1.9, 2.4, 3.0, 3.8 }) do
+        for _, da in ipairs(standFan) do
+            local a = a0 + math.rad(da)
+            local x = pos.X + math.cos(a) * radius
+            local z = pos.Z + math.sin(a) * radius
+            local hit = groundAt(x, z, level + 1.4, loose)
+            if hit and math.abs(hit - level) < 0.8 and clearColumn(x, hit, z) then
+                return Vector3.new(x, hit + off + 0.05, z), hit
+            end
+        end
+    end
+    return nil
+end
+
+-- put the character on the floor a step back from `pos` instead of
+-- dropping it in from above (a long fall is what wedges it). The height
+-- always comes from a level the character has actually stood on, never
+-- from the target's own height -- a grill plate or a bench top is not a
+-- place to stand.
+local function standNear(pos, node)
+    local r = root()
+    if not r or not pos then return end
+    learnStand()
+    local off = standOffset or 3.75
+
+    -- already close and standing on a level we trust: stay put (every
+    -- needless teleport is one more chance to get wedged). Standing on
+    -- furniture is never "trusted", so a bad landing always gets fixed.
+    local flat = (r.Position - pos) * Vector3.new(1, 0, 1)
+    if flat.Magnitude < 2.9 and not PackMod.onFurniture() then
+        for _, f in ipairs(floors) do
+            if math.abs(r.Position.Y - (f + off)) < 0.8 then return end
+        end
+    end
+
+    local levels = standLevels(pos, node)
+    if #levels == 0 then
+        -- nothing learned yet: the floor under the target is still real
+        -- ground (furniture hits are skipped), so it is safe to use
+        local y = groundAt(pos.X, pos.Z, pos.Y + 0.4)
+        levels = { y or (r.Position.Y - off) }
+    end
+    local spot, hit
+    for _, level in ipairs(levels) do
+        spot, hit = ringSpot(pos, level, off)
+        if spot then break end
+    end
+    if not spot then
+        -- the target may sit on a level we have never stood on (a shelf
+        -- out on the pad, say): the floor under it is still real ground,
+        -- and ringSpot will not accept a counter top as that floor
+        local y = groundAt(pos.X, pos.Z, pos.Y + 0.4)
+        if y then spot, hit = ringSpot(pos, y, off) end
+    end
+    if not spot then
+        -- nothing open at any known level: a tight corner is still better
+        -- than standing still and letting the interaction fail
+        for _, level in ipairs(levels) do
+            spot, hit = ringSpot(pos, level, off, true)
+            if spot then break end
+        end
+    end
+    if spot then
+        if hit then
+            rememberFloor(hit)
+            -- the level we just used becomes the current one
+            for i, v in ipairs(floors) do
+                if math.abs(v - hit) < 0.7 then
+                    table.remove(floors, i)
+                    table.insert(floors, 1, v)
+                    break
+                end
+            end
+        end
+        safe(function() r.CFrame = CFrame.new(spot) end)
+        task.wait(0.12)
+    end
+end
+
+-- let describe() reach these without a forward-declaration cycle
+standNearFwd, settleFwd = standNear, settle
+standNearRef = standNear
+
+-- exposed for live debugging from the executor console
+PackMod.describe = describe
+PackMod.needsOf = needsOf
+PackMod.standNear = standNear
+PackMod.standState = function()
+    local r = root()
+    local list = {}
+    for _, f in ipairs(floors) do list[#list + 1] = string.format("%.2f", f) end
+    return string.format("offset=%s floors={%s} rootY=%s",
+        standOffset and string.format("%.2f", standOffset) or "nil",
+        table.concat(list, ","),
+        r and string.format("%.2f", r.Position.Y) or "?")
+end
+
+-- walk to `pos`, then fire one interaction. `verify` lets us re-fire
+-- once when the server quietly ignored us (happens right after a
+-- teleport, or when the character is still getting up)
+local function act(node, action, pos, waitAfter, verify)
+    if not node or not R.Interact then return false end
+    local p = pos or nodePos(node)
+    for attempt = 1, 2 do
+        if PackMod.teleport and p then
+            -- The server silently ignores clicks from ~13-14 studs away
+            -- (the register had the same problem), so walk in well before
+            -- that. Every avoidable teleport is a chance to be shoved onto
+            -- a counter, but a refused click leaves the customer waiting.
+            local r = root()
+            -- ...and always get off furniture: a character left standing
+            -- on the counter stays there forever, because every station
+            -- is then "close enough" and nothing ever moves it again.
+            if not r or PackMod.onFurniture() or (r.Position - p).Magnitude > 6 then
+                standNear(p, node)
+                settle()
+            end
+        end
+        safe(function() R.Interact:FireServer(node, action, p) end)
+        task.wait(waitAfter or 0.25)
+        if not verify or verify() then return true end
+        if attempt == 1 then task.wait(0.25) end
+    end
+    return false
+end
+
+-- stand at `pos` and put what we hold down there
+local function dropAt(pos, yaw)
+    if not pos or not R.Drop then return false end
+    if PackMod.teleport then
+        standNear(pos)
+        settle()
+    end
+    local ok = safe(function() R.Drop:FireServer(pos, yaw or 0, "Left") end)
+    task.wait(0.3)
+    -- what we just put down is a fresh server model, and the item scan is
+    -- cached for a third of a second: drop the cache so the caller that
+    -- checks "did it land" actually sees it
+    itemCache.t = -1
+    task.wait(0.12)
+    return ok
+end
+
+local function stationModel(name)
+    local st = WStations()
+    return st and st:FindFirstChild(name) or nil
+end
+
+local function stationPart(kind, filter)
+    for _, part in ipairs(stationParts(kind)) do
+        if not filter or filter(part) then return part end
+    end
+    return nil
+end
+
+local function coldLeaf(stationName, index)
+    local station = stationModel(stationName)
+    if not station then return nil end
+    local art = station:FindFirstChild("Art")
+    local leaf = art and art:FindFirstChild("Leaf" .. tostring(index))
+    if not leaf then
+        for _, d in ipairs(station:GetDescendants()) do
+            if d.Name == "Leaf" .. tostring(index) and d:GetAttribute("StorageId") then
+                leaf = d
+                break
+            end
+        end
+    end
+    return leaf
+end
+
+local function openCold(stationName, index)
+    local leaf = coldLeaf(stationName, index)
+    if not leaf then return false end
+    if leaf:GetAttribute("Open") == true then return true end
+    local hit = leaf:FindFirstChild("LeafHit") or leaf
+    for _ = 1, 2 do
+        act(hit, "Primary", nodePos(hit), 0.8)
+        if leaf:GetAttribute("Open") == true then return true end
+    end
+    return false
+end
+
+-- forward declared: tubFor() below may top an empty tray up, and the
+-- helper that does that needs these two
+local refillTub, takeInto
+
+local function tubFor(ingredient)
+    local empty
+    for _, m in ipairs(items()) do
+        if m:GetAttribute("Item") == "Tub"
+            and m:GetAttribute("Ingredient") == ingredient then
+            if (tonumber(m:GetAttribute("Amount")) or 0) > 0 then return m end
+            empty = empty or m
+        end
+    end
+    -- the tray is on the line but empty: top it up from its supply box
+    if empty and refillTub(empty, ingredient) then return empty end
+    return nil
+end
+
+local function supplyBox(supply)
+    for _, m in ipairs(items()) do
+        if m:GetAttribute("Item") == "Box"
+            and m:GetAttribute("Supply") == supply
+            and (tonumber(m:GetAttribute("Amount")) or 0) > 0 then
+            return m
+        end
+    end
+    return nil
+end
+
+-- which supply box tops up which tray
+local SUPPLY_FOR = {
+    Bun = "Buns", Wrap = "Wrappers", Cheese = "Cheese",
+    Pickles = "Pickles", Cup = "Cups", Bag = "Bags", Patty = "Patties",
+}
+
+-- A tray on the line only holds a few pieces. When it runs dry the box
+-- that refills it may be sitting on the delivery pad outside, so carry
+-- it over exactly like a player would: take a piece, click the tray.
+refillTub = function(tub, ingredient, want)
+    local supply = SUPPLY_FOR[ingredient]
+    if not supply then return false end
+    local box = supplyBox(supply)
+    if not box then
+        PackMod.ensureStock(supply)
+        PackMod.step = "no " .. tostring(supply) .. " box (ordered)"
+        return false
+    end
+    -- takeInto with kind=nil only checks "are we holding anything", so a
+    -- wrapper left in hand made every pickup look successful while the
+    -- tray stayed empty. Start with genuinely empty hands.
+    if not clearHands() then
+        PackMod.step = "cannot refill " .. tostring(ingredient) .. ": hands full"
+        return false
+    end
+
+    local goal = want or 6
+    local tp = nodePos(tub)
+    for _ = 1, 24 do
+        if (tonumber(tub:GetAttribute("Amount")) or 0) >= goal then break end
+        if not tub.Parent or not box.Parent then break end
+        local bp = nodePos(box)
+        if not bp or not takeInto(box, nil, bp) then break end
+        if heldId() == nil then break end
+        act(tub, "Primary", tp, 0.5, function() return heldId() == nil end)
+        if heldId() ~= nil then
+            -- the tray would not take it; put the piece back down
+            dropAt(bp, 0)
+            break
+        end
+    end
+    local amount = tonumber(tub:GetAttribute("Amount")) or 0
+    if amount <= 0 then
+        PackMod.step = "could not refill " .. tostring(ingredient)
+    end
+    return amount > 0
+end
+
+-- the wrapper we just set down on the bench. Prefer a blank one close
+-- to `near`; stale wrappers left on the floor by a failed build must
+-- not be mistaken for the one we are assembling.
+local function findWrapper(near)
+    local best, bestD
+    -- pass 1: an untouched wrapper within reach of the bench
+    for _, m in ipairs(items()) do
+        if m:GetAttribute("Item") == "Wrapper"
+            and m:GetAttribute("Closed") ~= true then
+            local layered = m:GetAttribute("Layers")
+            if layered == nil or layered == "" then
+                local d = near and (m:GetPivot().Position - near).Magnitude or 0
+                if not near or d < 3 then
+                    if not bestD or d < bestD then best, bestD = m, d end
+                end
+            end
+        end
+    end
+    if best then return best end
+    -- pass 2: whatever is closest to the bench
+    for _, m in ipairs(items()) do
+        if m:GetAttribute("Item") == "Wrapper" then
+            local d = near and (m:GetPivot().Position - near).Magnitude or 0
+            if not near or d < 3 then
+                if not bestD or d < bestD then best, bestD = m, d end
+            end
+        end
+    end
+    if best then return best end
+    for _, m in ipairs(items()) do
+        if m:GetAttribute("Item") == "Wrapper" then return m end
+    end
+    return nil
+end
+
+-- nearest loose cup, optionally filtered by what is in it
+local function findCup(drink, near)
+    local best, bestD
+    for _, m in ipairs(items()) do
+        if m:GetAttribute("Item") == "Cup"
+            and (not drink or m:GetAttribute("Drink") == drink) then
+            local d = near and (m:GetPivot().Position - near).Magnitude or 0
+            if not bestD or d < bestD then best, bestD = m, d end
+        end
+    end
+    return best
+end
+
+-- nearest bag at `pos`. `any` ignores the order stamp so we can find
+-- the bag already sitting on the hatch whatever ticket it carries.
+local function bagNear(pos, radius, any)
+    local best, bestD
+    for _, m in ipairs(items()) do
+        if m:GetAttribute("Item") == "Bag"
+            and (any or m:GetAttribute("OrderId") == nil) then
+            local d = (m:GetPivot().Position - pos).Magnitude
+            if d < (radius or 3) and (not bestD or d < bestD) then
+                best, bestD = m, d
+            end
+        end
+    end
+    return best
+end
+
+-- take one item out of `node`; `kind` nil just means "something got held"
+takeInto = function(node, kind, pos)
+    -- the server occasionally needs more than 0.6s to answer a supply-box
+    -- click; verifying early reported a refusal while the item was still on
+    -- its way into our hands.
+    act(node, "Primary", pos or nodePos(node), 1.0, function()
+        if kind == nil then return heldId() ~= nil end
+        return heldKind() == kind
+    end)
+    if kind == nil then return heldId() ~= nil end
+    return heldKind() == kind
+end
+
+-- One delivery carries up to 30 boxes, and the cart is a plain map of
+-- supply id -> box count, so several shortages can go out in one trip.
+function PackMod.orderSupplies(cart, label)
+    if not R.Computer or type(cart) ~= "table" then return false end
+    -- the shop only answers while a computer is open, so tap the truck
+    -- tablet (or the office PC) first
+    local screen = stationPart("Computer", function(part) return part.Name == "Screen" end)
+        or stationPart("Computer")
+    if not screen then
+        PackMod.step = "no shop computer"
+        return false
+    end
+    act(screen, "Primary", nodePos(screen), 0.8)
+    task.wait(0.3)
+
+    -- the invoke can sit there unanswered; never let that wedge the run
+    local done, ok, res = false, false, nil
+    task.spawn(function()
+        ok, res = pcall(function()
+            return R.Computer:InvokeServer("Order", { Cart = cart })
         end)
-        n += 1
-        task.wait(0.1)
+        done = true
+    end)
+    local t0 = os.clock()
+    while not done and (os.clock() - t0) < 6 do task.wait(0.1) end
+    if not done then
+        PackMod.step = "shop did not answer"
+        return false
+    end
+    if ok and type(res) == "table" and res.Ok then
+        PackMod.stats.restocks += 1
+        PackMod.step = "ordered " .. tostring(label or "stock")
+        return true
+    end
+    PackMod.step = "shop refused " .. tostring(label or "stock")
+    return false
+end
+
+-- order one box of `supply`. Lives here because it needs the walking /
+-- interaction helpers above.
+function PackMod.ensureStock(supply)
+    if not PackMod.restock then return false end
+    local now = os.clock()
+    PackMod._restockAt = PackMod._restockAt or {}
+    -- a delivery takes ~25s to land, so do not queue another straight away
+    if now < (PackMod._restockAt[supply] or 0) then return false end
+    PackMod._restockAt[supply] = now + 40
+    return PackMod.orderSupplies({ [supply] = 1 }, supply)
+end
+
+-- How a fully stocked line looks: for each supply, the tray it fills
+-- and the number of boxes we like to keep behind it. The sweep only
+-- orders when *no* box is left and the tray is running down, so it tops
+-- the kitchen up before a cook ever stalls on an empty shelf.
+local AUTO_SUPPLY = {
+    { supply = "Patties",     tub = "Patty",       low = 10, boxes = 2 },
+    { supply = "Buns",        tub = "Bun",         low = 10, boxes = 2 },
+    { supply = "Cheese",      tub = "Cheese",      low = 8,  boxes = 1 },
+    { supply = "Pickles",     tub = "Pickles",     low = 8,  boxes = 1 },
+    { supply = "Wrappers",    tub = "Wrap",        low = 6,  boxes = 1 },
+    { supply = "Bags",        tub = "Bags",        low = 6,  boxes = 1 },
+    { supply = "Cups",        tub = "Cups",        low = 6,  boxes = 1 },
+    { supply = "Packaging",   tub = "Packaging",   low = 6,  boxes = 1 },
+    { supply = "NuggetBoxes", tub = "NuggetBoxes", low = 4,  boxes = 1 },
+    { supply = "FriesCase",   tub = nil,           low = 0,  boxes = 1 },
+    { supply = "NuggetsCase", tub = nil,           low = 0,  boxes = 1 },
+}
+
+local function boxStock(supply)
+    local n = 0
+    for _, m in ipairs(items()) do
+        if m:GetAttribute("Item") == "Box" and m:GetAttribute("Supply") == supply then
+            n += tonumber(m:GetAttribute("Amount")) or 0
+        end
     end
     return n
+end
+
+local function tubAmount(ingredient)
+    local best = 0
+    for _, m in ipairs(items()) do
+        if m:GetAttribute("Item") == "Tub" and m:GetAttribute("Ingredient") == ingredient then
+            best = math.max(best, tonumber(m:GetAttribute("Amount")) or 0)
+        end
+    end
+    return best
+end
+
+-- keep the kitchen stocked. Runs on its own clock so it never fights
+-- the order run for hands; returns the number of carts sent.
+function PackMod.supplySweep()
+    if not PackMod.autoStock or not R.Computer then return 0 end
+    if PackMod.busy or heldId() ~= nil then return 0 end
+    local now = os.clock()
+    if now < (PackMod._supplyAt or 0) then return 0 end
+    PackMod._supplyAt = now + 8
+
+    local cart, total, names = {}, 0, {}
+    for _, e in ipairs(AUTO_SUPPLY) do
+        if boxStock(e.supply) == 0 then
+            local tray = e.tub and tubAmount(e.tub) or 0
+            if tray <= e.low and total + e.boxes <= 30 then
+                cart[e.supply] = e.boxes
+                total += e.boxes
+                names[#names + 1] = e.supply
+            end
+        end
+    end
+    if total == 0 then return 0 end
+    return PackMod.orderSupplies(cart, table.concat(names, " + ")) and 1 or 0
+end
+
+local function waitSide(patty, side, limit)
+    local t = 0
+    while t < (limit or 50) do
+        if not patty.Parent then return false end
+        if (tonumber(patty:GetAttribute(side)) or 0) >= 99.5 then return true end
+        task.wait(0.2)
+        t = t + 0.2
+    end
+    return false
+end
+
+-- a delivery takes ~25s; sit on the shelf until it lands rather than
+-- failing the run and walking the whole chain again
+local function awaitSupply(supplies, limit)
+    local deadline = os.clock() + (limit or 35)
+    repeat
+        for _, supply in ipairs(supplies) do
+            local box = supplyBox(supply)
+            if box then
+                API.job.cookOn(false)
+                return box
+            end
+        end
+        -- a delivery is dead time too: the register may take an order
+        API.job.cookOn(true)
+        task.wait(1)
+    until os.clock() > deadline
+    API.job.cookOn(false)
+    return nil
+end
+
+-- The grill plate takes as many patties as you carry over, and they all
+-- cook side by side. A 3-patty Planet Burger is therefore one cook, not
+-- three: load them all, wait for both sides, then take them one at a
+-- time and hand each to `onEach` (which puts it on the burger).
+-- A failed cook leaves its half-finished item sitting on the station. The
+-- server silently refuses to place anything on an occupied slot, so one
+-- burnt patty or one half-built wrapper jams that station for the rest of
+-- the shift. Carry the leftover well away from the line before retrying.
+-- Stored on API rather than a local: this file is already near Luau's
+-- 200-local ceiling.
+API.discardFromStation = function(model, away)
+    if not model or not model.Parent then return false end
+    if heldId() ~= nil and not clearHands() then return false end
+    local p = model:GetPivot().Position
+    if not takeInto(model, nil, p) then return false end
+    if heldId() == nil then return false end
+    dropAt(away, 0)
+    return heldId() == nil
+end
+
+local function cookPatties(want, onEach)
+    want = math.max(tonumber(want) or 0, 0)
+    if want == 0 then return true end
+    local plate = stationPart("GrillPlate")
+    if not plate then return false end
+
+    -- clear anything we are still holding from a previous attempt
+    if heldId() ~= nil then clearHands() end
+
+    -- A patty an earlier run left on the plate can still be used (it saves a
+    -- whole side of cooking), but only while both sides are still under
+    -- 100%: a patty already past that keeps cooking while we finish the new
+    -- ones and is burnt before its second side is done. Past 200% it is
+    -- burnt outright: the burger refuses it and it can set the grill alight.
+    local function edible(m)
+        return m:GetAttribute("C") == nil
+            and (tonumber(m:GetAttribute("A")) or 0) < 100
+            and (tonumber(m:GetAttribute("B")) or 0) < 100
+    end
+    -- Overcooked patties are rejected by edible(), but the game still sees
+    -- them as occupying the plate: every attempt to load a fresh patty was
+    -- refused and cookPatties gave up. Move them off the grill first.
+    for _, m in ipairs(items()) do
+        if m:GetAttribute("Item") == "Patty" and m:GetAttribute("OnGrill") == true
+            and (m:GetPivot().Position - plate.Position).Magnitude < 3.2
+            and not edible(m) then
+            if API.discardFromStation(m, plate.Position + Vector3.new(-9, -4, 0)) then
+                itemCache.t = -1
+            end
+        end
+    end
+    local existing = {}
+    for _, m in ipairs(items()) do
+        if m:GetAttribute("Item") == "Patty" and m:GetAttribute("OnGrill") == true
+            and (m:GetPivot().Position - plate.Position).Magnitude < 3.2
+            and edible(m) then
+            existing[#existing + 1] = m
+        end
+    end
+
+    -- only load what the order still needs: an extra patty just burns while
+    -- the rest are assembled, and a burnt patty spoils the burger
+    local need = math.max(want - #existing, 0)
+    local loaded = 0
+    if need > 0 then
+        openCold("Freezer", 2)
+        for _ = 1, need do
+            local box = supplyBox("Patties")
+            if not box and PackMod.ensureStock("Patties") then
+                box = awaitSupply({ "Patties" })
+            end
+            if not box then break end
+            if not takeInto(box, "Patty") then break end
+            act(plate, "Primary", plate.Position, 0.75, function() return heldId() == nil end)
+            task.wait(0.25)
+            -- Placing a patty on the grill can hand us a fresh Wrapper. If we
+            -- break here the patty already on the plate is abandoned: it goes
+            -- on cooking until it burns and the watchdog resets the run.
+            -- Dump the stray item away from the line and keep loading.
+            if heldId() ~= nil then
+                dropAt(plate.Position + Vector3.new(-9, -4, 0), 0)
+                clearHands()
+            end
+            loaded += 1
+        end
+        if loaded < need then return false end
+    end
+
+    -- every edible patty now on this plate, capped at what the order needs
+    local mine = {}
+    for _, m in ipairs(existing) do mine[#mine + 1] = m end
+    for _, m in ipairs(items()) do
+        if m:GetAttribute("Item") == "Patty" and m:GetAttribute("OnGrill") == true
+            and (m:GetPivot().Position - plate.Position).Magnitude < 3.2
+            and edible(m) then
+            local dup = false
+            for _, e in ipairs(existing) do
+                if e == m then dup = true break end
+            end
+            if not dup then mine[#mine + 1] = m end
+        end
+    end
+    while #mine > want do table.remove(mine) end
+    -- a refused placement used to slip through with fewer patties than the
+    -- order needs, which then produced a rejected burger
+    if #mine < want then return false end
+
+    -- side A on all of them, then flip them all, then side B
+    API.job.cookOn(true)
+    for _, p in ipairs(mine) do
+        if p.Parent and tostring(p:GetAttribute("Down")) ~= "B" then
+            if not waitSide(p, "A", 70) then API.job.cookOn(false) return false end
+        end
+    end
+    API.job.cookOn(false)
+    for _, p in ipairs(mine) do
+        if p.Parent and tostring(p:GetAttribute("Down")) ~= "B" then
+            -- Down is applied a beat after the click is accepted; the old
+            -- 0.45s check read the stale value and fired a second flip that
+            -- turned the patty back over
+            act(p, "Secondary", p:GetPivot().Position, 0.75)
+            task.wait(0.25)
+            if tostring(p:GetAttribute("Down")) == "A" then
+                act(p, "Secondary", p:GetPivot().Position, 0.75)
+                task.wait(0.25)
+            end
+        end
+    end
+    API.job.cookOn(true)
+    for _, p in ipairs(mine) do
+        if p.Parent and not waitSide(p, "B", 70) then API.job.cookOn(false) return false end
+    end
+    API.job.cookOn(false)
+
+    local taken = 0
+    for _, p in ipairs(mine) do
+        if taken >= want then break end
+        if p.Parent then
+            act(p, "Primary", p:GetPivot().Position, 0.55,
+                function() return heldKind() == "Patty" end)
+            if heldKind() == "Patty" then
+                taken += 1
+                if onEach then onEach() end
+            end
+        end
+    end
+    return taken >= want
+end
+
+local function sauceBottle(sauce)
+    local want = sauce:lower()
+    for _, m in ipairs(items()) do
+        if m:GetAttribute("Item") == "SauceBottle" then
+            local bp = m:GetPivot().Position
+            if PackMod.teleport then standNear(bp, m) settle() end
+            local d = describe(m, 0)
+            local title = d and tostring(d.Title or ""):lower() or ""
+            if title:find(want, 1, true) then return m end
+        end
+    end
+    return nil
+end
+
+-- The prep bench is a row of slots. IslandZone is only an invisible,
+-- non-collidable trigger volume floating over it, so its centre is not a
+-- place you can put anything: a drop there is refused without a word.
+-- The real counter top is a few studs lower and the slots run along z,
+-- spaced like the pan slots in the same rack. Try them in turn.
+local benchX, benchZ = 1077.5, { 107.8, 106.4, 110.4, 109.1, 105.0, 111.0 }
+
+local function benchSpots()
+    local st = WStations()
+    local asm = st and (st:FindFirstChild("AssemblyA") or st:FindFirstChild("Assembly"))
+    local zone = asm and (asm:FindFirstChild("IslandZone") or asm)
+    local p = zone and nodePos(zone)
+    if not p then return {} end
+
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = LP.Character and { LP.Character } or {}
+
+    local out = {}
+    for _, z in ipairs(benchZ) do
+        local y = 7.55
+        local hit = Workspace:Raycast(Vector3.new(benchX, p.Y - 0.6, z),
+            Vector3.new(0, -3, 0), params)
+        -- walk past anything already lying on the bench
+        for _ = 1, 3 do
+            if not hit then break end
+            if hit.Instance:GetAttribute("Item") == nil then
+                y = hit.Position.Y + 0.15
+                break
+            end
+            hit = Workspace:Raycast(hit.Position - Vector3.new(0, 0.05, 0),
+                Vector3.new(0, -3, 0), params)
+        end
+        out[#out + 1] = Vector3.new(benchX, y, z)
+    end
+    return out
+end
+
+-- forward declared: defined next to the order JSON helpers further down
+local buildFor
+
+-- build one burger on the prep bench from a Builds entry, e.g.
+-- { Patty = 3, Pickles = 2, Cheese = 2, Ketchup = 1 }
+local function buildBurger(build)
+    build = type(build) == "table" and build or {}
+    if not clearHands() then
+        PackMod.step = "cannot build burger: hands full"
+        return false
+    end
+
+    -- A wrapper from a failed build is still lying in a bench slot with its
+    -- Layers half filled. The game refuses a fresh wrapper wherever one is
+    -- already sitting, so after a few failures all six slots are blocked.
+    -- Clear them before starting, then the next attempt has room again.
+    local firstSpot
+    for _, s in ipairs(benchSpots()) do firstSpot = s break end
+    if firstSpot then
+        for _, m in ipairs(items()) do
+            local layers = m:GetAttribute("Layers")
+            if m:GetAttribute("Item") == "Wrapper"
+                and m:GetAttribute("Closed") ~= true
+                and layers ~= nil and layers ~= ""
+                and (m:GetPivot().Position - firstSpot).Magnitude < 7 then
+                if API.discardFromStation(m, firstSpot + Vector3.new(11, -4, 0)) then
+                    itemCache.t = -1
+                end
+            end
+        end
+    end
+
+    -- the wrapper tray can run dry, and the game clears an empty one
+    -- (WrapStack trays are not stackable), so a wrapper straight from
+    -- the supply box is the fallback: same piece, one click
+    local wrapTub = tubFor("Wrap")
+    if wrapTub then
+        if not takeInto(wrapTub, "Wrapper") then return false end
+    else
+        local box = supplyBox("Wrappers")
+        if not box then
+            PackMod.ensureStock("Wrappers")
+            PackMod.step = "no wrappers (ordered)"
+            return false
+        end
+        if not takeInto(box, "Wrapper") then
+            PackMod.step = "wrapper box refused"
+            return false
+        end
+    end
+
+    -- set the wrapper down on a free bench slot. An occupied slot is
+    -- refused silently, so try each slot until the wrapper leaves our
+    -- hands; the server snaps it onto the slot centre itself.
+    local wrapper, tried
+    for _, spot in ipairs(benchSpots()) do
+        if PackMod.teleport then standNear(spot) settle() end
+        safe(function() R.Drop:FireServer(spot, 0, "Left") end)
+        task.wait(0.45)
+        tried = (tried or 0) + 1
+        if heldId() == nil then
+            wrapper = findWrapper(spot)
+            if wrapper then break end
+        end
+    end
+    if not wrapper then
+        PackMod.step = "could not set the wrapper down (" .. tostring(tried) .. " slots)"
+        return false
+    end
+
+    -- bottom bun
+    local bunTub = tubFor("Bun")
+    if not bunTub then
+        PackMod.step = "no buns for burger"
+        return false
+    end
+    if takeInto(bunTub, "Piece") then
+        act(wrapper, "Primary", wrapper:GetPivot().Position, 0.5)
+    end
+
+    -- patties, all at once: the plate holds the whole stack and they
+    -- cook side by side, so this is one wait instead of one per patty
+    local pattyCount = tonumber(build.Patty) or 0
+    if pattyCount > 0 then
+        PackMod.step = pattyCount > 1 and ("cooking " .. pattyCount .. " patties") or "cooking patty"
+        if not cookPatties(pattyCount, function()
+            act(wrapper, "Primary", wrapper:GetPivot().Position, 0.5)
+        end) then return false end
+    end
+
+    -- cold toppings
+    for _, topping in ipairs({ "Cheese", "Pickles", "Onion", "Lettuce", "Tomato" }) do
+        for _ = 1, tonumber(build[topping]) or 0 do
+            local tub = tubFor(topping)
+            if not tub then return false end
+            if takeInto(tub, "Piece") then
+                act(wrapper, "Primary", wrapper:GetPivot().Position, 0.45)
+            end
+        end
+    end
+
+    -- sauces come from a bottle that has to go back on its stand
+    for _, sauce in ipairs({ "Ketchup", "Mayo" }) do
+        for _ = 1, tonumber(build[sauce]) or 0 do
+            local bottle = sauceBottle(sauce)
+            if not bottle then return false end
+            local bp = bottle:GetPivot().Position
+            if takeInto(bottle, "SauceBottle") then
+                act(wrapper, "Primary", wrapper:GetPivot().Position, 0.45)
+            end
+            if heldId() ~= nil then dropAt(bp, 0) end
+        end
+    end
+
+    -- top bun, then wrap it into a carried burger
+    act(wrapper, "Primary", wrapper:GetPivot().Position, 0.55)
+    act(wrapper, "Primary", wrapper:GetPivot().Position, 0.6,
+        function() return heldKind() == "Burger" end)
+    if heldKind() ~= "Burger" then
+        PackMod.step = "burger did not wrap (held " .. tostring(heldKind()) .. ")"
+        return false
+    end
+    return true
+end
+
+-- exposed for live debugging from the executor console
+PackMod.buildBurger = buildBurger
+PackMod.benchSpots = benchSpots
+PackMod.refillTub = refillTub
+PackMod.tubFor = tubFor
+PackMod.cookPatties = cookPatties
+
+-- the fryer prints its cook progress on the basket itself:
+--   Primary = "Lift basket (Fries 87%)"   while it is in the oil
+--   Primary = "Take the basket (Fries 87%)" once it has been lifted
+-- The fryer names its hit parts BasketHit1..8, and each one's Interact
+-- attribute changes with its state ("Fry" empty, "Frying" in the oil,
+-- "Lift" done, "Box" ...). So the attribute cannot be used to find the
+-- baskets: look them up by name, exactly like the game's own client does,
+-- and read "is it out of the oil" from the BasketN model's UpCF.
+-- (Kept on PackMod: the file is at its 200-local ceiling.)
+PackMod.fryerBaskets = function()
+    local fry = stationModel("Fryer")
+    local out = {}
+    if not fry then return out end
+    for i = 1, 8 do
+        local hit = fry:FindFirstChild("BasketHit" .. i, true)
+        if not hit or not hit:IsA("BasePart") then break end
+        local model = fry:FindFirstChild("Basket" .. i, true)
+        local up = true
+        local upcf = model and model:GetAttribute("UpCF")
+        if typeof(upcf) == "CFrame" and model:IsA("Model") then
+            up = (model:GetPivot().Position - upcf.Position).Magnitude < 0.15
+        end
+        out[#out + 1] = { hit = hit, up = up }
+    end
+    return out
+end
+
+PackMod.basketLifted = function(part)
+    for _, b in ipairs(PackMod.fryerBaskets()) do
+        if b.hit == part then return b.up end
+    end
+    return false
+end
+
+-- anything currently alight (an over-cooked fryer or grill sets one
+-- going). Grab the extinguisher, spray it, then put the bottle back.
+local function fires()
+    local list = {}
+    local rt = FastFood:FindFirstChild("Runtime")
+    for _, d in ipairs(rt and rt:GetChildren() or {}) do
+        if d:GetAttribute("Interact") == "Fire" then list[#list + 1] = d end
+    end
+    return list
+end
+
+local function extinguish()
+    local burning = fires()
+    if #burning == 0 then return true end
+    local bottle = stationParts("Extinguisher")[1]
+    if not bottle then return false end
+    clearHands()
+    if not takeInto(bottle, "Extinguisher") then return false end
+    for _, fire in ipairs(burning) do
+        act(fire, "Primary", nodePos(fire), 0.6,
+            function() return fire.Parent == nil end)
+    end
+    if heldId() ~= nil then clearHands() end
+    return #fires() == 0
+end
+
+-- Fries and nuggets run the exact same fryer chain; only the frozen
+-- supply, the warmer on the front counter and the box tray differ.
+local FRY = {
+    Fries = {
+        supplies = { "FriesCase", "Fries" },
+        restock = "FriesCase",
+        warmer = "FriesHit",
+        boxTub = "Packaging", boxKind = "FryBox", result = "Fries",
+    },
+    Nuggets = {
+        supplies = { "NuggetsCase", "Nuggets" },
+        restock = "NuggetsCase",
+        warmer = "NuggetsHit",
+        boxTub = "NuggetBoxes", boxKind = "NuggetBox", result = "Nuggets",
+    },
+}
+
+local function warmerFor(cfg)
+    local part = stationPart("Warmer", function(p) return p.Name == cfg.warmer end)
+    if part then return part end
+    -- same story as the fryer: fall back to the part name, which is what
+    -- the game's own client uses to find the warmer slot
+    local warmer = stationModel("Warmer")
+    if not warmer then return nil end
+    for _, d in ipairs(warmer:GetDescendants()) do
+        if d:IsA("BasePart") and d.Name == cfg.warmer then return d end
+    end
+    return nil
+end
+
+-- pull one cooked portion out of its warmer, if it is holding any
+local function fryFromStation(cfg)
+    local station = warmerFor(cfg)
+    -- the fry/nugget cartons may live in a Tub, but on the truck they only
+    -- exist as a supply Box (Supply="Packaging"/"NuggetBoxes"). tubFor then
+    -- returns nil and even perfectly cooked fries could never be boxed.
+    local pkg = tubFor(cfg.boxTub) or supplyBox(cfg.boxTub)
+    if not station or not pkg then return false end
+    if not takeInto(pkg, cfg.boxKind) then return false end
+    act(station, "Primary", nodePos(station), 0.7,
+        function() return heldKind() == cfg.result end)
+    if heldKind() == cfg.result then return true end
+    clearHands()
+    return false
+end
+
+-- A fryer with no oil silently refuses every basket: the frozen box stays
+-- in hand, the basket stays up, and the order loops on "Chicken Nuggets"
+-- until somebody does it by hand. The only place the game says so is the
+-- basket's Info line ("The fryer's out of oil..."), so read it first.
+PackMod.fryerOutOfOil = function(part)
+    local d = describe(part, 0)
+    if not d then return false end
+    return tostring(d.Info or ""):lower():find("out of oil", 1, true) ~= nil
+end
+
+PackMod.refillFryerOil = function(part)
+    if not PackMod.fryerOutOfOil(part) then return true end
+    if os.clock() < (PackMod._oilAt or 0) then
+        PackMod.step = "waiting for fryer oil order"
+        task.wait(2)
+        return false
+    end
+    PackMod._oilAt = os.clock() + 60
+    PackMod.step = "ordering fryer oil"
+    if not PackMod.orderSupplies({ Oil = 1 }, "Fryer Oil") then return false end
+
+    -- a delivery lands in the dry store a little later
+    local jug
+    local deadline = os.clock() + 75
+    while os.clock() < deadline and API.running do
+        for _, m in ipairs(items()) do
+            if m:GetAttribute("Item") == "OilJug" then jug = m break end
+        end
+        if jug then break end
+        PackMod.step = "waiting for fryer oil delivery"
+        if PackMod.epoch ~= (PackMod._runEpoch or 0) then return false end
+        task.wait(1)
+    end
+    if not jug then
+        PackMod.step = "fryer oil never arrived"
+        return false
+    end
+
+    clearHands()
+    if not takeInto(jug, "OilJug") then return false end
+    local deck = stationPart("Fryer", function(p) return p.Name == "Deck" end)
+        or stationPart("Fryer")
+    if not deck then return false end
+    PackMod.step = "pouring fryer oil"
+    act(deck, "Primary", deck.Position, 0.8,
+        function() return heldId() == nil end)
+    if heldId() ~= nil then
+        PackMod.parkHeld()
+        return false
+    end
+    describeCache[part] = nil
+    return not PackMod.fryerOutOfOil(part)
+end
+
+-- freezer -> fryer basket -> lift at 100% -> take it -> tip into the
+-- warmer -> fill a box. Returns with the finished portion in hand, or
+-- with `keep` leaves the portion in the warmer (idle prep).
+--
+-- The basket is a three-click chain, confirmed live:
+--   Primary  "Lift basket (Fries 41%)"   -> basket raised, still cooking
+--   Primary  "Take the basket (100%)"    -> basket in hand
+--   Primary on the warmer                -> tipped, hand empty again
+-- Lifting before it is actually done flips Primary to "Lower basket
+-- (... not done)", so only lift at 100% -- otherwise the retry puts it
+-- straight back down and the whole run fails.
+local function makeFry(kind, keep)
+    local cfg = FRY[kind] or FRY.Fries
+    if heldKind() == cfg.result then return true end
+    clearHands()
+    extinguish()
+    if not keep and fryFromStation(cfg) then return true end
+
+    -- the frozen supply can be behind either freezer door
+    openCold("Freezer", 1)
+    openCold("Freezer", 2)
+    local box
+    for _, supply in ipairs(cfg.supplies) do
+        box = supplyBox(supply)
+        if box then break end
+    end
+    if not box and PackMod.ensureStock(cfg.restock) then
+        box = awaitSupply(cfg.supplies)
+    end
+    if not box then return false end
+    if not takeInto(box, "Box") then return false end
+
+    -- One click drops the pack into a free basket: a basket that is
+    -- hanging out of the oil takes the pack and lowers itself.
+    local basket
+    for _, b in ipairs(PackMod.fryerBaskets()) do
+        if b.up then
+            -- no oil means the click is refused with the box still in hand
+            if not PackMod.refillFryerOil(b.hit) then return false end
+            act(b.hit, "Primary", b.hit.Position, 0.8,
+                function() return heldId() == nil end)
+            if heldId() == nil then basket = b.hit break end
+        end
+    end
+    if not basket then
+        PackMod.step = "no free fryer basket"
+        PackMod.parkHeld()
+        return false
+    end
+
+    -- The fryer never shows a percentage, so cook by the clock: the game's
+    -- own config gives 25s for fries and 30s for nuggets. 100% is the start
+    -- of the perfect window and it only burns at 200%, so waiting the full
+    -- time (and a little more if the lift is refused) is safe.
+    local cookTime = (kind == "Nuggets") and 30 or 25
+    local droppedAt = os.clock()
+    local station = warmerFor(cfg)
+    local tipped = 0
+    local deadline = os.clock() + 90
+    while os.clock() < deadline and tipped < 1 do
+        -- the watchdog may have had to abandon this run (see API.watchdog)
+        if PackMod.epoch ~= (PackMod._runEpoch or 0) then
+            API.job.cookOn(false)
+            return false
+        end
+        -- waiting on the oil is dead time: let the register take an order
+        API.job.cookOn(true)
+        local left = cookTime - (os.clock() - droppedAt)
+        if left > 0 then
+            PackMod.step = kind:lower() .. " " .. tostring(math.ceil(left)) .. "s"
+            task.wait(math.min(left, 0.5))
+        else
+            API.job.cookOn(false)
+            PackMod.step = kind:lower() .. " ready"
+            -- 1. lift it out of the oil
+            if not PackMod.basketLifted(basket) then
+                safe(function()
+                    R.Interact:FireServer(basket, "Primary", basket.Position)
+                end)
+                task.wait(0.45)
+            end
+            if not PackMod.basketLifted(basket) then
+                -- refused: not done after all, put it back and wait a bit more
+                safe(function()
+                    R.Interact:FireServer(basket, "Primary", basket.Position)
+                end)
+                droppedAt = os.clock() - (cookTime - 2)
+                task.wait(0.3)
+            else
+                -- 2. take the raised basket
+                act(basket, "Primary", basket.Position, 0.6,
+                    function() return heldKind() == "FryBasket" end)
+                if heldKind() ~= "FryBasket" then return false end
+                -- 3. tip it into the warmer (one basket is several portions)
+                if station then
+                    act(station, "Primary", nodePos(station), 0.7,
+                        function() return heldId() == nil end)
+                    tipped += 1
+                end
+                if heldId() ~= nil then clearHands() end
+            end
+        end
+    end
+
+    API.job.cookOn(false)
+    if tipped == 0 then return false end
+    if keep then return true end
+    return fryFromStation(cfg)
+end
+
+local function makeFries(keep) return makeFry("Fries", keep) end
+local function makeNuggets(keep) return makeFry("Nuggets", keep) end
+
+-- exposed for live debugging from the executor console
+PackMod.makeFries = makeFries
+PackMod.makeNuggets = makeNuggets
+PackMod.clearHands = clearHands
+PackMod.act = act
+
+-- Seat position of a fountain cup slot. The game names them CupSlot_Ice,
+-- CupSlot_Cola, CupSlot_Orange, ... (there is no CupSlot attribute), and
+-- falls back to the cola slot for a flavour the machine does not have.
+local function cupSlot(flavor)
+    local drinks = stationModel("Drinks")
+    if not drinks then return nil end
+    local part = drinks:FindFirstChild("CupSlot_" .. tostring(flavor), true)
+        or drinks:FindFirstChild("CupSlot_Cola", true)
+    if not part or not part:IsA("BasePart") then return nil end
+    local seat = part:GetAttribute("Seat")
+    if typeof(seat) == "Vector3" then
+        return part.CFrame:PointToWorldSpace(seat)
+    end
+    return part.Position
+end
+
+local function makeDrink(flavor)
+    clearHands()
+    local cups = tubFor("Cups")
+    if not cups then
+        PackMod.ensureStock("Cups")
+        return false
+    end
+    if not takeInto(cups, "Cup") then return false end
+
+    -- The fountain is a fixed part-name chain (this is what the game's own
+    -- client looks up): CupSlot_Ice + IceHit for the ice, then
+    -- CupSlot_<flavour> + NozzleHit_<flavour> for the pour.
+    local drinks = stationModel("Drinks")
+    if not drinks then
+        PackMod.step = "no drink station"
+        PackMod.parkHeld()
+        return false
+    end
+    local iceSlot = drinks:FindFirstChild("CupSlot_Ice", true)
+    local iceHit = drinks:FindFirstChild("IceHit", true)
+    local pourSlot = drinks:FindFirstChild("CupSlot_" .. tostring(flavor), true)
+        or drinks:FindFirstChild("CupSlot_Cola", true)
+    local nozzle = drinks:FindFirstChild("NozzleHit_" .. tostring(flavor), true)
+        or drinks:FindFirstChild("NozzleHit_Cola", true)
+    if not (iceSlot and iceHit and pourSlot and nozzle) then
+        PackMod.step = "drink station incomplete"
+        PackMod.parkHeld()
+        return false
+    end
+
+    -- ice: set the cup on the ice slot, press ICE, pick it back up
+    local iceSeat = cupSlot("Ice")
+    dropAt(iceSeat, 0)
+    if heldId() ~= nil then return false end
+    act(iceHit, "Primary", iceHit.Position, 0.7)
+    local cup = findCup(nil, iceSeat)
+    if not cup or not takeInto(cup, "Cup") then return false end
+
+    -- pour: set it under the flavour nozzle and press it
+    local flavorSeat = cupSlot(flavor)
+    dropAt(flavorSeat, 0)
+    if heldId() ~= nil then return false end
+    act(nozzle, "Primary", nozzle.Position, 0.5)
+    task.wait(3.4)
+
+    cup = findCup(flavor, flavorSeat)
+    if not cup then return false end
+    return takeInto(cup, "Cup")
+end
+
+-- make one requirement and drop it in the bag
+local function addNeedToBag(need, bag)
+    local lower = need:lower()
+    if heldId() == nil then
+        if lower:find("burger", 1, true) then
+            -- match this exact bag line back to the customer's build so a
+            -- Double Cheeseburger gets two patties and not the first build
+            local build = buildFor(PackMod._order, need) or PackMod._build
+            if not buildBurger(build) then return false end
+        elseif lower:find("nugget", 1, true) then
+            if not makeNuggets() then return false end
+        elseif lower:find("fries", 1, true)
+            or lower:find("onion ring", 1, true)
+            or lower:find("hash", 1, true) then
+            if not makeFries() then return false end
+        else
+            local flavor = drinkFor(need)
+            if flavor then
+                if not makeDrink(flavor) then return false end
+            else
+                local target = findFood(need)
+                if not target or not takeInto(target, nil) then return false end
+            end
+        end
+    end
+    -- clicking the bag with the food in hand is what puts it in
+    act(bag, "Primary", bag:GetPivot().Position, 0.6,
+        function() return heldId() == nil end)
+    if heldId() ~= nil then
+        -- the bag refused it (overcooked / wrong item): bin it so the
+        -- next pass can make a fresh one instead of stalling
+        PackMod.step = "bag refused " .. tostring(need)
+        clearHands()
+        return false
+    end
+    return true
+end
+
+-- the bag currently sitting on the hatch counter, if any. This is the
+-- *physical* answer: cleanup (clearHatch / placeBag) must still see a stale
+-- bag, otherwise the hatch looks free while the game refuses a new bag.
+local function hatchBag()
+    local spot = hatchSpot()
+    if not spot then return nil end
+    return bagNear(spot, 2.6, true)
+end
+
+-- the bag a run is allowed to reuse. A bag left behind by a finished or
+-- expired order reads as "complete" (empty List); using it made the bot
+-- serve stale bags over and over without ever crediting an order.
+local function usableHatchBag()
+    local bag = hatchBag()
+    if not bag then return nil end
+    if API.staleBag(bag) then return nil end
+    return bag
+end
+
+-- pick the stale bag off the hatch and set it down out of the way so
+-- the slot is free again (the hatch only accepts one bag at a time).
+-- MUST be called with empty hands: takeInto verifies only HeldKind, so
+-- holding a fresh bag made it "succeed" without picking anything up and
+-- clearHands() then dropped the fresh bag instead of the stale one.
+local function clearHatch()
+    -- takeInto verifies only HeldKind, so with anything already in hand
+    -- "pick up the stale bag" silently succeeds without picking anything up.
+    -- A bag left held by a refused drop then killed every later order at
+    -- "could not clear the hatch". Return receipts to the printer and bags
+    -- to the hatch first, and only bin what is still stuck in our hands.
+    if heldId() ~= nil then
+        PackMod.parkHeld()
+        if heldId() ~= nil then clearHands() end
+        if heldId() ~= nil then return false end
+    end
+    local spot = hatchSpot()
+    if not spot then return false end
+    local stale = hatchBag()
+    if not stale then return true end
+    if not takeInto(stale, "Bag") then return false end
+    if heldId() == nil then return false end
+    standNear(spot + Vector3.new(-6, 0, 0))
+    settle()
+    -- put it well away from the hatch so it cannot be picked up as the
+    -- bag we are about to place for the live order
+    dropAt(spot + Vector3.new(-8, 0, 0), PackMod.hatchYaw)
+    return heldId() == nil
+end
+
+-- Put whatever is in hand somewhere it can be picked up again. Dropping a
+-- receipt on the floor loses that order's only ticket -- the printer prints
+-- exactly one per order and never a second -- so a receipt goes back on the
+-- counter by the printer, and a paper bag goes back on the hatch.
+function PackMod.parkHeld()
+    if heldId() == nil then return true end
+    local printer = stationPart("Printer")
+    if heldKind() == "Receipt" and printer then
+        dropAt(printer.Position + Vector3.new(0, 0.4, 0), PackMod.hatchYaw)
+        if heldId() == nil then return true end
+    end
+    if heldKind() == "Bag" then
+        local spot = hatchSpot()
+        if spot then
+            dropAt(spot, PackMod.hatchYaw)
+            if heldId() == nil then return true end
+        end
+    end
+    return not clearHands()
+end
+
+-- A receipt lying about instead of sitting on the printer is still that
+-- order's only ticket. Find one for a live order that has no bag yet,
+-- nearest first, so a run that lost its receipt can carry on.
+function PackMod.looseReceipt()
+    local r = root()
+    local best, bestD
+    for _, m in ipairs(items()) do
+        if m:GetAttribute("Item") == "Receipt" then
+            local id = m:GetAttribute("OrderId")
+            if id ~= nil and orderIsLive(findOrderById(id)) and not findBagFor(id) then
+                local d = r and (m:GetPivot().Position - r.Position).Magnitude or 0
+                if not bestD or d < bestD then best, bestD = m, d end
+            end
+        end
+    end
+    return best
+end
+
+local function placeBag()
+    PackMod.parkHeld()
+    local spot = hatchSpot()
+    if not spot then
+        PackMod.step = "no register found"
+        return nil
+    end
+    -- Clear a leftover bag FIRST, while our hands are still empty. Doing it
+    -- after picking up the new bag used to drop the new one instead, leaving
+    -- the stale bag on the hatch and handing it back to runOrder.
+    if hatchBag() and not clearHatch() then
+        PackMod.step = "could not clear the hatch"
+        return nil
+    end
+    if heldId() ~= nil then
+        PackMod.step = "hands not empty before bag pickup"
+        return nil
+    end
+    local src = findBagSource()
+    if not src then
+        PackMod.step = "no paper bags"
+        PackMod.ensureStock("Bags")
+        return nil
+    end
+    if not takeInto(src, "Bag") then
+        PackMod.step = "bag pickup failed"
+        return nil
+    end
+    -- Require the drop to actually empty our hand: a refused drop used to
+    -- leave the bag held, and the old code carried on as if it had landed.
+    for _ = 1, 2 do
+        dropAt(spot, PackMod.hatchYaw)
+        if heldId() == nil then break end
+    end
+    if heldId() ~= nil then
+        PackMod.step = "hatch would not take the bag"
+        PackMod.parkHeld()
+        return nil
+    end
+    local landed = bagNear(spot, 3, false) or bagNear(spot, 3, true)
+    if landed and API.staleBag(landed) then landed = nil end
+    if not landed then
+        PackMod.step = "bag would not sit on the hatch"
+        return nil
+    end
+    PackMod.stats.placed += 1
+    PackMod.step = "bag on bench"
+    return landed
+end
+
+local function findCustomer(order)
+    local wanted = order and order:GetAttribute("Customer")
+    local npcs = FastFood:FindFirstChild("NPCs")
+    local fallback
+    for _, m in ipairs(npcs and npcs:GetChildren() or {}) do
+        if m:GetAttribute("Interact") == "Customer" then
+            fallback = fallback or m
+            if wanted and (m:GetAttribute("CustomerName") == wanted or m.Name == wanted) then
+                return m
+            end
+        end
+    end
+    -- only hand the bag to whoever is standing there when the order did
+    -- not name a customer. If it did name one and that customer has left,
+    -- giving the bag to a stranger would hand over the wrong order.
+    if wanted and tostring(wanted) ~= "" then return nil end
+    return fallback
+end
+
+-- the Builds attribute is JSON: [ {"Patty":3,"Ketchup":1}, false ], and
+-- Items is index aligned with it, so a bag line can be matched back to
+-- the exact burger the customer ordered
+local function decodeList(raw)
+    if type(raw) ~= "string" or raw == "" then return nil end
+    local ok, decoded = pcall(function() return HttpService:JSONDecode(raw) end)
+    if not ok or type(decoded) ~= "table" then return nil end
+    return decoded
+end
+
+local function normName(text)
+    return (tostring(text):lower():gsub("[^%w]", ""))
+end
+
+-- "1x Double Cheeseburger" -> the {"Patty":2,"Cheese":2} entry
+buildFor = function(order, need)
+    local items = order and decodeList(order:GetAttribute("Items"))
+    local builds = order and decodeList(order:GetAttribute("Builds"))
+    if not items or not builds then return nil end
+    local want = normName(need)
+    -- exact id first, then a substring match ("DoubleCheese" against
+    -- "Double Cheeseburger"), so a plain Cheeseburger never wins over
+    -- the double when both are on the ticket
+    for pass = 1, 2 do
+        for i, name in ipairs(items) do
+            local id = normName(name)
+            local hit = id ~= "" and (id == want or (pass == 2
+                and (want:find(id, 1, true) ~= nil or id:find(want, 1, true) ~= nil)))
+            if hit and type(builds[i]) == "table" and next(builds[i]) ~= nil then
+                return builds[i]
+            end
+        end
+    end
+    return nil
+end
+
+local function firstBuild(order)
+    local decoded = order and decodeList(order:GetAttribute("Builds"))
+    if not decoded then return nil end
+    for _, entry in ipairs(decoded) do
+        if type(entry) == "table" and next(entry) ~= nil then return entry end
+    end
+    return nil
+end
+
+PackMod.buildFor = buildFor
+PackMod.firstBuild = firstBuild
+
+-- the cleaning corner's bucket. The model has two parts with
+-- Interact="MopBucket" (the bucket art and a taller hitbox); the art
+-- part is the one that reliably answers for both grabbing and hanging
+-- the mop back.
+function PackMod.mopBucket()
+    local stations = WStations()
+    local ms = stations and stations:FindFirstChild("MopStation")
+    if not ms then return nil end
+    local fallback
+    for _, d in ipairs(ms:GetDescendants()) do
+        if d:IsA("BasePart") and d:GetAttribute("Interact") == "MopBucket" then
+            if d.Name == "Bucket" then return d end
+            fallback = fallback or d
+        end
+    end
+    return fallback
+end
+
+-- a mop in hand is not ours to bin: hang it back on its bucket before
+-- an order run takes over the hands
+function PackMod.stowMop()
+    if heldKind() ~= "Mop" then return true end
+    local bucket = PackMod.mopBucket()
+    if not bucket then return false end
+    act(bucket, "Primary", nodePos(bucket), 0.6,
+        function() return heldId() == nil end)
+    return heldId() == nil
+end
+
+function PackMod.runOrder(order)
+    PackMod._order = order
+    PackMod._runEpoch = PackMod.epoch or 0
+    PackMod.step = "starting"
+
+    -- never start a run holding something from an earlier failure, but never
+    -- bin a receipt or a bag either: they are the order's only ticket and its
+    -- packing
+    PackMod.stowMop()
+    PackMod.parkHeld()
+
+    -- 1. get a reusable bag on the hatch. A stale one is left there for
+    --    placeBag()/clearHatch() to remove, and this run looks for the
+    --    order's own bag (which may be on the floor) instead.
+    local bag = usableHatchBag()
+    if not bag and order then
+        -- this order's bag may have been left somewhere else (a hand-over
+        -- that ran out of customer, a bag that slid off the hatch). Use it:
+        -- a second bag would need a second receipt, and the printer only
+        -- ever prints one per order.
+        bag = findBagFor(tonumber(order.Name) or order:GetAttribute("Id"))
+    end
+    if not bag then
+        bag = placeBag()
+        if not bag then return false end
+    end
+
+    -- 2. the printer hands out the next ticket, so the receipt decides
+    --    which order this run is really for - not the order we picked
+    if bag:GetAttribute("OrderId") == nil then
+        PackMod.step = "receipt"
+        local printer = stationPart("Printer")
+        if heldKind() == "Bag" then
+            -- the bag never got set down: clicking the printer with it in
+            -- hand is the game's other binding path, and it leaves the bag
+            -- in hand already stamped with the ticket's order
+            if printer then
+                act(printer, "Primary", printer.Position, 0.7,
+                    function() return PackMod.heldOrderId() ~= nil end)
+            end
+            local bound = PackMod.heldOrderId()
+            if bound ~= nil then
+                local spot = hatchSpot()
+                if spot then dropAt(spot, PackMod.hatchYaw) end
+                bag = findBagFor(bound) or bag
+                PackMod.stats.receipts += 1
+            end
+        else
+            -- a receipt already in hand is this run's ticket: use it instead
+            -- of asking the printer for another one it will not print
+            if heldKind() ~= "Receipt" and printer then
+                act(printer, "Primary", printer.Position, 0.7,
+                    function() return heldKind() == "Receipt" end)
+            end
+            if heldKind() ~= "Receipt" then
+                local loose = PackMod.looseReceipt()
+                if loose then
+                    act(loose, "Primary", loose:GetPivot().Position, 0.6,
+                        function() return heldKind() == "Receipt" end)
+                end
+            end
+            if heldKind() ~= "Receipt" then
+                PackMod.step = "no receipt on the printer"
+                return false
+            end
+            act(bag, "Primary", bag:GetPivot().Position, 0.7,
+                function() return bag:GetAttribute("OrderId") ~= nil end)
+            if bag:GetAttribute("OrderId") == nil then
+                -- the bag refused the ticket: keep the receipt in hand for
+                -- the next pass rather than throwing the order away
+                PackMod.step = "bag refused the ticket"
+                return false
+            end
+            PackMod.stats.receipts += 1
+        end
+        if bag:GetAttribute("OrderId") == nil then
+            PackMod.step = "bag still has no ticket"
+            return false
+        end
+    end
+
+    local boundId = bag:GetAttribute("OrderId")
+    if boundId == nil then
+        PackMod.step = "bag still has no ticket"
+        return false
+    end
+    -- a bag stamped with an order that has already ended is the bag that
+    -- used to loop forever: Describe reports no needs, so the old code
+    -- "served" it and bumped stats.served without the game crediting it.
+    -- Move it off the hatch so the next pass can place a fresh bag instead
+    -- of picking this one up again and again.
+    local real = findOrderById(boundId)
+    if not real or not orderIsLive(real) then
+        PackMod.step = "discarding stale bag " .. tostring(boundId)
+        clearHands()
+        clearHatch()
+        return false
+    end
+    PackMod._order = real
+    PackMod._build = firstBuild(real)
+    PackMod.step = "order " .. tostring(boundId)
+
+    -- 3. feed everything the bag still says it needs
+    local fed = 0
+    for _ = 1, 12 do
+        if PackMod.epoch ~= (PackMod._runEpoch or 0) then return false end
+        local needs = needsOf(bag)
+        if needs == nil then
+            PackMod.step = "cannot read the bag"
+            return false
+        end
+        if #needs == 0 then break end
+        PackMod.step = "making " .. tostring(needs[1])
+        if not addNeedToBag(needs[1], bag) then
+            PackMod.step = "stuck on " .. tostring(needs[1])
+            return false
+        end
+        PackMod.stats.fed += 1
+        fed += 1
+        bag = findBagFor(boundId) or bag
+        task.wait(0.2)
+    end
+
+    -- only hand over a bag the game itself says is complete
+    local finalNeeds = needsOf(bag)
+    if finalNeeds == nil or #finalNeeds > 0 then
+        PackMod.step = "bag still incomplete"
+        return false
+    end
+
+    -- 4. hand it over: the game serves a counter order by setting the
+    --    finished bag on the pickup pad beside the register; the customer
+    --    collects it from there. Clicking the customer does nothing.
+    if PackMod.autoServe then
+        PackMod.step = "serving"
+        -- an empty bag can read as "nothing needed" if Describe is stale;
+        -- the game only accepts a bag that actually holds food
+        local contents = tostring(bag:GetAttribute("Contents") or "")
+        if contents == "" or contents == "[]" then
+            PackMod.step = "bag is empty"
+            return false
+        end
+        act(bag, "Primary", bag:GetPivot().Position, 0.6,
+            function() return heldKind() == "Bag" end)
+        if heldKind() ~= "Bag" then
+            act(bag, "Secondary", bag:GetPivot().Position, 0.6,
+                function() return heldKind() == "Bag" end)
+        end
+        if heldKind() ~= "Bag" then
+            PackMod.step = "bag not picked up"
+            return false
+        end
+        local spot = PackMod.counterSpot()
+        if not spot then
+            PackMod.step = "no free counter spot"
+            PackMod.parkHeld()
+            return false
+        end
+        dropAt(spot, PackMod.hatchYaw)
+        if heldId() ~= nil then
+            PackMod.step = "counter refused the bag"
+            PackMod.parkHeld()
+            return false
+        end
+        PackMod.step = "bag on the counter"
+        PackMod.stats.served += 1
+    else
+        PackMod.step = "packed"
+    end
+    return true
+end
+
+function PackMod.sweep()
+    if not R.Interact then return 0 end
+    if PackMod.busy then return 1 end
+    -- somebody else owns the body right now: wait our turn rather than
+    -- dragging the character away from their job
+    if API.job.busy("pack") then
+        PackMod.step = "waiting for " .. tostring(API.job.owner)
+        return 0
+    end
+    -- a bag of rubbish in hand is the bin run's business: let it finish
+    -- rather than dropping the bag on the floor to start an order
+    if carryingBag() then
+        PackMod.step = "waiting for the trash bag"
+        return 0
+    end
+    -- a run that ended stuck should back off instead of hammering the
+    -- same station every tick (one skipped pass, then try again)
+    if PackMod.stalled then
+        PackMod.stalled = false
+        return 0
+    end
+
+    local order = liveOrder()
+    PackMod._order = order
+    if not order then
+        -- a paper bag left in hand (a hand-over that ran out of customer)
+        -- is not an order in progress: put it back so every other job
+        -- stops seeing full hands
+        if heldKind() == "Bag" and API.job.take("pack") then
+            local ok = pcall(function()
+                local spot = hatchSpot()
+                if spot then dropAt(spot, PackMod.hatchYaw) end
+            end)
+            API.job.free("pack")
+            if not ok then PackMod.step = "could not park the bag" return 0 end
+        end
+        PackMod.step = "no live order"
+        return 0
+    end
+
+    if not API.job.take("pack") then return 0 end
+    PackMod.busy = true
+    task.spawn(function()
+        local ok, advanced = pcall(function() return PackMod.runOrder(order) end)
+        if not ok then
+            PackMod.step = "error: " .. tostring(advanced)
+            PackMod.stalled = true
+        else
+            PackMod.stalled = not advanced
+        end
+        PackMod.busy = false
+        API.job.free("pack")
+    end)
+    return 1
+end
+
+function PackMod.status()
+    return string.format(
+        "%s%s | placed=%d receipts=%d fed=%d served=%d restocks=%d",
+        PackMod.busy and "running " or "", PackMod.step,
+        PackMod.stats.placed, PackMod.stats.receipts,
+        PackMod.stats.fed, PackMod.stats.served, PackMod.stats.restocks)
+end
+
+-- ============================================================
+-- ANTI-STUCK WATCHDOG
+--
+-- A step that keeps failing (no oil, a refused bag, a station that will
+-- not answer) used to retry the same click forever and drag the
+-- character between the same two stations. Watch the step plus the
+-- counters; when neither moves for a while, drop what we are holding,
+-- put the character back on a trusted floor tile and start over.
+-- ============================================================
+API.watchdog = {
+    enabled = true, limit = 100, step = "idle", since = 0, resets = 0,
+}
+
+API.watchdog.signature = function()
+    local st = PackMod.stats
+    -- the bot's own `served` counter is deliberately excluded: a stale bag
+    -- reads as "complete" and gets "served" again and again while the game
+    -- credits nothing. Use the game's DayServed as the real progress marker.
+    return tostring(PackMod.step) .. "|" .. tostring(st.placed)
+        .. "|" .. tostring(st.receipts) .. "|" .. tostring(st.fed)
+        .. "|" .. tostring(State:GetAttribute("DayServed"))
+        .. "|" .. tostring(st.restocks)
+end
+
+-- separate detector for the fake-serve loop: our counter climbed but the
+-- game never credited a single order for it
+API.watchdog.fake = { bot = 0, game = 0, day = -1, since = os.clock() }
+
+API.watchdog.recover = function(why)
+    local w = API.watchdog
+    w.resets += 1
+    w.step, w.since = why, os.clock()
+    -- any in-flight run must stop touching the body before we take it back
+    PackMod.epoch = (PackMod.epoch or 0) + 1
+    if heldId() ~= nil then pcall(function() PackMod.parkHeld() end) end
+    -- standNear is floor-aware: it never drops us on a counter or register
+    local anchor = stationModel("Grill") or stationModel("Fryer") or mainRegister()
+    if anchor then pcall(function() standNear(nodePos(anchor)) end) end
+    PackMod.stalled, PackMod.busy = false, false
+    API.job.free("pack")
+    -- reset both baselines. (Assigning to w.signature here would overwrite
+    -- the function with a string and kill this whole watchdog after the
+    -- first recovery.) The fake-serve baseline must move too, otherwise
+    -- the same count re-triggers the detector every three seconds.
+    w.step = API.watchdog.signature()
+    local f = w.fake
+    if f then f.bot, f.since = PackMod.stats.served, os.clock() end
+    safe(function()
+        GousseUI:Notify({
+            Title = "Burger Planet · recovered",
+            Content = tostring(why),
+            Type = "warning", Duration = 4,
+        })
+    end)
+end
+
+task.spawn(function()
+    while API.running do
+        task.wait(3)
+        local w = API.watchdog
+        -- fake-serve loop: our served counter moves but the game's does not
+        local bot, gameServed = PackMod.stats.served,
+            tonumber(State:GetAttribute("DayServed")) or 0
+        local day = tonumber(State:GetAttribute("Day")) or 0
+        local f = w.fake
+        if day ~= f.day then
+            -- DayServed resets at rollover, so rebase instead of recovering
+            f.day, f.bot, f.game, f.since = day, bot, gameServed, os.clock()
+        elseif gameServed > f.game then
+            f.bot, f.game, f.since = bot, gameServed, os.clock()
+        elseif bot > f.bot and (os.clock() - f.since) > 45 then
+            w.recover("serves not registering: bot=" .. tostring(bot)
+                .. " game=" .. tostring(gameServed))
+            continue
+        end
+        if not (w.enabled and API.enabled.pack and PackMod.busy) then
+            w.step, w.since = w.signature(), os.clock()
+            continue
+        end
+        local sig = w.signature()
+        if sig ~= w.step then
+            w.step, w.since = sig, os.clock()
+            continue
+        end
+        if os.clock() - w.since >= w.limit then
+            w.recover("no progress ~" .. tostring(w.limit) .. "s: "
+                .. tostring(PackMod.step))
+        end
+    end
+end)
+
+-- ============================================================
+-- MODULE: PREP (get tomorrow's food ready while nobody is waiting)
+--
+-- When the shop is closed, or the queue is empty and no customer is
+-- around, the slow parts of an order are done in advance:
+--   * a portion of fries and one of nuggets sit in the warmers (they
+--     keep; an order then only pulls a box instead of frying one)
+--   * a bag waits on the hatch, so the first order skips that step
+--   * the trays are topped up from their supply boxes
+-- Patties are deliberately NOT pre-cooked: they burn past the
+-- 100-150% window, so a patty cooked in advance is a wasted patty.
+-- ============================================================
+API.prep = {
+    enabled = true,
+    step = "idle",
+    next = 0,
+    stats = { fries = 0, nuggets = 0, bags = 0, tubs = 0 },
+}
+
+-- does this warmer still have food in it? The pile model's Heap part is
+-- transparent while the warmer is empty and solid once something is in
+-- it (confirmed live: trans 1.0 empty, 0.0 after one portion).
+function API.prep.warmerEmpty(cfg)
+    local w = stationModel("Warmer")
+    if not w then return nil end
+    local want = cfg.result:lower()
+    for _, d in ipairs(w:GetDescendants()) do
+        if d:IsA("BasePart") and d.Name == "Heap"
+            and d.Parent and d.Parent.Name:lower():find(want, 1, true) then
+            return d.Transparency > 0.85
+        end
+    end
+    return nil
+end
+
+function API.prep.sweep()
+    if not API.prep.enabled then return 0 end
+    if PackMod.busy then return 0 end
+    if heldId() ~= nil then return 0 end
+    if liveOrder() then return 0 end
+    if #findWaitingRegisters() > 0 then return 0 end
+    local now = os.clock()
+    if now < (API.prep.next or 0) then return 0 end
+    API.prep.next = now + 2
+
+    -- how many customers are on the lot right now? a long fry is only
+    -- started when the answer is none (or the shop is shut)
+    local customers = 0
+    local npcs = WNPCs()
+    for _, npc in ipairs(npcs and npcs:GetChildren() or {}) do
+        local tag = npc:GetAttribute("Interact")
+        if tag == "Customer" or tag == "DeliveryCustomer" then customers += 1 end
+    end
+    local idle = tostring(State:GetAttribute("Phase") or "") ~= "Open" or customers == 0
+
+    -- 1. warmers first: this is the part that makes a customer wait
+    if idle then
+        for _, kind in ipairs({ "Fries", "Nuggets" }) do
+            local cfg = FRY[kind]
+            if API.prep.warmerEmpty(cfg) then
+                API.prep.step = "pre-making " .. kind:lower()
+                local ok = (kind == "Fries") and makeFries(true) or makeNuggets(true)
+                API.prep.step = ok and ("prepped " .. kind:lower())
+                    or ("could not prep " .. kind:lower())
+                if ok then
+                    if kind == "Fries" then
+                        API.prep.stats.fries += 1
+                    else
+                        API.prep.stats.nuggets += 1
+                    end
+                end
+                API.prep.next = os.clock() + 2
+                return ok and 1 or 0
+            end
+        end
+    end
+
+    -- 2. a bag waiting on the hatch saves the first step of the next order
+    if not hatchBag() then
+        API.prep.step = "pre-placing a bag"
+        if placeBag() then
+            API.prep.stats.bags += 1
+            API.prep.step = "bag on the hatch"
+            API.prep.next = os.clock() + 2
+            return 1
+        end
+    end
+
+    -- 3. top the trays up from their boxes
+    for _, ing in ipairs({ "Patty", "Bun", "Cheese", "Pickles", "Wrap" }) do
+        if tubAmount(ing) < 4 then
+            API.prep.step = "topping up " .. ing
+            if tubFor(ing) then
+                API.prep.stats.tubs += 1
+                API.prep.next = os.clock() + 2
+                return 1
+            end
+        end
+    end
+
+    API.prep.step = "stocked"
+    API.prep.next = os.clock() + 5
+    return 0
+end
+
+function API.prep.status()
+    return string.format("%s%s | fries=%d nuggets=%d bags=%d tubs=%d",
+        API.prep.enabled and "" or "off ",
+        API.prep.step, API.prep.stats.fries, API.prep.stats.nuggets,
+        API.prep.stats.bags, API.prep.stats.tubs)
+end
+
+-- kept so older UI/worker wiring still resolves
+local AssemblyMod = PackMod
+
+-- ============================================================
+-- MODULE: CLEAN (mop the spills customers leave on the floor)
+--
+--   spill parts carry Interact="Spill" and a Wipes count. The mop comes
+--   from the bucket in the cleaning corner: Primary on the bucket grabs
+--   it, Primary on the spill wipes it, Primary on the bucket again puts
+--   the mop back. The part is destroyed by the server once it has been
+--   wiped enough, so we just keep going until it is gone.
+-- ============================================================
+local CleanMod = {
+    interval = 0.8,
+    teleport = true,
+    state = "idle",
+    stats = { mopped = 0 },
+    fails = 0,
+}
+
+local function spillParts()
+    local out = {}
+    for _, d in ipairs(Workspace:GetDescendants()) do
+        if d:IsA("BasePart") and d:GetAttribute("Interact") == "Spill" then
+            out[#out + 1] = d
+        end
+    end
+    return out
+end
+
+local function nearestSpill(list)
+    local r = root()
+    local rp = r and r.Position
+    local best, bestD
+    for _, sp in ipairs(list) do
+        if sp.Parent then
+            local d = rp and (sp.Position - rp).Magnitude or 0
+            if not bestD or d < bestD then best, bestD = sp, d end
+        end
+    end
+    return best
+end
+
+function CleanMod.grabMop()
+    if heldKind() == "Mop" then return true end
+    if heldId() ~= nil then clearHands() end
+
+    -- The mop is a loose item when it is not in the bucket (a previous
+    -- run can leave it on the floor), and the bucket only hands back a
+    -- mop it is actually holding. Try the item first, then the bucket.
+    local mop
+    for _, m in ipairs(items()) do
+        if m:GetAttribute("Item") == "Mop" then mop = m break end
+    end
+    if mop then
+        act(mop, "Primary", mop:GetPivot().Position, 0.8,
+            function() return heldKind() == "Mop" end)
+    end
+    if heldKind() ~= "Mop" then
+        local bucket = PackMod.mopBucket()
+        if bucket then
+            act(bucket, "Primary", nodePos(bucket), 0.8,
+                function() return heldKind() == "Mop" end)
+        end
+    end
+    CleanMod.state = heldKind() == "Mop" and "mop in hand" or "could not grab the mop"
+    return heldKind() == "Mop"
+end
+
+function CleanMod.sweep()
+    local spills = spillParts()
+    if #spills == 0 then
+        if heldKind() == "Mop" then PackMod.stowMop() end
+        CleanMod.state = "clean"
+        return 0
+    end
+    -- the order run owns the hands while it is working
+    if PackMod.busy then return 0 end
+    -- never yank a trash bag out of our hands to grab the mop
+    if carryingBag() and heldKind() ~= "Mop" then
+        CleanMod.state = "carrying a trash bag"
+        return 0
+    end
+    if not CleanMod.grabMop() then
+        CleanMod.fails += 1
+        return 0
+    end
+
+    local sp = nearestSpill(spills)
+    if not sp then return 0 end
+    local pos = sp.Position
+    local area = tostring(sp:GetAttribute("Area") or "floor")
+    CleanMod.state = "mopping the " .. area:lower() .. " spill"
+    local wipes = tonumber(sp:GetAttribute("Wipes")) or 6
+    for _ = 1, wipes + 3 do
+        if not sp.Parent then break end
+        act(sp, "Primary", pos, 0.55)
+    end
+    -- hand the mop back so it never blocks the next order
+    PackMod.stowMop()
+    if not sp.Parent then
+        CleanMod.stats.mopped += 1
+        CleanMod.fails = 0
+        return 1
+    end
+    CleanMod.fails += 1
+    return 0
+end
+
+function CleanMod.status()
+    return string.format("%s | spills=%d mopped=%d",
+        CleanMod.state, #spillParts(), CleanMod.stats.mopped)
+end
+
+-- ============================================================
+-- MODULE: TRASH (full bin → bag → dumpster)
+--
+--   A bin is emptied in two steps. Primary on the can's hit part hands
+--   over the bag ("Take out the trash bag (10/10)"); the bag is then
+--   carried to the dumpster and handed in there. Empty cans answer with
+--   "Trash can (empty)", so each one is only re-read every few seconds
+--   instead of the sweep hopping between bins that have nothing to give.
+-- ============================================================
+local TrashMod = {
+    interval = 1.0,
+    state = "idle",
+    stats = { taken = 0, emptied = 0 },
+    fails = 0,
+    carrying = false,
+    minFill = 5,      -- only walk a bag out once a bin is half full
+    checked = {},     -- can model -> os.clock() of its last empty reading
+    recheck = 6.0,    -- how long an empty bin is left alone
+}
+
+local function trashNodes(kind)
+    local stations = WStations()
+    local out = {}
+    if not stations then return out end
+    local function walk(node, depth)
+        if depth > 5 or not node then return end
+        for _, child in ipairs(node:GetChildren()) do
+            if child:GetAttribute("Interact") == kind then
+                out[#out + 1] = child
+            end
+            if child:IsA("Folder") or child:IsA("Model") then
+                walk(child, depth + 1)
+            end
+        end
+    end
+    walk(stations, 0)
+    return out
+end
+
+-- one entry per bin: a can is a model (Body/Lid/ChuteHit) inside Stations
+local function canModels()
+    local stations = WStations()
+    local seen, out = {}, {}
+    for _, node in ipairs(trashNodes("TrashCan")) do
+        local model = node
+        while model and model.Parent and model.Parent ~= stations do
+            model = model.Parent
+        end
+        if model and model.Parent == stations and not seen[model] then
+            seen[model] = true
+            out[#out + 1] = model
+        end
+    end
+    return out
+end
+
+local function handsFull()
+    return heldId() ~= nil or LP:GetAttribute("Holding") ~= nil
+end
+
+local function holdingBag()
+    return TrashMod.carrying or carryingBag()
+end
+
+-- "Hit" parts are the ones that answer describe; the art parts usually
+-- answer nothing, so try them in that order.
+local function hitFirst(a, b)
+    local ah = a.Name:lower():find("hit", 1, true) and 0 or 1
+    local bh = b.Name:lower():find("hit", 1, true) and 0 or 1
+    return ah < bh
+end
+
+-- describe only answers within arm's reach, and only one of a can's
+-- parts carries the prompt, so walk up and try each part in turn.
+local function describeCan(model)
+    local nodes = {}
+    for _, d in ipairs(model:GetDescendants()) do
+        if d:GetAttribute("Interact") == "TrashCan" then nodes[#nodes + 1] = d end
+    end
+    table.sort(nodes, hitFirst)
+    for _, n in ipairs(nodes) do
+        local d = describe(n, 0)
+        if d and (d.Primary or d.Secondary or d.Info) then
+            return d, n
+        end
+    end
+    return nil, nodes[1]
+end
+
+function TrashMod.emptyBag()
+    local dumps = trashNodes("Dumpster")
+    if #dumps == 0 then
+        TrashMod.state = "holding a bag, no dumpster here"
+        return 0
+    end
+    table.sort(dumps, hitFirst)
+    TrashMod.state = "emptying the bag at the dumpster"
+    for _, node in ipairs(dumps) do
+        for _, action in ipairs({ "Primary", "Secondary" }) do
+            act(node, action, nodePos(node), 1.0, function() return not handsFull() end)
+            if not handsFull() then
+                TrashMod.carrying = false
+                TrashMod.stats.emptied += 1
+                TrashMod.fails = 0
+                TrashMod.state = "bag emptied"
+                table.clear(TrashMod.checked)
+                return 1
+            end
+        end
+    end
+    TrashMod.fails += 1
+    TrashMod.state = "the dumpster did not take the bag"
+    return 0
+end
+
+function TrashMod.sweep(force)
+    if PackMod.busy then return 0 end
+
+    if handsFull() then
+        if holdingBag() then return TrashMod.emptyBag() end
+        TrashMod.state = "hands busy (" .. tostring(heldKind()
+            or LP:GetAttribute("Holding") or "item") .. ")"
+        return 0
+    end
+
+    local now = os.clock()
+    local r = root()
+    local rp = r and r.Position
+    local todo = {}
+    for _, model in ipairs(canModels()) do
+        local last = TrashMod.checked[model]
+        if force or not last or now - last > TrashMod.recheck then
+            local pivot = model:GetPivot().Position
+            todo[#todo + 1] = {
+                model = model,
+                dist = rp and (pivot - rp).Magnitude or 0,
+            }
+        end
+    end
+    table.sort(todo, function(a, b) return a.dist < b.dist end)
+
+    -- a couple of bins per pass: the sweep is cheap when they are all
+    -- empty and still clears a fresh one quickly when it fills up
+    local pending = false
+    for i = 1, math.min(#todo, force and #todo or 4) do
+        local model = todo[i].model
+        local d, node = describeCan(model)
+        if d then
+            local primary = tostring(d.Primary or ""):lower()
+            local info = tostring(d.Info or ""):lower()
+            -- the prompt carries the load: "Take out the trash bag (6/10)"
+            local count = tonumber(tostring(d.Primary or ""):match("%((%d+)/%d+%)") or "")
+            local full
+            if primary:find("take out", 1, true) then
+                full = force or count == nil or count >= TrashMod.minFill
+                if not full then pending = true end
+            else
+                full = info:find("full", 1, true) ~= nil
+                    and info:find("empty", 1, true) == nil
+            end
+            if full then
+                TrashMod.state = "taking the bag out of " .. model.Name
+                act(node, "Primary", nodePos(node), 1.2,
+                    function() return handsFull() end)
+                local after = describe(node, 0)
+                local stillFull = after
+                    and tostring(after.Primary or ""):lower():find("take out", 1, true) ~= nil
+                if handsFull() or not stillFull then
+                    TrashMod.carrying = handsFull()
+                    TrashMod.stats.taken += 1
+                    TrashMod.fails = 0
+                    TrashMod.checked[model] = nil
+                    -- take it straight out to the dumpster in the same
+                    -- pass, so the bag is never in hand for long
+                    if TrashMod.carrying then return TrashMod.emptyBag() end
+                    return 1
+                end
+                TrashMod.fails += 1
+                TrashMod.checked[model] = now
+            else
+                TrashMod.checked[model] = now
+            end
+        else
+            TrashMod.checked[model] = now
+        end
+    end
+    if pending then
+        TrashMod.state = "bins filling (take at " .. TrashMod.minFill .. "/10)"
+    else
+        TrashMod.state = "all bins empty"
+    end
+    return 0
+end
+
+function TrashMod.status()
+    return string.format("%s | bins=%d taken=%d emptied=%d%s",
+        TrashMod.state, #canModels(), TrashMod.stats.taken, TrashMod.stats.emptied,
+        TrashMod.carrying and " (carrying a bag)" or "")
 end
 
 -- ============================================================
@@ -1546,7 +4531,7 @@ end
 task.spawn(function()
     while API.running do
         if API.enabled.litter then
-            local did = LitterMod.sweep()
+            local did = API.job.run("litter", LitterMod.sweep)
             LitterMod.fails = did and 0 or (LitterMod.fails + 1)
             task.wait(LitterMod.fails >= LitterMod.failBudget
                 and LitterMod.interval * 4 or LitterMod.interval)
@@ -1559,7 +4544,7 @@ end)
 task.spawn(function()
     while API.running do
         if API.enabled.register then
-            RegisterMod.sweep()
+            API.job.run("register", RegisterMod.sweep)
         end
         task.wait(RegisterMod.interval)
     end
@@ -1568,7 +4553,7 @@ end)
 task.spawn(function()
     while API.running do
         if API.enabled.cook then
-            CookMod.sweep()
+            API.job.run("cook", CookMod.sweep)
         end
         task.wait(CookMod.interval)
     end
@@ -1576,17 +4561,80 @@ end)
 
 task.spawn(function()
     while API.running do
-        if API.enabled.assembly then
-            AssemblyMod.sweep()
+        if API.enabled.pack then
+            local did = PackMod.sweep()
+            PackMod.fails = did and 0 or ((PackMod.fails or 0) + 1)
+            -- stall out (no live order / waiting on stock) without spinning
+            task.wait(PackMod.fails >= 8 and PackMod.interval * 4 or PackMod.interval)
+        else
+            task.wait(0.3)
         end
-        task.wait(AssemblyMod.interval)
+    end
+end)
+
+-- keep the shelves full on its own clock, so a cook never has to stop
+-- and walk to the shop mid-order
+task.spawn(function()
+    while API.running do
+        if PackMod.autoStock then
+            local ok, err = pcall(function()
+                return API.job.run("supply", PackMod.supplySweep)
+            end)
+            if not ok then PackMod.step = "supply: " .. tostring(err) end
+        end
+        task.wait(3.0)
+    end
+end)
+
+-- get ahead of the queue while the shop is quiet: warmers, a bag on the
+-- hatch, topped-up trays
+task.spawn(function()
+    while API.running do
+        if API.prep.enabled then
+            local ok, err = pcall(function()
+                return API.job.run("prep", API.prep.sweep)
+            end)
+            if not ok then API.prep.step = "error: " .. tostring(err) end
+        end
+        task.wait(1.5)
+    end
+end)
+
+task.spawn(function()
+    while API.running do
+        if API.enabled.clean then
+            local did = API.job.run("clean", CleanMod.sweep)
+            CleanMod.fails = did and 0 or (CleanMod.fails + 1)
+            task.wait(CleanMod.fails >= 4 and CleanMod.interval * 4 or CleanMod.interval)
+        else
+            task.wait(0.5)
+        end
+    end
+end)
+
+-- empty the bins on its own clock: a full can blocks new customers
+-- from using it, and a bag left in hand would block the order run
+task.spawn(function()
+    while API.running do
+        if API.enabled.trash then
+            local ok, did = pcall(function()
+                return API.job.run("trash", TrashMod.sweep)
+            end)
+            if not ok then
+                TrashMod.fails += 1
+                TrashMod.state = "error: " .. tostring(did)
+            end
+            task.wait(TrashMod.fails >= 4 and TrashMod.interval * 4 or TrashMod.interval)
+        else
+            task.wait(0.5)
+        end
     end
 end)
 
 task.spawn(function()
     while API.running do
         if API.enabled.drive then
-            DriveMod.sweep()
+            API.job.run("drive", DriveMod.sweep)
         end
         task.wait(DriveMod.interval)
     end
@@ -1603,6 +4651,16 @@ task.spawn(function()
     while API.running do
         if API.enabled.autoOrder then safe(FarmMod.fireOrders) end
         task.wait(FarmMod.interval)
+    end
+end)
+
+-- backup for experiences that never raise Player.Idled
+task.spawn(function()
+    while API.running do
+        if API.afk.enabled and os.clock() - API.afk.last > 45 then
+            API.afk.ping()
+        end
+        task.wait(10)
     end
 end)
 
@@ -1720,12 +4778,53 @@ CookTab:CreateSlider({
     Callback = function(v) CookMod.interval = v end,
 })
 
-CookTab:CreateSection("Assembly")
+CookTab:CreateSection("Pack & Serve")
 CookTab:CreateToggle({
-    Name = "Auto Assembly",
-    SubTitle = "Fire Interact on Island zones / order monitors",
+    Name = "Auto Complete Order",
+    SubTitle = "Bag → receipt → feed food → seal → serve on the hatch",
     Default = false,
-    Callback = function(v) API.enabled.assembly = v end,
+    Callback = function(v) API.enabled.pack = v end,
+})
+CookTab:CreateToggle({
+    Name = "Auto Restock Bags",
+    SubTitle = "Orders a box of paper bags when none are left",
+    Default = true,
+    Callback = function(v) PackMod.restock = v end,
+})
+CookTab:CreateToggle({
+    Name = "Auto Supply",
+    SubTitle = "Keeps patties, buns, cheese, wrappers, bags and cases in stock",
+    Default = true,
+    Callback = function(v) PackMod.autoStock = v end,
+})
+CookTab:CreateToggle({
+    Name = "Auto Serve",
+    SubTitle = "Put the finished bag on the hatch counter",
+    Default = true,
+    Callback = function(v) PackMod.autoServe = v end,
+})
+CookTab:CreateToggle({
+    Name = "Teleport to items",
+    Default = true,
+    Callback = function(v) PackMod.teleport = v end,
+})
+CookTab:CreateSlider({
+    Name = "Pack Interval",
+    Min = 0.2, Max = 2.0, Default = 0.4,
+    Decimals = 2, Step = 0.05, Suffix = "s",
+    Callback = function(v) PackMod.interval = v end,
+})
+CookTab:CreateButton({
+    Name = "Pack Status",
+    ButtonText = "Read",
+    Variant = "secondary",
+    Callback = function()
+        GousseUI:Notify({
+            Title = "Pack & Serve",
+            Content = PackMod.status(),
+            Type = "info", Duration = 6,
+        })
+    end,
 })
 CookTab:CreateButton({
     Name = "Cook Stats",
@@ -1960,6 +5059,58 @@ LitterTab:CreateButton({
     Callback = function() LitterMod.sweep() end,
 })
 
+LitterTab:CreateSection("Mop Spills")
+LitterTab:CreateToggle({
+    Name = "Auto Mop Spills",
+    SubTitle = "Grab the mop, wipe every spill on the floor, hang the mop back",
+    Default = false,
+    Callback = function(v) API.enabled.clean = v end,
+})
+LitterTab:CreateButton({
+    Name = "Mop Status",
+    ButtonText = "Check",
+    Variant = "secondary",
+    Callback = function()
+        GousseUI:Notify({
+            Title = "Spills",
+            Content = CleanMod.status(),
+            Type = "info", Duration = 6,
+        })
+    end,
+})
+LitterTab:CreateButton({
+    Name = "Mop Once",
+    ButtonText = "Mop",
+    Variant = "primary",
+    Callback = function() CleanMod.sweep() end,
+})
+
+LitterTab:CreateSection("Empty Trash")
+LitterTab:CreateToggle({
+    Name = "Auto Clean Trash",
+    SubTitle = "Take the full bag out of each bin and hand it in at the dumpster",
+    Default = false,
+    Callback = function(v) API.enabled.trash = v end,
+})
+LitterTab:CreateButton({
+    Name = "Trash Status",
+    ButtonText = "Check",
+    Variant = "secondary",
+    Callback = function()
+        GousseUI:Notify({
+            Title = "Trash",
+            Content = TrashMod.status(),
+            Type = "info", Duration = 6,
+        })
+    end,
+})
+LitterTab:CreateButton({
+    Name = "Empty Trash Once",
+    ButtonText = "Empty",
+    Variant = "primary",
+    Callback = function() TrashMod.sweep(true) end,
+})
+
 -- DRIVE TAB ---------------------------------------------------
 DriveTab:CreateSection("Drive-Thru")
 local driveToggle
@@ -2058,6 +5209,45 @@ SessionTab:CreateButton({
 })
 
 -- TOOLS TAB ---------------------------------------------------
+ToolsTab:CreateSection("Safety")
+ToolsTab:CreateToggle({
+    Name = "Anti-AFK",
+    SubTitle = "Synthetic input whenever Roblox reports the account idle",
+    Default = true,
+    Callback = function(v) API.afk.enabled = v end,
+})
+ToolsTab:CreateToggle({
+    Name = "Anti-Stuck Recovery",
+    SubTitle = "Reset hands + position when a step stops progressing",
+    Default = true,
+    Callback = function(v) API.watchdog.enabled = v end,
+})
+ToolsTab:CreateButton({
+    Name = "Recover Now",
+    ButtonText = "Reset",
+    Variant = "secondary",
+    Callback = function()
+        API.watchdog.recover("manual reset")
+    end,
+})
+ToolsTab:CreateButton({
+    Name = "Safety Status",
+    ButtonText = "Check",
+    Variant = "secondary",
+    Callback = function()
+        GousseUI:Notify({
+            Title = "Safety",
+            Content = string.format(
+                "AFK pings=%d  last=%ds\nwatchdog resets=%d  step=%s\n%s",
+                API.afk.pings,
+                math.floor(os.clock() - API.afk.last),
+                API.watchdog.resets, tostring(API.watchdog.step),
+                PackMod.status()),
+            Type = "info", Duration = 6,
+        })
+    end,
+})
+
 ToolsTab:CreateSection("Interaction")
 ToolsTab:CreateButton({
     Name = "Fire All Order Remotes",
@@ -2211,12 +5401,17 @@ print("  NPCs     :", WNPCs() and #WNPCs():GetChildren() or 0)
 _G.BP = {
     Site     = SiteMod,
     Litter   = LitterMod,
+    Clean    = CleanMod,
+    Trash    = TrashMod,
     Register = RegisterMod,
     Cook     = CookMod,
+    Pack     = PackMod,
     Assembly = AssemblyMod,
     Drive    = DriveMod,
     Farm     = FarmMod,
     Session  = SessionMod,
+    AFK      = API.afk,
+    Watchdog = API.watchdog,
     State    = API,
     Window   = Window,
     Shutdown     = shutdown,
