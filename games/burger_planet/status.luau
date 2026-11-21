@@ -737,6 +737,8 @@ local function StorageUnits()
         local stations = root and root:FindFirstChild("Stations")
         for _, station in ipairs(stations and stations:GetChildren() or {}) do
             local name = station.Name
+            -- Truck has no real freezer; its "Freezer" station is another cold unit.
+            if siteName == "FoodTruck" and name == "Freezer" then continue end
             local isCabinet = name == "Cupboards" or tostring(name):lower():find("cabinet")
             local isCold = station:GetAttribute("Station") == "ColdStorage"
             if isCabinet or isCold then
