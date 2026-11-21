@@ -66,7 +66,9 @@ local state = {
     tick = 0,
     siteTick = 0,
     orderQty = 1,
-    catalog = nil
+    catalog = nil,
+    pending = 0,
+    baselineBoxes = {}
 }
 
 local function New(class, props, parent)
@@ -134,8 +136,9 @@ end
 
 local function FetchCatalog()
     local data = AskComputer("GetData")
-    if type(data) == "table" and type(data.Supplies) == "table" then
-        state.catalog = data.Supplies
+    if type(data) == "table" then
+        if type(data.Supplies) == "table" then state.catalog = data.Supplies end
+        state.pending = tonumber(data.Pending) or 0
     end
     return state.catalog
 end
@@ -179,6 +182,47 @@ local function OrderSupply(id, name, quantity)
     end
 end
 
+local function IsSupplyBox(inst)
+    return inst:GetAttribute("Interact") == "Item"
+        and inst:GetAttribute("Item") == "Box"
+        and inst:GetAttribute("Supply") ~= nil
+end
+
+local function SnapshotBoxes()
+    state.baselineBoxes = {}
+    local root = SiteRoot()
+    for _, inst in ipairs(root and root:GetDescendants() or {}) do
+        if IsSupplyBox(inst) then state.baselineBoxes[inst] = true end
+    end
+end
+
+local function DeliveryBoxes()
+    local out = {}
+    local root = SiteRoot()
+    for _, inst in ipairs(root and root:GetDescendants() or {}) do
+        if IsSupplyBox(inst) and not state.baselineBoxes[inst] then
+            local location = inst.Parent and inst.Parent.Name or "—"
+            local cursor = inst.Parent
+            while cursor do
+                if tostring(cursor.Name):find("Pallet") then
+                    location = cursor.Name
+                    break
+                end
+                cursor = cursor.Parent
+            end
+            out[#out + 1] = {
+                ref = inst,
+                supply = tostring(inst:GetAttribute("Supply") or "—"),
+                amount = tonumber(inst:GetAttribute("Amount")) or 0,
+                label = tostring(inst:GetAttribute("Label") or inst.Name),
+                id = tostring(inst:GetAttribute("ItemId") or "—"),
+                location = location
+            }
+        end
+    end
+    return out
+end
+
 local function OrderLive(order)
     if not order then return false end
     local status = tostring(order:GetAttribute("Status") or "")
@@ -199,6 +243,7 @@ local Window = GousseUI:CreateWindow({
 local statusTab = Window:CreateTab({ Name = "Status", Icon = "activity" })
 local customerTab = Window:CreateTab({ Name = "Customers", Icon = "users" })
 local siteTab = Window:CreateTab({ Name = "Site", Icon = "store" })
+local deliveryTab = Window:CreateTab({ Name = "Delivery", Icon = "truck" })
 
 local CARD_W, STATUS_H, CUSTOMER_H = 196, 92, 124
 
@@ -681,6 +726,118 @@ local function RenderSite()
     end
 end
 
+local function RenderDelivery()
+    if state.unloaded then return end
+    ClearPage(deliveryTab.Page)
+
+    New("TextLabel", {
+        Size = UDim2.new(1, -8, 0, 26),
+        BackgroundTransparency = 1,
+        Font = FontMedium,
+        Text = "Pending deliveries: " .. tostring(state.pending)
+            .. "   ·   Tracking boxes placed after this script loaded",
+        TextColor3 = GousseUI.Theme.TextSecondary,
+        TextSize = 11.5,
+        TextXAlignment = Enum.TextXAlignment.Left
+    }, deliveryTab.Page)
+
+    local rescan = ActionButton(deliveryTab.Page, "RESCAN", UDim2.new(0, 0, 0, 32), 110,
+        GousseUI.Theme.SurfaceHover, function()
+            SnapshotBoxes()
+            FetchCatalog()
+            RenderDelivery()
+        end)
+    rescan.Position = UDim2.new(1, -118, 0, 32)
+
+    local boxes = DeliveryBoxes()
+    if #boxes == 0 then
+        New("TextLabel", {
+            Position = UDim2.new(0, 0, 0, 78),
+            Size = UDim2.new(1, -8, 0, 44),
+            BackgroundTransparency = 1,
+            Font = FontRegular,
+            Text = "Belum ada barang baru di pallet / storage sejak script dimuat.",
+            TextColor3 = GousseUI.Theme.TextMuted,
+            TextSize = 11,
+            TextWrapped = true
+        }, deliveryTab.Page)
+        return
+    end
+
+    local grid = New("Frame", {
+        Name = "DeliveryGrid",
+        Position = UDim2.new(0, 0, 0, 78),
+        Size = UDim2.new(1, -8, 0, 1),
+        BackgroundTransparency = 1,
+        AutomaticSize = Enum.AutomaticSize.Y
+    }, deliveryTab.Page)
+    New("UIGridLayout", {
+        CellSize = UDim2.new(0, CARD_W, 0, 124),
+        CellPadding = UDim2.new(0, 8, 0, 8),
+        FillDirection = Enum.FillDirection.Horizontal,
+        FillDirectionMaxCells = 3,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        HorizontalAlignment = Enum.HorizontalAlignment.Center,
+        VerticalAlignment = Enum.VerticalAlignment.Top
+    }, grid)
+
+    for i, box in ipairs(boxes) do
+        local card = New("Frame", {
+            Name = "Delivery_" .. tostring(i),
+            LayoutOrder = i,
+            Size = UDim2.new(0, CARD_W, 0, 124),
+            BackgroundColor3 = GousseUI.Theme.Surface,
+            BorderSizePixel = 0,
+            ClipsDescendants = true
+        }, grid)
+        New("UICorner", { CornerRadius = UDim.new(0, 8) }, card)
+        New("UIStroke", { Color = GousseUI.Theme.Border, Thickness = 1 }, card)
+        New("Frame", {
+            Size = UDim2.new(1, 0, 0, 3),
+            BackgroundColor3 = GousseUI.Theme.Warning,
+            BorderSizePixel = 0
+        }, card)
+
+        New("TextLabel", {
+            Position = UDim2.new(0, 10, 0, 9),
+            Size = UDim2.new(1, -20, 0, 20),
+            BackgroundTransparency = 1,
+            Font = FontBold,
+            Text = box.supply,
+            TextColor3 = GousseUI.Theme.TextPrimary,
+            TextSize = 12.5,
+            TextTruncate = Enum.TextTruncate.AtEnd,
+            TextXAlignment = Enum.TextXAlignment.Left
+        }, card)
+        New("TextLabel", {
+            Position = UDim2.new(0, 10, 0, 32),
+            Size = UDim2.new(1, -20, 0, 18),
+            BackgroundTransparency = 1,
+            Font = FontRegular,
+            Text = "Amount " .. box.amount .. "  ·  " .. box.location,
+            TextColor3 = GousseUI.Theme.Warning,
+            TextSize = 10.5,
+            TextXAlignment = Enum.TextXAlignment.Left
+        }, card)
+        New("TextLabel", {
+            Position = UDim2.new(0, 10, 0, 52),
+            Size = UDim2.new(1, -20, 0, 18),
+            BackgroundTransparency = 1,
+            Font = FontRegular,
+            Text = box.label .. "  ·  id " .. box.id,
+            TextColor3 = GousseUI.Theme.TextMuted,
+            TextSize = 9.5,
+            TextTruncate = Enum.TextTruncate.AtEnd,
+            TextXAlignment = Enum.TextXAlignment.Left
+        }, card)
+
+        ActionButton(card, "MOVE TO STORAGE", UDim2.new(0, 10, 1, -38), CARD_W - 20,
+            GousseUI.Theme.SurfaceHover, function()
+                GousseUI:NotifyInfo("Pemindahan ke storage belum diimplementasikan.", "Burger Planet", 3)
+            end)
+    end
+end
+
 -- Refresh scheduling: attribute storms coalesce into one rebuild per frame.
 local function Schedule(kind)
     if kind == "status" then state.statusDirty = true
@@ -722,6 +879,7 @@ Watch(RunService.Heartbeat, function()
         state.siteTick = os.clock()
         state.siteDirty = false
         RenderSite()
+        if Window.ActiveTab == deliveryTab then RenderDelivery() end
     end
 end)
 
@@ -749,8 +907,10 @@ env.BPStatus = {
     end
 }
 
+SnapshotBoxes()
 FetchCatalog()
 RenderStatus()
 RenderCustomers()
 RenderSite()
-GousseUI:NotifySuccess("Status, customers & site controls ready.", "Burger Planet", 3)
+RenderDelivery()
+GousseUI:NotifySuccess("Status, customers, site & delivery tracking ready.", "Burger Planet", 3)
