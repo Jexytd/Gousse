@@ -106,6 +106,7 @@ end
 
 local Remotes = FastFood:WaitForChild("Remotes", 10)
 local Computer = Remotes and Remotes:FindFirstChild("Computer")
+local Describe = Remotes and Remotes:FindFirstChild("Describe")
 
 local function SiteRoot()
     -- The active site is the root that actually has Items/NPCs replicated.
@@ -729,8 +730,39 @@ local function RenderSite()
     end
 end
 
+-- The server only exposes one aggregate Inventory (Dry/Fridge/Freezer) for the
+-- whole site. It cannot tell us which physical fridge or cupboard holds what.
+-- The game's own Describe response is authoritative per door ("N boxes inside").
+local function DescribeBoxes(station)
+    if not Describe then return nil, nil end
+    local hit
+    for _, d in ipairs(station:GetDescendants()) do
+        local tag = d:GetAttribute("Interact")
+        if tag == "ColdDoor" or tag == "CabinetDoor" then
+            hit = d
+            break
+        end
+    end
+    if not hit then return nil, nil end
+    local ok, res = pcall(function() return Describe:InvokeServer(hit, "Primary") end)
+    if not ok or type(res) ~= "table" then return nil, nil end
+    local text = nil
+    if type(res.Fields) == "table" then
+        for _, field in pairs(res.Fields) do
+            if type(field) == "table" then
+                for _, value in pairs(field) do
+                    local s = tostring(value)
+                    if s:find("box", 1, true) then text = s end
+                end
+            end
+        end
+    end
+    if not text then return 0, "Kosong" end
+    local count = tonumber(text:match("(%d+)%s*box"))
+    return count, text
+end
+
 local function StorageUnits()
-    local inv = type(state.inventory) == "table" and state.inventory or {}
     local out = {}
     for _, siteName in ipairs({ "FoodTruck", "FastFood" }) do
         local root = workspace:FindFirstChild(siteName, true)
@@ -754,14 +786,14 @@ local function StorageUnits()
                 if capacity == 0 then capacity = #station:GetChildren() end
 
                 local key = isCabinet and "Dry" or tostring(station:GetAttribute("StorageId") or "")
-                local contents = type(inv[key]) == "table" and inv[key] or {}
-                capacity = math.max(capacity, #contents)
+                local boxesInside, describeText = DescribeBoxes(station)
                 out[#out + 1] = {
                     site = siteName,
                     name = name,
                     key = key,
                     capacity = capacity,
-                    contents = contents,
+                    boxesInside = boxesInside,
+                    describeText = describeText,
                     cold = isCold,
                     station = station
                 }
@@ -853,21 +885,23 @@ local function BuildBillboards()
 
             local dots = {}
             local dotFrame = New("Frame", {
-                Name = "Dots",
+                Name = "BoxMarkers",
                 Position = UDim2.new(0, 8, 0, 44),
                 Size = UDim2.new(1, -16, 0, 26),
                 BackgroundTransparency = 1
             }, gui)
-            local perRow = 8
-            for i = 1, math.min(unit.capacity, 32) do
-                local col = (i - 1) % perRow
-                local row = math.floor((i - 1) / perRow)
+            -- One marker per reported box. Markers appear only for boxes the
+            -- game actually reports, so they never imply a fake slot capacity.
+            for i = 1, 12 do
+                local col = (i - 1) % 8
+                local row = math.floor((i - 1) / 8)
                 local dot = New("Frame", {
                     LayoutOrder = i,
                     Position = UDim2.new(0, col * 24, 0, row * 12),
                     Size = UDim2.new(0, 20, 0, 9),
-                    BackgroundColor3 = GousseUI.Theme.SurfaceHover,
-                    BorderSizePixel = 0
+                    BackgroundColor3 = unit.cold and GousseUI.Theme.Blue or GousseUI.Theme.Warning,
+                    BorderSizePixel = 0,
+                    Visible = false
                 }, dotFrame)
                 New("UICorner", { CornerRadius = UDim.new(0, 2) }, dot)
                 dots[i] = dot
@@ -884,17 +918,25 @@ local function BuildBillboards()
     end
 end
 
+local function RefreshUnitData(unit)
+    local count, text = DescribeBoxes(unit.station)
+    unit.boxesInside = count
+    unit.describeText = text
+    return unit
+end
+
 local function UpdateBillboards()
     for _, rec in ipairs(Billboards) do
-        local unit = rec.unit
-        local contents = type(state.inventory) == "table"
-            and type(state.inventory[unit.key]) == "table" and state.inventory[unit.key] or unit.contents
-        local filled = #contents
-        rec.status.Text = filled .. " / " .. unit.capacity .. " terisi"
-            .. (filled == 0 and "   ·   KOSONG" or "")
-        for i, dot in ipairs(rec.dots) do
-            local entry = contents[i]
-            dot.BackgroundColor3 = entry and SupplyColor(entry.S) or GousseUI.Theme.SurfaceHover
+        local unit = RefreshUnitData(rec.unit)
+        local count = unit.boxesInside
+        if count == nil then
+            rec.status.Text = "Data tidak tersedia dari server"
+            for _, dot in ipairs(rec.dots) do dot.Visible = false end
+        else
+            rec.status.Text = unit.describeText or (count .. " box(es) inside")
+            for i, dot in ipairs(rec.dots) do
+                dot.Visible = i <= count
+            end
         end
     end
 end
@@ -911,7 +953,7 @@ local function RenderStorage()
         Size = UDim2.new(1, -8, 0, 26),
         BackgroundTransparency = 1,
         Font = FontMedium,
-        Text = "Inventory   ·   Dry " .. dry .. "   Fridge " .. fridge .. "   Freezer " .. freezer,
+        Text = "Inventori situs (agregat)   ·   Dry " .. dry .. "   Fridge " .. fridge .. "   Freezer " .. freezer,
         TextColor3 = GousseUI.Theme.TextSecondary,
         TextSize = 11.5,
         TextXAlignment = Enum.TextXAlignment.Left
@@ -948,6 +990,7 @@ local function RenderStorage()
     }, grid)
 
     for i, unit in ipairs(units) do
+        RefreshUnitData(unit)
         local card = New("Frame", {
             Name = "Storage_" .. unit.name,
             LayoutOrder = i,
@@ -979,7 +1022,8 @@ local function RenderStorage()
             Size = UDim2.new(1, -20, 0, 18),
             BackgroundTransparency = 1,
             Font = FontRegular,
-            Text = unit.key .. "   ·   " .. #unit.contents .. " / " .. unit.capacity .. " slot terisi",
+            Text = unit.boxesInside == nil and "Data tidak tersedia dari server"
+                or (unit.describeText or (unit.boxesInside .. " box(es) inside")),
             TextColor3 = unit.cold and GousseUI.Theme.Blue or GousseUI.Theme.Warning,
             TextSize = 10.5,
             TextXAlignment = Enum.TextXAlignment.Left
@@ -990,30 +1034,28 @@ local function RenderStorage()
             Size = UDim2.new(1, -20, 0, 66),
             BackgroundTransparency = 1
         }, card)
-        for slot = 1, math.min(unit.capacity, 24) do
-            local col = (slot - 1) % 6
-            local row = math.floor((slot - 1) / 6)
-            local entry = unit.contents[slot]
+        local shown = unit.boxesInside or 0
+        for box = 1, math.min(shown, 24) do
+            local col = (box - 1) % 6
+            local row = math.floor((box - 1) / 6)
             New("Frame", {
                 Position = UDim2.new(0, col * 38, 0, row * 32),
                 Size = UDim2.new(0, 32, 0, 26),
-                BackgroundColor3 = entry and SupplyColor(entry.S) or GousseUI.Theme.SurfaceHover,
+                BackgroundColor3 = unit.cold and GousseUI.Theme.Blue or GousseUI.Theme.Warning,
                 BorderSizePixel = 0
             }, slotFrame)
         end
 
-        local names = {}
-        for _, entry in ipairs(unit.contents) do
-            names[#names + 1] = tostring(entry.S or "?") .. " x" .. tostring(entry.A or 0)
-        end
         New("TextLabel", {
             Position = UDim2.new(0, 10, 0, 130),
             Size = UDim2.new(1, -20, 0, 28),
             BackgroundTransparency = 1,
             Font = FontRegular,
-            Text = #names > 0 and table.concat(names, "  ·  ") or "Kosong",
+            Text = unit.boxesInside == nil
+                and "Server tidak melaporkan isi unit ini."
+                or ("Sumber: Describe server (per-unit). Kapasitas pasti tidak dipublikasikan."),
             TextColor3 = GousseUI.Theme.TextMuted,
-            TextSize = 10,
+            TextSize = 9.5,
             TextWrapped = true,
             TextXAlignment = Enum.TextXAlignment.Left,
             TextYAlignment = Enum.TextYAlignment.Top
