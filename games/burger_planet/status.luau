@@ -58,7 +58,16 @@ local FontBold = Enum.Font.BuilderSansBold or Enum.Font.GothamBold
 local FontMedium = Enum.Font.BuilderSansMedium or Enum.Font.GothamMedium
 local FontRegular = Enum.Font.BuilderSans or Enum.Font.Gotham
 
-local state = { unloaded = false, statusDirty = true, customersDirty = true, siteDirty = true, tick = 0, siteTick = 0 }
+local state = {
+    unloaded = false,
+    statusDirty = true,
+    customersDirty = true,
+    siteDirty = true,
+    tick = 0,
+    siteTick = 0,
+    orderQty = 1,
+    catalog = nil
+}
 
 local function New(class, props, parent)
     local inst = Instance.new(class)
@@ -121,6 +130,53 @@ end
 local function FindNPCs()
     local root = SiteRoot()
     return root and root:FindFirstChild("NPCs") or nil
+end
+
+local function FetchCatalog()
+    local data = AskComputer("GetData")
+    if type(data) == "table" and type(data.Supplies) == "table" then
+        state.catalog = data.Supplies
+    end
+    return state.catalog
+end
+
+local function OpenComputer()
+    local root = SiteRoot()
+    local stations = root and root:FindFirstChild("Stations")
+    if not stations or not Remotes or not Remotes:FindFirstChild("Interact") then return false end
+    local screen
+    for _, part in ipairs(stations:GetDescendants()) do
+        if part:IsA("BasePart") and part:GetAttribute("Interact") == "Computer" then
+            if part.Name == "Screen" then
+                screen = part
+                break
+            end
+            screen = screen or part
+        end
+    end
+    if not screen then return false end
+    pcall(function()
+        Remotes.Interact:FireServer(screen, "Primary", screen.Position)
+    end)
+    return true
+end
+
+local function OrderSupply(id, name, quantity)
+    if not id then return end
+    OpenComputer()
+    task.wait(0.3)
+    local cart = { [id] = quantity }
+    local result = AskComputer("Order", { Cart = cart })
+    GousseUI:Notify({
+        Title = "Order " .. tostring(name),
+        Content = result.Ok and ("Ordered " .. quantity .. " box(es).") or (result.Message or "Order refused."),
+        Type = result.Ok and "success" or "error",
+        Duration = 3
+    })
+    if result.Ok then
+        FetchCatalog()
+        state.siteDirty = true
+    end
 end
 
 local function OrderLive(order)
@@ -423,7 +479,7 @@ local function RenderSite()
             Type = result.Ok and "success" or "error",
             Duration = 3
         })
-        Schedule("site")
+        state.siteDirty = true
     end)
     ActionButton(actionRow, "CLOSE EARLY", UDim2.new(0, 158, 0, 0), 150, Color3.fromRGB(190, 45, 65), function()
         local result = AskComputer("CloseEarly")
@@ -433,7 +489,7 @@ local function RenderSite()
             Type = result.Ok and "success" or "error",
             Duration = 3
         })
-        Schedule("site")
+        state.siteDirty = true
     end)
 
     local laneRow = New("Frame", {
@@ -458,7 +514,7 @@ local function RenderSite()
                     Type = result.Ok and "success" or "error",
                     Duration = 2.5
                 })
-                Schedule("site")
+                state.siteDirty = true
             end)
     end
 
@@ -472,16 +528,56 @@ local function RenderSite()
         TextXAlignment = Enum.TextXAlignment.Left
     }, siteTab.Page)
 
+    local qtyRow = New("Frame", {
+        Size = UDim2.new(1, -8, 0, 32),
+        BackgroundTransparency = 1
+    }, siteTab.Page)
+    New("TextLabel", {
+        Position = UDim2.new(0, 0, 0, 7),
+        Size = UDim2.new(0, 78, 0, 18),
+        BackgroundTransparency = 1,
+        Font = FontMedium,
+        Text = "ORDER QTY",
+        TextColor3 = GousseUI.Theme.TextMuted,
+        TextSize = 10.5,
+        TextXAlignment = Enum.TextXAlignment.Left
+    }, qtyRow)
+    for i, qty in ipairs({ 1, 5, 10 }) do
+        ActionButton(qtyRow, "x" .. qty, UDim2.new(0, 84 + (i - 1) * 66, 0, 0), 60,
+            state.orderQty == qty and GousseUI.Theme.Accent or GousseUI.Theme.SurfaceHover,
+            function()
+                state.orderQty = qty
+                RenderSite()
+            end)
+    end
+
+    local stock = {}
     local root = SiteRoot()
     local items = root and root:FindFirstChild("Items")
-    local entries = {}
     for _, item in ipairs(items and items:GetChildren() or {}) do
-        local amount = tonumber(item:GetAttribute("Amount")) or 0
-        entries[#entries + 1] = {
-            name = tostring(item:GetAttribute("Supply") or item:GetAttribute("Ingredient") or item.Name),
-            label = tostring(item:GetAttribute("Label") or item.Name),
-            amount = amount
-        }
+        local key = item:GetAttribute("Supply") or item:GetAttribute("Ingredient")
+        if not key and item:GetAttribute("Sauce") then key = "Sauces" end
+        key = tostring(key or item.Name)
+        stock[key] = (stock[key] or 0) + (tonumber(item:GetAttribute("Amount")) or 0)
+    end
+
+    local entries = {}
+    for _, supply in ipairs(state.catalog or {}) do
+        if type(supply) == "table" and not supply.Locked then
+            entries[#entries + 1] = {
+                id = supply.Id,
+                name = tostring(supply.Name or supply.Id),
+                amount = stock[supply.Id] or 0,
+                price = tonumber(supply.Price) or 0,
+                storage = tostring(supply.Storage or "Dry"),
+                pack = tonumber(supply.Amount) or 0
+            }
+        end
+    end
+    if #entries == 0 then
+        for key, amount in pairs(stock) do
+            entries[#entries + 1] = { id = nil, name = key, amount = amount, price = 0, storage = "—", pack = 0 }
+        end
     end
     table.sort(entries, function(a, b) return a.amount < b.amount end)
 
@@ -497,11 +593,91 @@ local function RenderSite()
         return
     end
 
-    local grid = MakeGrid(siteTab.Page)
+    local grid = New("Frame", {
+        Name = "SupplyGrid",
+        Size = UDim2.new(1, -8, 0, 1),
+        BackgroundTransparency = 1,
+        AutomaticSize = Enum.AutomaticSize.Y
+    }, siteTab.Page)
+    New("UIGridLayout", {
+        CellSize = UDim2.new(0, CARD_W, 0, 124),
+        CellPadding = UDim2.new(0, 8, 0, 8),
+        FillDirection = Enum.FillDirection.Horizontal,
+        FillDirectionMaxCells = 3,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        HorizontalAlignment = Enum.HorizontalAlignment.Center,
+        VerticalAlignment = Enum.VerticalAlignment.Top
+    }, grid)
+
     for i, entry in ipairs(entries) do
         local color = entry.amount <= 5 and GousseUI.Theme.Danger
             or (entry.amount <= 12 and GousseUI.Theme.Warning or GousseUI.Theme.Success)
-        MakeCard(grid, entry.name, i, "package", color, tostring(entry.amount), entry.label)
+        local card = New("Frame", {
+            Name = "Supply_" .. tostring(entry.id or entry.name),
+            LayoutOrder = i,
+            Size = UDim2.new(0, CARD_W, 0, 124),
+            BackgroundColor3 = GousseUI.Theme.Surface,
+            BorderSizePixel = 0,
+            ClipsDescendants = true
+        }, grid)
+        New("UICorner", { CornerRadius = UDim.new(0, 8) }, card)
+        New("UIStroke", { Color = GousseUI.Theme.Border, Thickness = 1 }, card)
+        New("Frame", {
+            Size = UDim2.new(1, 0, 0, 3),
+            BackgroundColor3 = color,
+            BorderSizePixel = 0
+        }, card)
+
+        New("TextLabel", {
+            Position = UDim2.new(0, 10, 0, 9),
+            Size = UDim2.new(1, -20, 0, 20),
+            BackgroundTransparency = 1,
+            Font = FontBold,
+            Text = entry.name,
+            TextColor3 = GousseUI.Theme.TextPrimary,
+            TextSize = 12.5,
+            TextTruncate = Enum.TextTruncate.AtEnd,
+            TextXAlignment = Enum.TextXAlignment.Left
+        }, card)
+
+        New("TextLabel", {
+            Position = UDim2.new(0, 10, 0, 32),
+            Size = UDim2.new(1, -20, 0, 18),
+            BackgroundTransparency = 1,
+            Font = FontRegular,
+            Text = "Stock " .. entry.amount .. "  ·  " .. entry.storage,
+            TextColor3 = color,
+            TextSize = 10.5,
+            TextXAlignment = Enum.TextXAlignment.Left
+        }, card)
+
+        New("TextLabel", {
+            Position = UDim2.new(0, 10, 0, 52),
+            Size = UDim2.new(1, -20, 0, 18),
+            BackgroundTransparency = 1,
+            Font = FontRegular,
+            Text = "$" .. entry.price .. " / box  ·  pack " .. entry.pack,
+            TextColor3 = GousseUI.Theme.TextMuted,
+            TextSize = 10,
+            TextXAlignment = Enum.TextXAlignment.Left
+        }, card)
+
+        if entry.id then
+            ActionButton(card, "ORDER x" .. state.orderQty, UDim2.new(0, 10, 1, -38), CARD_W - 20,
+                GousseUI.Theme.Accent, function()
+                    OrderSupply(entry.id, entry.name, state.orderQty)
+                end)
+        else
+            New("TextLabel", {
+                Position = UDim2.new(0, 10, 1, -34),
+                Size = UDim2.new(1, -20, 0, 18),
+                BackgroundTransparency = 1,
+                Font = FontRegular,
+                Text = "No catalog id",
+                TextColor3 = GousseUI.Theme.TextMuted,
+                TextSize = 10
+            }, card)
+        end
     end
 end
 
@@ -573,6 +749,7 @@ env.BPStatus = {
     end
 }
 
+FetchCatalog()
 RenderStatus()
 RenderCustomers()
 RenderSite()
