@@ -292,12 +292,14 @@ local function Radio(parent, x, y, active)
         Size = UDim2.new(0, 20, 0, 20),
         Position = UDim2.new(0, x, 0, y),
         BackgroundColor3 = active and GousseUI.Theme.Accent or GousseUI.Theme.Background,
-        BorderSizePixel = 0
+        BorderSizePixel = 0,
+        ZIndex = 10
     }, parent)
     New("UICorner", { CornerRadius = UDim.new(1, 0) }, outer)
     New("UIStroke", {
         Color = active and GousseUI.Theme.Accent or GousseUI.Theme.BorderLight,
-        Thickness = 1.5
+        Thickness = 1.5,
+        ZIndex = 10
     }, outer)
     local dot = New("Frame", {
         Name = "Dot",
@@ -305,7 +307,8 @@ local function Radio(parent, x, y, active)
         Position = UDim2.new(0.5, -4, 0.5, -4),
         BackgroundColor3 = GousseUI.Theme.Background,
         BorderSizePixel = 0,
-        Visible = active
+        Visible = active,
+        ZIndex = 11
     }, outer)
     New("UICorner", { CornerRadius = UDim.new(1, 0) }, dot)
     return outer
@@ -468,7 +471,7 @@ local function OpenCreateModal()
             ZIndex = 3
         }, modal)
         New("UICorner", { CornerRadius = UDim.new(0, 8) }, card)
-        New("UIStroke", { Color = i == 1 and GousseUI.Theme.Warning or GousseUI.Theme.Border, Thickness = 1.3 }, card)
+        New("UIStroke", { Color = i == 1 and GousseUI.Theme.Warning or GousseUI.Theme.Border, Thickness = 1.3, ZIndex = 10 }, card)
 
         local icon = GousseUI:GetIcon(info.Icon)
         if icon and icon ~= "" then
@@ -561,7 +564,7 @@ local function OpenCreateModal()
             ClipsDescendants = true
         }, modal)
         New("UICorner", { CornerRadius = UDim.new(0, 8) }, card)
-        New("UIStroke", { Color = i == 1 and GousseUI.Theme.Warning or GousseUI.Theme.Border, Thickness = 1.3 }, card)
+        New("UIStroke", { Color = i == 1 and GousseUI.Theme.Warning or GousseUI.Theme.Border, Thickness = 1.3, ZIndex = 10 }, card)
 
         New("ImageLabel", {
             Size = UDim2.new(1, 0, 0, 128),
