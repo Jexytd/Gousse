@@ -259,28 +259,41 @@ local function TypeIcon(kind)
     return "utensils"
 end
 
+-- Visibility pills use the same amber highlight as the create modal so the
+-- two surfaces read as one palette instead of a green/amber clash.
+local PILL_ACTIVE = GousseUI.Theme.Warning
+local PILL_IDLE = Color3.fromRGB(17, 24, 39)
+local PILL_TEXT_ACTIVE = Color3.fromRGB(11, 14, 20)
+local PILL_TEXT_IDLE = Color3.fromRGB(107, 114, 128)
+local PILL_STROKE_IDLE = Color3.fromRGB(31, 41, 55)
+
 local function Pill(parent, text, x, width, active, onClick)
     local btn = New("TextButton", {
         Name = "Pill_" .. text,
         Position = UDim2.new(0, x, 0, 0),
         Size = UDim2.new(0, width, 0, 24),
-        BackgroundColor3 = active and GousseUI.Theme.Accent or GousseUI.Theme.Sidebar,
+        BackgroundColor3 = active and PILL_ACTIVE or PILL_IDLE,
         BorderSizePixel = 0,
         Font = FontMedium,
         Text = text,
-        TextColor3 = active and GousseUI.Theme.Background or GousseUI.Theme.TextSecondary,
+        TextColor3 = active and PILL_TEXT_ACTIVE or PILL_TEXT_IDLE,
         TextSize = 11,
         AutoButtonColor = false
     }, parent)
     New("UICorner", { CornerRadius = UDim.new(0, 6) }, btn)
-    New("UIStroke", { Color = active and GousseUI.Theme.Accent or GousseUI.Theme.Border, Thickness = 1 }, btn)
+    local stroke = New("UIStroke", {
+        Color = active and PILL_ACTIVE or PILL_STROKE_IDLE,
+        Thickness = 1
+    }, btn)
     btn.MouseButton1Click:Connect(function()
         onClick()
         for _, sibling in ipairs(parent:GetChildren()) do
             if sibling:IsA("TextButton") and sibling.Name:find("^Pill_") then
                 local isActive = sibling == btn
-                sibling.BackgroundColor3 = isActive and GousseUI.Theme.Accent or GousseUI.Theme.Sidebar
-                sibling.TextColor3 = isActive and GousseUI.Theme.Background or GousseUI.Theme.TextSecondary
+                sibling.BackgroundColor3 = isActive and PILL_ACTIVE or PILL_IDLE
+                sibling.TextColor3 = isActive and PILL_TEXT_ACTIVE or PILL_TEXT_IDLE
+                local s = sibling:FindFirstChildOfClass("UIStroke")
+                if s then s.Color = isActive and PILL_ACTIVE or PILL_STROKE_IDLE end
             end
         end
     end)
