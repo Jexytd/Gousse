@@ -1,6 +1,6 @@
 --[[
     ========================================================================
-    GousseUI - Authentic Modern Game Utility UI Library (v2.4.1)
+    GousseUI - Authentic Modern Game Utility UI Library (v2.4.2)
     Engineered for Gousse Hub & Roblox Execution Environments
     ========================================================================
     Design Direction & Features:
@@ -885,7 +885,7 @@ local FontRegular = Enum.Font.BuilderSans or Enum.Font.Gotham
 local FontCode = Enum.Font.RobotoMono or Enum.Font.Code
 
 local GousseUI = {
-    Version = "2.4.1",
+    Version = "2.4.2",
     Windows = {},
     ActiveKeybind = Enum.KeyCode.RightControl,
     NotificationPosition = "BottomRight",
@@ -2213,7 +2213,7 @@ function GousseUI:CreateLoader(config: {
     track.Name = "Track"
     track.Size = UDim2.new(1, 0, 0, 6)
     track.Position = UDim2.new(0, 0, 0, 22)
-    track.BackgroundColor3 = Color3.fromRGB(30, 41, 59)
+    track.BackgroundColor3 = GousseUI.Theme.Border
     track.BorderSizePixel = 0
     track.Parent = progressContainer
 
@@ -3424,7 +3424,7 @@ function GousseUI:CreateWindow(config: {
             infoBtn = Instance.new("TextButton")
             infoBtn.Name = "InfoBtn"
             infoBtn.Size = UDim2.new(0, 18, 0, 18)
-            infoBtn.BackgroundColor3 = Color3.fromRGB(30, 41, 59)
+            infoBtn.BackgroundColor3 = GousseUI.Theme.Border
             infoBtn.Font = FontBold
             infoBtn.Text = "?"
             infoBtn.TextColor3 = GousseUI.Theme.TextSecondary
@@ -3859,7 +3859,7 @@ function GousseUI:CreateWindow(config: {
                     actionBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
                     actStroke.Color = Color3.fromRGB(244, 63, 94)
                 else -- secondary
-                    actionBtn.BackgroundColor3 = Color3.fromRGB(26, 35, 48)
+                    actionBtn.BackgroundColor3 = GousseUI.Theme.SurfaceHover
                     actionBtn.TextColor3 = th.TextPrimary
                     actStroke.Color = th.BorderLight
                 end
@@ -3874,7 +3874,7 @@ function GousseUI:CreateWindow(config: {
             actionBtn.MouseButton1Click:Connect(function()
                 Tween(actionBtn, { BackgroundColor3 = GousseUI.Theme.SurfaceHover }, 0.08)
                 task.delay(0.1, function()
-                    local returnColor = (variant == "primary" and GousseUI.Theme.Accent) or (variant == "danger" and Color3.fromRGB(225, 29, 72)) or Color3.fromRGB(26, 35, 48)
+                    local returnColor = (variant == "primary" and GousseUI.Theme.Accent) or (variant == "danger" and Color3.fromRGB(225, 29, 72)) or GousseUI.Theme.SurfaceHover
                     Tween(actionBtn, { BackgroundColor3 = returnColor }, 0.1)
                 end)
                 pcall(callback)
@@ -4129,7 +4129,7 @@ function GousseUI:CreateWindow(config: {
                 local infoBtn = Instance.new("TextButton")
                 infoBtn.Name = "InfoBtn"
                 infoBtn.Size = UDim2.new(0, 18, 0, 18)
-                infoBtn.BackgroundColor3 = Color3.fromRGB(30, 41, 59)
+                infoBtn.BackgroundColor3 = GousseUI.Theme.Border
                 infoBtn.Font = FontBold
                 infoBtn.Text = "?"
                 infoBtn.TextColor3 = GousseUI.Theme.TextSecondary
@@ -4260,7 +4260,7 @@ function GousseUI:CreateWindow(config: {
             track.Name = "Track"
             track.Size = UDim2.new(1, -24, 0, 6)
             track.Position = UDim2.new(0, 12, 0, if isMobile then 33 else 29)
-            track.BackgroundColor3 = Color3.fromRGB(30, 41, 59)
+            track.BackgroundColor3 = GousseUI.Theme.Border
             track.Text = ""
             track.AutoButtonColor = false
             track.Parent = sliderFrame
