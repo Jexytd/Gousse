@@ -1,6 +1,7 @@
 -- Burger Planet: Fast Food Simulator — lobby restaurant manager (card layout)
 -- Cards show owned saves with Load / Delete. The grid container has an Add tile
--- sized exactly like a restaurant card.
+-- sized exactly like a restaurant card. Create opens a full modal matching the
+-- game's own "New restaurant" flow.
 
 local env = (getgenv and getgenv()) or _G or {}
 local GousseUI = env.GousseUI
@@ -40,6 +41,7 @@ if type(previous) == "table" and type(previous.Shutdown) == "function" then
 end
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
 local menu = ReplicatedStorage:FindFirstChild("Menu")
 local MenuFn = menu and menu:FindFirstChild("MenuFn")
 if not MenuFn then
@@ -51,14 +53,19 @@ local FontBold = Enum.Font.BuilderSansBold or Enum.Font.GothamBold
 local FontMedium = Enum.Font.BuilderSansMedium or Enum.Font.GothamMedium
 local FontRegular = Enum.Font.BuilderSans or Enum.Font.Gotham
 
-local MODES = { "Career", "Sandbox", "Food Truck" }
+local MODES = { "Career", "Sandbox" }
+local MAPS = { "Restaurant", "Food Truck" }
 local VISIBILITY = { "Solo", "Friends", "Anyone" }
 
 local CARD_W = 210
 local CARD_H = 138
 
+local PHOTO_RESTAURANT = "rbxassetid://93335508698582"
+local PHOTO_TRUCK = "rbxassetid://120456991592636"
+
 local state = {
     mode = "Career",
+    map = "Restaurant",
     name = "",
     visibility = "Solo",
     data = nil,
@@ -73,6 +80,16 @@ local function New(class, props, parent)
     end
     if parent then inst.Parent = parent end
     return inst
+end
+
+local function GetSafeParent()
+    local ok, hui = pcall(function()
+        return (type(gethui) == "function") and gethui() or nil
+    end)
+    if ok and hui then return hui end
+    local okCore, core = pcall(function() return game:GetService("CoreGui") end)
+    if okCore and core then return core end
+    return Players.LocalPlayer:WaitForChild("PlayerGui")
 end
 
 local function Ask(...)
@@ -123,15 +140,33 @@ local function Collect(data)
     return owned
 end
 
-local function FindEmpty(data, mode)
-    local lists = {
-        Career = data.Slots,
-        Sandbox = data.Sandbox,
-        ["Food Truck"] = data.Truck
-    }
-    local list = lists[mode]
-    if type(list) ~= "table" then return nil end
+local function MapList(data, map, mode)
+    if map == "Food Truck" then
+        local list = {}
+        for _, entry in pairs((data and data.Truck) or {}) do
+            if type(entry) == "table" and (entry.Sandbox == true) == (mode == "Sandbox") then
+                list[#list + 1] = entry
+            end
+        end
+        return list
+    end
+    return (mode == "Sandbox" and data.Sandbox or data.Slots) or {}
+end
+
+local function SlotStats(data, map, mode)
+    local list = MapList(data, map, mode)
+    local free, unlocked = 0, 0
     for _, entry in pairs(list) do
+        if type(entry) == "table" and not entry.Locked then
+            unlocked += 1
+            if entry.Empty then free += 1 end
+        end
+    end
+    return free, unlocked
+end
+
+local function FindSlot(data, map, mode)
+    for _, entry in pairs(MapList(data, map, mode)) do
         if type(entry) == "table" and entry.Empty and not entry.Locked then
             return tonumber(entry.Slot)
         end
@@ -183,9 +218,9 @@ local function CreateSlot(name)
         return
     end
 
-    local slot = FindEmpty(state.data, state.mode)
+    local slot = FindSlot(state.data, state.map, state.mode)
     if not slot then
-        GousseUI:NotifyWarning("No free " .. state.mode .. " slot. Delete one or unlock Extra Slots.", "Burger Planet", 4)
+        GousseUI:NotifyWarning("No free slot for that combination. Delete one or unlock Extra Slots.", "Burger Planet", 4)
         return
     end
 
@@ -238,10 +273,7 @@ local function Pill(parent, text, x, width, active, onClick)
         AutoButtonColor = false
     }, parent)
     New("UICorner", { CornerRadius = UDim.new(0, 6) }, btn)
-    New("UIStroke", {
-        Color = active and GousseUI.Theme.Accent or GousseUI.Theme.Border,
-        Thickness = 1
-    }, btn)
+    New("UIStroke", { Color = active and GousseUI.Theme.Accent or GousseUI.Theme.Border, Thickness = 1 }, btn)
     btn.MouseButton1Click:Connect(function()
         onClick()
         for _, sibling in ipairs(parent:GetChildren()) do
@@ -253,6 +285,409 @@ local function Pill(parent, text, x, width, active, onClick)
         end
     end)
     return btn
+end
+
+local function Radio(parent, x, y, active)
+    local outer = New("Frame", {
+        Size = UDim2.new(0, 20, 0, 20),
+        Position = UDim2.new(0, x, 0, y),
+        BackgroundColor3 = active and GousseUI.Theme.Accent or GousseUI.Theme.Background,
+        BorderSizePixel = 0
+    }, parent)
+    New("UICorner", { CornerRadius = UDim.new(1, 0) }, outer)
+    New("UIStroke", {
+        Color = active and GousseUI.Theme.Accent or GousseUI.Theme.BorderLight,
+        Thickness = 1.5
+    }, outer)
+    local dot = New("Frame", {
+        Name = "Dot",
+        Size = UDim2.new(0, 8, 0, 8),
+        Position = UDim2.new(0.5, -4, 0.5, -4),
+        BackgroundColor3 = GousseUI.Theme.Background,
+        BorderSizePixel = 0,
+        Visible = active
+    }, outer)
+    New("UICorner", { CornerRadius = UDim.new(1, 0) }, dot)
+    return outer
+end
+
+local function SetRadio(radio, active)
+    radio.BackgroundColor3 = active and GousseUI.Theme.Accent or GousseUI.Theme.Background
+    local stroke = radio:FindFirstChildOfClass("UIStroke")
+    if stroke then stroke.Color = active and GousseUI.Theme.Accent or GousseUI.Theme.BorderLight end
+    local dot = radio:FindFirstChild("Dot")
+    if dot then dot.Visible = active end
+end
+
+-- Full create modal, matching the game's New restaurant screen.
+local function OpenCreateModal()
+    for _, child in ipairs(GetSafeParent():GetChildren()) do
+        if child:IsA("ScreenGui") and child.Name == "GousseBP_CreateModal" then
+            child:Destroy()
+        end
+    end
+
+    state.mode = "Career"
+    state.map = "Restaurant"
+    state.name = ""
+
+    local screen = New("ScreenGui", {
+        Name = "GousseBP_CreateModal",
+        ResetOnSpawn = false,
+        DisplayOrder = 5000,
+        ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    }, GetSafeParent())
+
+    local dim = New("TextButton", {
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+        BackgroundTransparency = 0.6,
+        Text = "",
+        AutoButtonColor = false,
+        ZIndex = 1
+    }, screen)
+
+    local modal = New("Frame", {
+        Name = "Modal",
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        Size = UDim2.new(0, 720, 0, 620),
+        BackgroundColor3 = GousseUI.Theme.Background,
+        BorderSizePixel = 0,
+        ZIndex = 2,
+        ClipsDescendants = true
+    }, screen)
+    New("UICorner", { CornerRadius = UDim.new(0, 12) }, modal)
+    New("UIStroke", { Color = GousseUI.Theme.Border, Thickness = 1 }, modal)
+
+    New("TextLabel", {
+        Position = UDim2.new(0, 24, 0, 18),
+        Size = UDim2.new(1, -48, 0, 34),
+        BackgroundTransparency = 1,
+        Font = FontBold,
+        Text = "New restaurant",
+        TextColor3 = GousseUI.Theme.TextPrimary,
+        TextSize = 26,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 3
+    }, modal)
+
+    New("TextLabel", {
+        Position = UDim2.new(0, 24, 0, 56),
+        Size = UDim2.new(1, -48, 0, 32),
+        BackgroundTransparency = 1,
+        Font = FontRegular,
+        Text = "Name it, then pick how you play and where. Other players see the name when they join.",
+        TextColor3 = GousseUI.Theme.TextSecondary,
+        TextSize = 12,
+        TextWrapped = true,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextYAlignment = Enum.TextYAlignment.Top,
+        ZIndex = 3
+    }, modal)
+
+    local inputWrap = New("Frame", {
+        Position = UDim2.new(0, 24, 0, 96),
+        Size = UDim2.new(1, -48, 0, 42),
+        BackgroundColor3 = GousseUI.Theme.Surface,
+        BorderSizePixel = 0,
+        ZIndex = 3
+    }, modal)
+    New("UICorner", { CornerRadius = UDim.new(0, 8) }, inputWrap)
+    New("UIStroke", { Color = GousseUI.Theme.Accent, Thickness = 1.3 }, inputWrap)
+
+    local nameBox = New("TextBox", {
+        Position = UDim2.new(0, 14, 0, 0),
+        Size = UDim2.new(1, -80, 1, 0),
+        BackgroundTransparency = 1,
+        Font = FontRegular,
+        PlaceholderText = "e.g. Burger Planet",
+        PlaceholderColor3 = GousseUI.Theme.TextMuted,
+        Text = "",
+        TextColor3 = GousseUI.Theme.TextPrimary,
+        TextSize = 14,
+        ClearTextOnFocus = false,
+        ZIndex = 4
+    }, inputWrap)
+
+    local counter = New("TextLabel", {
+        AnchorPoint = Vector2.new(1, 0),
+        Position = UDim2.new(1, -14, 0, 0),
+        Size = UDim2.new(0, 56, 1, 0),
+        BackgroundTransparency = 1,
+        Font = FontRegular,
+        Text = "0/24",
+        TextColor3 = GousseUI.Theme.TextMuted,
+        TextSize = 11,
+        TextXAlignment = Enum.TextXAlignment.Right,
+        ZIndex = 4
+    }, inputWrap)
+
+    nameBox:GetPropertyChangedSignal("Text"):Connect(function()
+        if #nameBox.Text > 24 then
+            nameBox.Text = nameBox.Text:sub(1, 24)
+        end
+        counter.Text = #nameBox.Text .. "/24"
+    end)
+
+    New("TextLabel", {
+        Position = UDim2.new(0, 24, 0, 154),
+        Size = UDim2.new(1, -48, 0, 18),
+        BackgroundTransparency = 1,
+        Font = FontBold,
+        Text = "HOW YOU PLAY",
+        TextColor3 = GousseUI.Theme.TextMuted,
+        TextSize = 11,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 3
+    }, modal)
+
+    local modeCards, modeRadios = {}, {}
+    local modeInfo = {
+        { Name = "Career", Desc = "Start small and grow: earn money, level up and unlock upgrades. Counts on the leaderboards.", Icon = "utensils" },
+        { Name = "Sandbox", Desc = "Unlimited money and everything unlocked. Just for fun: it doesn't count towards Career.", Icon = "flask-conical" }
+    }
+
+    local function selectMode(index)
+        state.mode = modeInfo[index].Name
+        for i, card in ipairs(modeCards) do
+            local active = i == index
+            local stroke = card:FindFirstChildOfClass("UIStroke")
+            if stroke then stroke.Color = active and GousseUI.Theme.Warning or GousseUI.Theme.Border end
+            SetRadio(modeRadios[i], active)
+        end
+    end
+
+    for i, info in ipairs(modeInfo) do
+        local card = New("TextButton", {
+            Position = UDim2.new(0, 24 + (i - 1) * 348, 0, 178),
+            Size = UDim2.new(0, 336, 0, 78),
+            BackgroundColor3 = GousseUI.Theme.Surface,
+            BorderSizePixel = 0,
+            AutoButtonColor = false,
+            ZIndex = 3
+        }, modal)
+        New("UICorner", { CornerRadius = UDim.new(0, 8) }, card)
+        New("UIStroke", { Color = i == 1 and GousseUI.Theme.Warning or GousseUI.Theme.Border, Thickness = 1.3 }, card)
+
+        local icon = GousseUI:GetIcon(info.Icon)
+        if icon and icon ~= "" then
+            New("ImageLabel", {
+                Position = UDim2.new(0, 14, 0, 12),
+                Size = UDim2.new(0, 22, 0, 22),
+                BackgroundTransparency = 1,
+                Image = icon,
+                ImageColor3 = GousseUI.Theme.TextPrimary,
+                ZIndex = 4
+            }, card)
+        end
+        New("TextLabel", {
+            Position = UDim2.new(0, 44, 0, 10),
+            Size = UDim2.new(1, -80, 0, 24),
+            BackgroundTransparency = 1,
+            Font = FontBold,
+            Text = info.Name,
+            TextColor3 = GousseUI.Theme.TextPrimary,
+            TextSize = 15,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            ZIndex = 4
+        }, card)
+        New("TextLabel", {
+            Position = UDim2.new(0, 14, 0, 42),
+            Size = UDim2.new(1, -28, 0, 30),
+            BackgroundTransparency = 1,
+            Font = FontRegular,
+            Text = info.Desc,
+            TextColor3 = GousseUI.Theme.TextSecondary,
+            TextSize = 11,
+            TextWrapped = true,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Top,
+            ZIndex = 4
+        }, card)
+
+        modeRadios[i] = Radio(card, 300, 12, i == 1)
+        modeCards[i] = card
+        card.MouseButton1Click:Connect(function() selectMode(i) end)
+    end
+
+    New("TextLabel", {
+        Position = UDim2.new(0, 24, 0, 270),
+        Size = UDim2.new(1, -48, 0, 18),
+        BackgroundTransparency = 1,
+        Font = FontBold,
+        Text = "WHERE",
+        TextColor3 = GousseUI.Theme.TextMuted,
+        TextSize = 11,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 3
+    }, modal)
+
+    local mapCards, mapRadios = {}, {}
+    local mapInfo = {
+        { Name = "Restaurant", Desc = "In town: dine-in, drive-thru, staff and deliveries.", Photo = PHOTO_RESTAURANT, Icon = "utensils", Mode = "Career" },
+        { Name = "Food Truck", Desc = "At the beach: a smaller kitchen, every order to go.", Photo = PHOTO_TRUCK, Icon = "truck", Mode = "Career", New = true }
+    }
+
+    local function refreshMapLines()
+        for i, info in ipairs(mapInfo) do
+            local line = mapCards[i]:FindFirstChild("SlotsLine")
+            if line then
+                local free, total = SlotStats(state.data, info.Name, state.mode)
+                line.Text = tostring(free) .. " of " .. tostring(total) .. " " .. state.mode .. " " .. (info.Name == "Food Truck" and "truck" or "restaurant") .. " slots free"
+            end
+        end
+    end
+
+    local function selectMap(index)
+        state.map = mapInfo[index].Name
+        for i, card in ipairs(mapCards) do
+            local active = i == index
+            local stroke = card:FindFirstChildOfClass("UIStroke")
+            if stroke then stroke.Color = active and GousseUI.Theme.Warning or GousseUI.Theme.Border end
+            SetRadio(mapRadios[i], active)
+        end
+        refreshMapLines()
+    end
+
+    for i, info in ipairs(mapInfo) do
+        local card = New("TextButton", {
+            Position = UDim2.new(0, 24 + (i - 1) * 348, 0, 294),
+            Size = UDim2.new(0, 336, 0, 222),
+            BackgroundColor3 = GousseUI.Theme.Surface,
+            BorderSizePixel = 0,
+            AutoButtonColor = false,
+            ZIndex = 3,
+            ClipsDescendants = true
+        }, modal)
+        New("UICorner", { CornerRadius = UDim.new(0, 8) }, card)
+        New("UIStroke", { Color = i == 1 and GousseUI.Theme.Warning or GousseUI.Theme.Border, Thickness = 1.3 }, card)
+
+        New("ImageLabel", {
+            Size = UDim2.new(1, 0, 0, 128),
+            BackgroundColor3 = GousseUI.Theme.Sidebar,
+            Image = info.Photo,
+            ScaleType = Enum.ScaleType.Crop,
+            ZIndex = 4
+        }, card)
+
+        if info.New then
+            local badge = New("Frame", {
+                Position = UDim2.new(0, 10, 0, 10),
+                Size = UDim2.new(0, 46, 0, 20),
+                BackgroundColor3 = GousseUI.Theme.Warning,
+                BorderSizePixel = 0,
+                ZIndex = 5
+            }, card)
+            New("UICorner", { CornerRadius = UDim.new(0, 4) }, badge)
+            New("TextLabel", {
+                Size = UDim2.new(1, 0, 1, 0),
+                BackgroundTransparency = 1,
+                Font = FontBold,
+                Text = "NEW",
+                TextColor3 = GousseUI.Theme.Background,
+                TextSize = 10,
+                ZIndex = 6
+            }, badge)
+        end
+
+        local icon = GousseUI:GetIcon(info.Icon)
+        if icon and icon ~= "" then
+            New("ImageLabel", {
+                Position = UDim2.new(0, 14, 0, 138),
+                Size = UDim2.new(0, 18, 0, 18),
+                BackgroundTransparency = 1,
+                Image = icon,
+                ImageColor3 = GousseUI.Theme.TextPrimary,
+                ZIndex = 4
+            }, card)
+        end
+        New("TextLabel", {
+            Position = UDim2.new(0, 38, 0, 136),
+            Size = UDim2.new(1, -80, 0, 22),
+            BackgroundTransparency = 1,
+            Font = FontBold,
+            Text = info.Name,
+            TextColor3 = GousseUI.Theme.TextPrimary,
+            TextSize = 15,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            ZIndex = 4
+        }, card)
+        New("TextLabel", {
+            Position = UDim2.new(0, 14, 0, 162),
+            Size = UDim2.new(1, -28, 0, 30),
+            BackgroundTransparency = 1,
+            Font = FontRegular,
+            Text = info.Desc,
+            TextColor3 = GousseUI.Theme.TextSecondary,
+            TextSize = 11,
+            TextWrapped = true,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Top,
+            ZIndex = 4
+        }, card)
+
+        local line = New("TextLabel", {
+            Name = "SlotsLine",
+            Position = UDim2.new(0, 14, 0, 192),
+            Size = UDim2.new(1, -28, 0, 18),
+            BackgroundTransparency = 1,
+            Font = FontMedium,
+            Text = "",
+            TextColor3 = GousseUI.Theme.Warning,
+            TextSize = 10.5,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            ZIndex = 4
+        }, card)
+
+        mapRadios[i] = Radio(card, 300, 12, i == 1)
+        mapCards[i] = card
+        card.MouseButton1Click:Connect(function() selectMap(i) end)
+    end
+    refreshMapLines()
+
+    local cancelBtn = New("TextButton", {
+        Position = UDim2.new(1, -24 - 160 - 12 - 80, 1, -52),
+        Size = UDim2.new(0, 80, 0, 34),
+        BackgroundTransparency = 1,
+        Font = FontMedium,
+        Text = "Cancel",
+        TextColor3 = GousseUI.Theme.TextSecondary,
+        TextSize = 12,
+        AutoButtonColor = false,
+        ZIndex = 4
+    }, modal)
+    cancelBtn.MouseButton1Click:Connect(function()
+        screen:Destroy()
+    end)
+
+    local createBtn = New("TextButton", {
+        AnchorPoint = Vector2.new(1, 0),
+        Position = UDim2.new(1, -24, 1, -52),
+        Size = UDim2.new(0, 160, 0, 34),
+        BackgroundColor3 = GousseUI.Theme.Warning,
+        BorderSizePixel = 0,
+        Font = FontBold,
+        Text = "CREATE  →",
+        TextColor3 = GousseUI.Theme.Background,
+        TextSize = 12,
+        AutoButtonColor = false,
+        ZIndex = 4
+    }, modal)
+    New("UICorner", { CornerRadius = UDim.new(0, 8) }, createBtn)
+    createBtn.MouseButton1Click:Connect(function()
+        local name = nameBox.Text
+        screen:Destroy()
+        task.spawn(function() CreateSlot(name) end)
+    end)
+
+    dim.MouseButton1Click:Connect(function()
+        screen:Destroy()
+    end)
+
+    task.defer(function()
+        if nameBox.Parent then nameBox:CaptureFocus() end
+    end)
 end
 
 local function MakeCard(parent, entry, layoutOrder)
@@ -270,7 +705,7 @@ local function MakeCard(parent, entry, layoutOrder)
     local stroke = New("UIStroke", { Color = GousseUI.Theme.Border, Thickness = 1 }, card)
     GousseUI:RegisterThemeElement(stroke, "Color", "Border")
 
-    local bar = New("Frame", {
+    New("Frame", {
         Name = "Accent",
         Size = UDim2.new(1, 0, 0, 3),
         BackgroundColor3 = accent,
@@ -279,7 +714,7 @@ local function MakeCard(parent, entry, layoutOrder)
 
     local iconAsset = GousseUI:GetIcon(TypeIcon(entry.Kind))
     if iconAsset and iconAsset ~= "" then
-        local icon = New("ImageLabel", {
+        New("ImageLabel", {
             Name = "Icon",
             Position = UDim2.new(0, 10, 0, 11),
             Size = UDim2.new(0, 20, 0, 20),
@@ -287,7 +722,6 @@ local function MakeCard(parent, entry, layoutOrder)
             Image = iconAsset,
             ImageColor3 = accent
         }, card)
-        icon.ImageColor3 = accent
     end
 
     local title = New("TextLabel", {
@@ -304,7 +738,7 @@ local function MakeCard(parent, entry, layoutOrder)
     }, card)
     GousseUI:RegisterThemeElement(title, "TextColor3", "TextPrimary")
 
-    local kind = New("TextLabel", {
+    New("TextLabel", {
         Name = "Kind",
         Position = UDim2.new(0, 10, 0, 38),
         Size = UDim2.new(1, -20, 0, 18),
@@ -381,8 +815,6 @@ local function MakeCard(parent, entry, layoutOrder)
             end
         end)
     end)
-
-    return card
 end
 
 local function MakeAddTile(parent, layoutOrder, onClick)
@@ -427,108 +859,9 @@ local function MakeAddTile(parent, layoutOrder, onClick)
         TextSize = 11
     }, tile)
 
-    tile.MouseEnter:Connect(function()
-        tile.BackgroundTransparency = 0.1
-    end)
-    tile.MouseLeave:Connect(function()
-        tile.BackgroundTransparency = 0.35
-    end)
+    tile.MouseEnter:Connect(function() tile.BackgroundTransparency = 0.1 end)
+    tile.MouseLeave:Connect(function() tile.BackgroundTransparency = 0.35 end)
     tile.MouseButton1Click:Connect(onClick)
-    return tile
-end
-
-local function MakeCreatePanel(parent)
-    local panel = New("Frame", {
-        Name = "CreatePanel",
-        Size = UDim2.new(1, 0, 0, 138),
-        BackgroundColor3 = GousseUI.Theme.Surface,
-        BorderSizePixel = 0,
-        Visible = false
-    }, parent)
-    GousseUI:RegisterThemeElement(panel, "BackgroundColor3", "Surface")
-    New("UICorner", { CornerRadius = UDim.new(0, 10) }, panel)
-    local stroke = New("UIStroke", { Color = GousseUI.Theme.Border, Thickness = 1 }, panel)
-    GousseUI:RegisterThemeElement(stroke, "Color", "Border")
-
-    local title = New("TextLabel", {
-        Position = UDim2.new(0, 12, 0, 8),
-        Size = UDim2.new(1, -24, 0, 20),
-        BackgroundTransparency = 1,
-        Font = FontBold,
-        Text = "NEW RESTAURANT",
-        TextColor3 = GousseUI.Theme.TextPrimary,
-        TextSize = 12,
-        TextXAlignment = Enum.TextXAlignment.Left
-    }, panel)
-    GousseUI:RegisterThemeElement(title, "TextColor3", "TextPrimary")
-
-    local typeRow = New("Frame", {
-        Position = UDim2.new(0, 12, 0, 34),
-        Size = UDim2.new(1, -24, 0, 24),
-        BackgroundTransparency = 1
-    }, panel)
-
-    local nameBox = New("TextBox", {
-        Name = "NameBox",
-        Position = UDim2.new(0, 12, 0, 66),
-        Size = UDim2.new(1, -24, 0, 28),
-        BackgroundColor3 = GousseUI.Theme.Sidebar,
-        BorderSizePixel = 0,
-        Font = FontRegular,
-        PlaceholderText = "Restaurant name",
-        PlaceholderColor3 = GousseUI.Theme.TextMuted,
-        Text = state.name or "",
-        TextColor3 = GousseUI.Theme.TextPrimary,
-        TextSize = 12,
-        ClearTextOnFocus = false
-    }, panel)
-    New("UICorner", { CornerRadius = UDim.new(0, 6) }, nameBox)
-    GousseUI:RegisterThemeElement(nameBox, "TextColor3", "TextPrimary")
-
-    local createBtn = New("TextButton", {
-        Name = "ConfirmCreate",
-        Position = UDim2.new(0, 12, 1, -36),
-        Size = UDim2.new(0, 100, 0, 26),
-        BackgroundColor3 = GousseUI.Theme.Accent,
-        BorderSizePixel = 0,
-        Font = FontMedium,
-        Text = "Create",
-        TextColor3 = GousseUI.Theme.Background,
-        TextSize = 11.5,
-        AutoButtonColor = false
-    }, panel)
-    New("UICorner", { CornerRadius = UDim.new(0, 6) }, createBtn)
-    createBtn.MouseButton1Click:Connect(function()
-        CreateSlot(nameBox.Text)
-    end)
-
-    local cancelBtn = New("TextButton", {
-        Name = "Cancel",
-        Position = UDim2.new(0, 120, 1, -36),
-        Size = UDim2.new(0, 100, 0, 26),
-        BackgroundColor3 = GousseUI.Theme.Sidebar,
-        BorderSizePixel = 0,
-        Font = FontMedium,
-        Text = "Cancel",
-        TextColor3 = GousseUI.Theme.TextSecondary,
-        TextSize = 11.5,
-        AutoButtonColor = false
-    }, panel)
-    New("UICorner", { CornerRadius = UDim.new(0, 6) }, cancelBtn)
-    cancelBtn.MouseButton1Click:Connect(function()
-        panel.Visible = false
-        nameBox.Text = ""
-        state.name = ""
-    end)
-
-    local typeButtons = {}
-    for i, mode in ipairs(MODES) do
-        typeButtons[i] = Pill(typeRow, mode, (i - 1) * 136, 128, mode == state.mode, function()
-            state.mode = mode
-        end)
-    end
-
-    return panel
 end
 
 function Render()
@@ -562,7 +895,7 @@ function Render()
     local owned = Collect(data)
     local extra = data.Extra or {}
 
-    local header = New("TextLabel", {
+    New("TextLabel", {
         Name = "Summary",
         Size = UDim2.new(1, -8, 0, 34),
         BackgroundTransparency = 1,
@@ -575,7 +908,6 @@ function Render()
         TextSize = 11.5,
         TextXAlignment = Enum.TextXAlignment.Left
     }, tab.Page)
-    GousseUI:RegisterThemeElement(header, "TextColor3", "TextSecondary")
 
     local visRow = New("Frame", {
         Name = "VisibilityRow",
@@ -601,8 +933,6 @@ function Render()
         AutoButtonColor = false
     }, visRow)
     New("UICorner", { CornerRadius = UDim.new(0, 6) }, refreshBtn)
-    GousseUI:RegisterThemeElement(refreshBtn, "BackgroundColor3", "Surface")
-    GousseUI:RegisterThemeElement(refreshBtn, "ImageColor3", "TextSecondary")
     refreshBtn.MouseButton1Click:Connect(function()
         task.spawn(function()
             if Fetch() then Render() end
@@ -615,7 +945,7 @@ function Render()
         BackgroundTransparency = 1,
         AutomaticSize = Enum.AutomaticSize.Y
     }, tab.Page)
-    local gridLayout = New("UIGridLayout", {
+    New("UIGridLayout", {
         CellSize = UDim2.new(0, CARD_W, 0, CARD_H),
         CellPadding = UDim2.new(0, 10, 0, 10),
         FillDirection = Enum.FillDirection.Horizontal,
@@ -625,23 +955,22 @@ function Render()
         VerticalAlignment = Enum.VerticalAlignment.Top
     }, grid)
 
-    local createPanel = MakeCreatePanel(tab.Page)
-
     for i, entry in ipairs(owned) do
         MakeCard(grid, entry, i)
     end
-    MakeAddTile(grid, #owned + 1, function()
-        createPanel.Visible = not createPanel.Visible
-        if createPanel.Visible then
-            createPanel.NameBox:CaptureFocus()
-        end
-    end)
-
+    MakeAddTile(grid, #owned + 1, OpenCreateModal)
 end
 
 Window:OnUnload(function()
     state.unloaded = true
     env.BPRestaurants = nil
+    pcall(function()
+        for _, child in ipairs(GetSafeParent():GetChildren()) do
+            if child:IsA("ScreenGui") and child.Name == "GousseBP_CreateModal" then
+                child:Destroy()
+            end
+        end
+    end)
 end)
 
 env.BPRestaurants = {
