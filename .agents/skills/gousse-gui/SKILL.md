@@ -343,16 +343,39 @@ Tab:CreateParagraph({
 ## 6. Global Systems: Notifications & Loader
 
 ### 6.1 Toast Notifications
-Sliding bottom-right notification cards with color-coded accent indicators:
+Theme-reactive notification cards with type icons, manual dismissal, click callbacks, and optional countdown/progress bars. Capped at `GousseUI.NotificationMax` (default 6) visible cards; the oldest is dismissed automatically.
 
 ```luau
-GousseUI:Notify({
+local toast = GousseUI:Notify({
     Title = "Streamer Tycoon",
     Content = "Trainer initialized successfully.",
-    Type = "success", -- "success" (green) | "info" (blue) | "warning" (amber) | "error" (red)
-    Duration = 3
+    Type = "success",      -- "success" | "info" | "warning" | "error"
+    Duration = 3,          -- 0 = persistent until Close()
+    Icon = "check-circle", -- optional Lucide name, defaults per Type
+    Position = "BottomRight", -- TopLeft | TopRight | BottomLeft | BottomRight
+    Dismissible = true,
+    ShowProgress = false,
+    Callback = function() end
 })
+
+toast.Update("New content", "New title")
+toast.SetProgress(0.5)  -- requires ShowProgress; stops auto countdown
+toast.SetType("warning")
+toast.Close()
 ```
+
+Shortcuts: `GousseUI:NotifySuccess(content, title?, duration?)`, `NotifyInfo`, `NotifyWarning`, `NotifyError`.
+
+Persistent progress toast:
+
+```luau
+local job = GousseUI:NotifyProgress({ Title = "Loading", Content = "Modules...", Icon = "loader-2" })
+job.SetProgress(0.4)
+job.Update("Shaders...")
+job.Close()
+```
+
+Globals: `GousseUI:SetNotificationPosition("TopRight")`, `GousseUI.NotificationMax = 8`, `GousseUI:ClearNotifications()`. All colors come from `GousseUI.Theme` via `RegisterThemeElement`, so live toasts follow theme changes.
 
 ### 6.2 Animated Loader Modal
 Full tactical initialization modal with pulsing icon and progress bar:
@@ -372,6 +395,31 @@ Loader:Finish(function()
     print("Initialization finished!")
 end)
 ```
+
+### 6.3 Settings Persistence
+
+Profiles are JSON files in the executor workspace (`GousseUI/<profile>.json`) using executor `writefile`/`readfile` plus `HttpService`; every filesystem call is `pcall`-guarded.
+
+```luau
+GousseUI:GetSettings()
+GousseUI:SaveSettings(nil, "default")
+GousseUI:LoadSettings("default")     -- (settings, ok)
+GousseUI:ListSettings()
+GousseUI:DeleteSettings("mobile")
+GousseUI:ResetSettings("default")
+GousseUI:SetAutoSave(true)
+GousseUI:SetAutoLoad(true)
+GousseUI:ApplySettings({ Theme = "amber", UIScale = 0.9 })
+
+Window:SaveSettings("profile")
+Window:LoadSettings("profile")
+
+local unbind = GousseUI:OnSettingsLoaded(function(settings)
+    -- applied to every open window
+end)
+```
+
+Persisted keys: `Version`, `Theme`, `Accent`, `UIScale`, `Keybind`, `NotificationPosition`, `NotificationMax`, `AutoSave`, `ShowFAB`, `WindowSize`. The built-in Settings tab includes a *Settings & Profiles* section for Save / Load / Delete / Auto Save / Reset. `CreateWindow({ LoadSettings = false, SettingsProfile = "name" })` controls auto-load.
 
 ---
 

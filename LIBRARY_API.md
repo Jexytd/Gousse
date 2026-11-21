@@ -1,6 +1,6 @@
 # GousseUI Library API & Agent Developer Guide
 
-> **Target Version**: GousseUI v2.3.0  
+> **Target Version**: GousseUI v2.4.0  
 > **Environment**: Roblox Luau (Executor / Client)  
 > **Repository Core**: [`library.luau`](file:///c:/Users/Gouang/Desktop/Gousse/library.luau)  
 > **Agent Skill**: [`.agents/skills/gousse-gui/SKILL.md`](file:///c:/Users/Gouang/Desktop/Gousse/.agents/skills/gousse-gui/SKILL.md)
@@ -27,6 +27,7 @@
   - [Notifications](#61-notifications-gousseuinotify)
   - [Loader Modal](#62-loader-modal-gousseuicreateloader)
   - [Lucide Icons](#63-lucide-icons-engine)
+  - [Settings Persistence](#64-settings-persistence)
 - [7. Agent Coding Invariants](#7-agent-coding-invariants)
 
 ---
@@ -125,6 +126,8 @@ local Window = GousseUI:CreateWindow({
 | `Window:ConfirmUnload(prompt?)` | Displays the modal confirmation dialog |
 | `Window:Unload()` / `Window:Destroy()` | Unloads the script and cleans up the UI |
 | `Window:OnUnload(cb)` | Registers an unload cleanup callback |
+| `Window:SaveSettings(profile?)` | Saves theme, accent, scale, keybind, notifications and window size |
+| `Window:LoadSettings(profile?)` | Loads a profile and applies it to every open window |
 
 ---
 
@@ -346,14 +349,75 @@ Tab:CreateParagraph({
 
 ### 6.1 Notifications: `GousseUI:Notify`
 
+Toast cards render into a dedicated `GousseNotifications` ScreenGui through `GetSafeGuiParent()`. They are theme-reactive, capped at 6 visible cards (oldest auto-dismissed), and support icons, manual dismissal, click callbacks, and a countdown progress bar.
+
 ```luau
-GousseUI:Notify({
+local toast = GousseUI:Notify({
     Title = "Gousse Hub",
     Content = "Configuration saved successfully.",
-    Type = "success", -- "success" | "info" | "warning" | "error"
-    Duration = 3
+    Type = "success",        -- "success" | "info" | "warning" | "error"
+    Duration = 3,            -- seconds; 0 = persistent until Close()
+    Icon = "check-circle",   -- optional Lucide name; defaults per Type
+    Position = "BottomRight",-- TopLeft | TopRight | BottomLeft | BottomRight
+    Dismissible = true,      -- shows an X button
+    ShowProgress = false,    -- thin countdown bar at the card bottom
+    Callback = function()    -- optional click handler
+        print("Toast clicked")
+    end
 })
+
+toast.Update("Saving complete", "All 3 profiles written.")
+toast.SetProgress(0.75)     -- only meaningful with ShowProgress
+toast.SetType("warning")    -- re-colors accent bar + icon
+toast.Close()
 ```
+
+**Returned handle**
+
+| Field | Description |
+| :--- | :--- |
+| `Card` | The backing `Frame`, for advanced customisation |
+| `Close()` | Animates out and destroys the card |
+| `Update(content?, title?)` | Changes text and auto-grows the card for long content |
+| `SetProgress(ratio)` | Sets fill to `0..1` and stops the automatic countdown tween |
+| `SetType(type)` | Switches accent bar, icon and progress fill colors |
+
+**Type shortcuts**
+
+```luau
+GousseUI:NotifySuccess("Farm started.")
+GousseUI:NotifyInfo("Waiting for server...", "Status", 2)
+GousseUI:NotifyWarning("Low HP.", "Combat", 4)
+GousseUI:NotifyError("Remote timeout.", "Network")
+```
+
+**Progress toast (persistent, manually driven)**
+
+```luau
+local job = GousseUI:NotifyProgress({
+    Title = "Injecting modules",
+    Content = "Loading assets...",
+    Type = "info",
+    Icon = "loader-2",
+    Position = "BottomRight",
+    Dismissible = false
+})
+
+job.SetProgress(0.35)
+job.Update("Compiling shaders...")
+job.SetProgress(1)
+job.Close()
+```
+
+**Global notification controls**
+
+```luau
+GousseUI:SetNotificationPosition("TopRight") -- default: "BottomRight"
+GousseUI.NotificationMax = 8                 -- default: 6
+GousseUI:ClearNotifications()                -- dismiss every active card
+```
+
+Default type icons: `success → check-circle`, `info → info`, `warning → alert-triangle`, `error → x-circle`. All colors come from `GousseUI.Theme`, so theme switches update live toasts automatically.
 
 ### 6.2 Loader Modal: `GousseUI:CreateLoader`
 
@@ -377,6 +441,38 @@ end)
 local assetId, rectOffset, rectSize = GousseUI:ResolveIcon("shopping-cart")
 local directAsset = GousseUI:GetIcon("crosshair") -- "rbxassetid://10709818534"
 ```
+
+### 6.4 Settings Persistence
+
+Profiles are JSON files written into the executor workspace at `GousseUI/<profile>.json` via `writefile` / `readfile` (`HttpService` handles encoding). All filesystem calls are wrapped in `pcall`, so the library keeps working on executors without those functions.
+
+```luau
+-- Library-level API
+GousseUI:GetSettings()                  -- snapshot of current global settings
+GousseUI:SaveSettings(nil, "default")   -- extra table may override any field
+GousseUI:LoadSettings("default")        -- returns (settings, ok)
+GousseUI:ListSettings()                 -- { "default", "mobile", ... }
+GousseUI:DeleteSettings("mobile")
+GousseUI:ResetSettings("default")
+GousseUI:SetAutoSave(true)              -- theme/accent changes persist automatically
+GousseUI:SetAutoLoad(true)              -- windows apply the saved profile on creation
+GousseUI:ApplySettings({ Theme = "amber", UIScale = 0.9 })
+
+-- Per-window convenience (includes WindowSize, ShowFAB, Keybind)
+Window:SaveSettings("profile-name")
+Window:LoadSettings("profile-name")
+
+-- React to a profile being applied
+local unbind = GousseUI:OnSettingsLoaded(function(settings)
+    print("Loaded profile:", settings.Theme)
+end)
+```
+
+**Persisted fields**: `Version`, `Theme`, `Accent` (hex), `UIScale`, `Keybind`, `NotificationPosition`, `NotificationMax`, `AutoSave`, `ShowFAB`, `WindowSize` (`X`, `Y`, `SX`, `SY`).
+
+**Built-in Settings tab** gains a *Settings & Profiles* section with Profile Name input, Saved Profile dropdown, Save / Load / Delete buttons, Auto Save toggle, and Reset to Defaults. Every open window receives applied values through `OnSettingsLoaded`, so one Load updates theme, accent, scale, keybind, FAB visibility and size simultaneously.
+
+`CreateWindow` config additions: `LoadSettings = false` disables auto-load for that window, `SettingsProfile = "name"` picks a specific profile.
 
 ---
 

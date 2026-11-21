@@ -75,6 +75,10 @@
         "101107153774667": {
           "name": "Burger Planet: Fast Food Simulator",
           "script": "games/burger_planet/main.luau"
+        },
+        "121348681731705": {
+          "name": "Lobby - Restaurants",
+          "script": "games/burger_planet/restaurants.luau"
         }
       }
     }

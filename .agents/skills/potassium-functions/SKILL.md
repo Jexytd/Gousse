@@ -1,10 +1,11 @@
 ---
 name: potassium-functions
 description: >-
-  Comprehensive reference and documentation for all Potassium Luau executor functions
-  tested in eVars.luau. Use when writing, debugging, or verifying Luau exploit scripts
-  targeting Potassium across Actor, Cache, Closure, Debug, FileSystem, Input, Instance,
-  Metatable, Miscellaneous, RakNet, Reflection, Script, Signal, and WebSocket APIs.
+  Comprehensive reference for Potassium Luau executor functions, live-verified against
+  Potassium v2.7.0 in a connected client. Use when writing, debugging, or verifying Luau
+  exploit scripts targeting Potassium across Actor, Cache, Closure, Debug, FileSystem,
+  Input, Instance, Metatable, Miscellaneous, RakNet, Reflection, Script, Signal, WebSocket,
+  Crypt, Drawing, and bridge APIs.
 ---
 
 # Potassium Luau Functions Reference
@@ -12,6 +13,41 @@ description: >-
 Official Documentation Source: [https://docs.potassium.pro/api-reference/introduction](https://docs.potassium.pro/api-reference/introduction)
 
 This reference documents all functions checked in [eVars.luau](file:///c:/Users/Gouang/Desktop/Gousse/eVars.luau).
+
+---
+
+## Live verification — Potassium v2.7.0
+
+Probed on the connected client (Burger Planet: Fast Food Simulator, `PlaceId 121348681731705`) via `roblox-mcp.get-data-by-code` at thread identity 8. `identifyexecutor()` returned `Potassium | v2.7.0`. `getgenv()` exposes **255** string-keyed entries. Every function in sections 1–14 is present in this build; the tables below record the extra spellings and the libraries the doc sheet does not cover.
+
+Probe template — chunk the names, because the MCP serializer truncates arrays at 60 entries and strings at roughly 600 characters:
+
+```lua
+local names = { "identifyexecutor", "hookfunction", "decompile", "raknet" }
+local out = {}
+for _, n in ipairs(names) do
+    local fn = getgenv()[n] or _G[n]
+    out[#out+1] = n .. "=" .. (fn and "present:" .. (typeof(fn) or type(fn)) or "MISSING")
+end
+return out
+```
+
+| Section | Library | Live status | Extra on this build |
+| :--- | :--- | :--- | :--- |
+| 1 | Actor | verified | snake_case aliases (`get_actors`, `get_actor_threads`, `get_deleted_actors`, `get_comm_channel`, `is_parallel`, `run_on_actor`, `run_on_thread`); legacy `getactorthreads`, `getdeletedactors`; also `getallthreads`, `psm` mirror |
+| 2 | Cache | verified | `cache` has exactly `invalidate`, `iscached`, `replace`; plus `clonereference`, `clonefunction` |
+| 3 | Closure | verified | `checkclosure`, `isourclosure`, `hookfunc`, `replaceclosure`, `restorefunc`, `checkcaller`; global `getconstant(s)`, `setupvalue`, `setconstant` mirror `debug.*` |
+| 4 | Debug | verified | `debug` has 35 keys — adds `getinfo/setinfo`, `getstack`, `getcallstack`, `traceback`, `tracerefs`, `dumpheap`, `dumprefs`, `dumpcodesize`, `profilebegin/end`, `getmemorycategory/set...`, `loadmodule`, `getmetatable/setmetatable`, `getsafeenv/setsafeenv`, `isuntouched/setuntouched`, `validlevel/isvalidlevel` |
+| 5 | FileSystem | verified | `isfile`, `isfolder`, `delfile`, `delfolder`, `listfiles`, `readfile`, `writefile`, `appendfile`, `makefolder`, `loadfile`, `dofile` |
+| 6 | Input | verified | adds `keyclick`, `keypress`, `keyrelease`, `keytap`, `isgameactive`, `isrbxactive`, `iswindowactive` |
+| 7 | Instance | verified | adds `getcallbackmember`, `getrenderproperty`, `setrenderproperty`, `get_hidden_gui` |
+| 8 | Metatable | verified | `is_readonly`, `set_readonly`, `get_namecall_method`, `set_namecall_method`, `makewritable`/`makewriteable`, `makereadonly` |
+| 9 | Misc | verified | `gethwid`/`get_hwid`, `get_user_identifier`, `getfastflag*`/`setfastflag`, `HttpGet`, `http_request`, `toclipboard`, `messageboxasync`, `dumpstring`, `queue_on_teleport` |
+| 10 | RakNet | verified | `raknet` has exactly 5 keys: `add_send_hook`, `remove_send_hook`, `add_receive_hook`, `remove_receive_hook`, `send` |
+| 11 | Reflection | verified | adds `gethiddenprop`/`sethiddenprop`, `getpcdprop`, `getrenderproperty`/`setrenderproperty`, `getallthreads` |
+| 12 | Script | verified | adds `getscriptfunction`, `getcallingscript`, `getsenv`, `gettenv`, `getfenv`, `getreg`, `getrenv`, `getstack`, `getinfo`, `filtergc` |
+| 13 | Signal | verified | complete: `firesignal`, `cansignalreplicate`, `getconnection(s)`, `getsignalarguments(info)`, `getsignalwhitelist`, `replicatesignal` |
+| 14 | WebSocket | verified | `WebSocket` and `websocket` are identical tables: `connect`, `new`, `Connect`, `New` |
 
 ---
 
@@ -31,7 +67,11 @@ This reference documents all functions checked in [eVars.luau](file:///c:/Users/
 12. [Script Library](#12-script-library)
 13. [Signal Library](#13-signal-library)
 14. [WebSocket Library](#14-websocket-library)
-15. [eVars.luau Naming & Compatibility Map](#evarsluau-naming--compatibility-map)
+15. [Crypt & Encoding (live-only)](#15-crypt--encoding-live-only)
+16. [Drawing & Render Objects (live-only)](#16-drawing--render-objects-live-only)
+17. [Signal, Regex, PSM, OTH, Cobalt (live-only)](#17-signal-regex-psm-oth-cobalt-live-only)
+18. [Live Global Aliases](#18-live-global-aliases)
+19. [eVars.luau Naming & Compatibility Map](#evarsluau-naming--compatibility-map)
 
 ---
 
@@ -631,17 +671,128 @@ Full-duplex real-time communication via WebSockets.
 
 ---
 
+## 15. Crypt & Encoding (live-only)
+
+### `crypt` table (14 keys, verified)
+- **`generatekey()`** / **`generatebytes(n)`** — key and random byte generation.
+- **`encrypt(data, key)`** / **`decrypt(data, key)`** — symmetric encryption.
+- **`hash(data, algorithm)`** / **`hmac(data, key, algorithm)`** — digests and keyed digests.
+- **`random(n)`** — cryptographic random bytes.
+- **`base64encode` / `base64decode` / `base64_encode` / `base64_decode`** — four spellings, all present.
+- **`lz4compress` / `lz4decompress`** — also exposed as globals.
+- **`base64`** — nested table with `encode` and `decode`.
+
+### Globals
+- `base64_encode`, `base64_decode`, `base64encode`, `base64decode`, `base64` — aliases of the `crypt` helpers.
+- `lz4compress`, `lz4decompress`, `dumpstring` — present at root.
+
+---
+
+## 16. Drawing & Render Objects (live-only)
+
+### `Drawing`
+- **`Drawing.new(className)`** — creates a draw object.
+- **`Drawing.clear()`** — clears managed drawings.
+- **`Drawing.Fonts`** — font registry table.
+
+### `DrawingImmediate` (12 keys, verified)
+- Primitives: `Line`, `Text`, `OutlinedText`, `Circle`, `FilledCircle`, `Triangle`, `FilledTriangle`, `Quad`, `FilledQuad`, `Rectangle`, `FilledRectangle`.
+- **`GetPaint()`** — returns the current immediate-mode paint handle.
+
+### Related globals
+- `createrenderobj`, `createrenderobject` — aliases.
+- `cleardrawcache`, `isrenderobj` — cache and type check.
+- `getrenderproperty(obj, property)` / `setrenderproperty(obj, property, value)`.
+
+---
+
+## 17. Signal, Regex, PSM, OTH, Cobalt (live-only)
+
+### `Signal` / `PsmSignal`
+- **`Signal.new()`** and **`PsmSignal.new()`** — custom signal constructors (both verified).
+- Prefer these over ad-hoc BindableEvents when a script needs its own event bus.
+
+### `Regex`
+- **`Regex.new(pattern)`**, **`Regex.Escape(text)`** — regex helper, verified.
+
+### `psm` (19 keys, verified)
+- Actor mirrors: `get_actors`, `get_actor_threads`, `get_deleted_actors`, `get_comm_channel`, `create_comm_channel`, `is_parallel`, `run_on_actor`, `run_on_thread`, plus legacy `getactors`, `getactorthreads`, `getdeletedactors`, `isparallel`.
+- Fast flags: `getfastflag`, `getfastflagtype`, `getfflag`, `getfflagtype`, `setfastflag`, `setfflag`.
+- Thread enumeration: `getallthreads`.
+
+### `oth` (5 keys, verified)
+- **`hook(target)`**, **`unhook(handle)`**, **`get_original_thread()`**, **`get_root_callback()`**, **`is_hook_thread()`** — thread/hook helpers from the bridge layer.
+
+### `Cobalt` (5 keys, verified)
+- `envname`, `version`, `require`, `script`, `shared` — MCP bridge surface.
+- Root `MCP_ClientIdentityKey`, `MCP_ClientSessionId`, `MCP_Loaded`, `CobaltInitialized`, `VexExecutedCheck`, `BridgeURL`/`bridgeurl` are bridge bookkeeping, not executor APIs. Do not rely on them in shipped scripts.
+
+---
+
+## 18. Live Global Aliases
+
+Use the canonical name in new code; the alias column is what older scripts may call.
+
+| Canonical | Live aliases |
+| :--- | :--- |
+| `identifyexecutor` | `getexecutorname` |
+| `isourthread` | `checkcaller` (`is_parallel` is a separate actor API) |
+| `isexecutorclosure` | `checkclosure`, `isourclosure` |
+| `hookfunction` | `hookfunc`, `replaceclosure` |
+| `restorefunction` | `restorefunc` |
+| `cloneref` | `clonereference` |
+| `getthreadidentity` | `getidentity`, `get_thread_identity`; related: `getthreadcontext`, `getthreadcaps` |
+| `setthreadidentity` | `setidentity`, `set_thread_identity`; related: `setthreadcontext`, `setthreadcaps` |
+| `getnamecallmethod` | `get_namecall_method` |
+| `setnamecallmethod` | `set_namecall_method` |
+| `isreadonly` | `is_readonly` |
+| `setreadonly` | `set_readonly` |
+| `clearteleportqueue` | `clearqueueonteleport`, `clear_teleport_queue` |
+| `queueonteleport` | `queue_on_teleport` |
+| `getactors` | `get_actors`, `psm.get_actors` |
+| `getactorthreads` | `get_actor_threads`, `psm.get_actor_threads` |
+| `getdeletedactors` | `get_deleted_actors`, `psm.get_deleted_actors` |
+| `gethui` | `get_hidden_gui` |
+| `gethwid` | `get_hwid`, `get_user_identifier` |
+| `getfflag` | `getfastflag`, `psm.getfflag`, `psm.getfastflag` |
+| `setfflag` | `setfastflag`, `psm.setfflag`, `psm.setfastflag` |
+| `request` | `http_request`, `http.request` |
+| `httpget` | `HttpGet` (global), `game:HttpGet` |
+| `WebSocket.connect` | `websocket.connect`, `WebSocket.Connect`, `websocket.New` |
+| `getgenv` | `getrenv` (game env), `getreg`, `getgc` (different scopes) |
+| `getsenv` | `gettenv`, `getsafeenv`, `getfenv` |
+| `getconstant` | `getconstants` (plural), `debug.getconstant(s)` |
+| `getupvalue` | `getupvalues` (plural), `debug.getupvalue(s)` |
+| `getproto` | `getprotos` (plural), `debug.getproto(s)` |
+| `setupvalue` | `debug.setupvalue`; `setconstant` / `debug.setconstant` |
+| `setclipboard` | `toclipboard`, `setrbxclipboard` |
+| `messagebox` | `messageboxasync` |
+| `isvalidlevel` | `validlevel` |
+| `isuntouched` | `setuntouched` (setter), `debug.isuntouched`, `debug.setuntouched` |
+| `getscriptclosure` | `getscriptfunction` |
+| `restorefunction` | `restorefunc` |
+| `createrenderobject` | `createrenderobj` |
+
+Additional root globals with no doc-sheet entry: `getcallbackmember`, `getcallingscript`, `getcallstack`, `getstack`, `getallthreads`, `getpcdprop`, `getsynasset`, `getrenderproperty`, `setrenderproperty`, `getinfo`, `setinfo`, `setname`, `getthreadcaps`, `setthreadcaps`, `keyclick`, `keypress`, `keyrelease`, `keytap`, `isgameactive`, `isrbxactive`, `iswindowactive`, `makereadonly`, `makewritable`, `makewriteable`, `clonefunction`, `dumpstring`, `require` (genv override), `Drawing`, `DrawingImmediate`, `crypt`, `base64`, `http`, `Signal`, `Regex`, `psm`, `oth`, `Cobalt`, `WebSocket`/`websocket`.
+
+---
+
 ## eVars.luau Naming & Compatibility Map
 
 If checking compatibility against [eVars.luau](file:///c:/Users/Gouang/Desktop/Gousse/eVars.luau), observe the following name mappings and common aliases:
 
-| `eVars.luau` Variable | Official Potassium Doc Name | Notes / Alias |
+Checked against Potassium v2.7.0 `getgenv()` on a connected client.
+
+| `eVars.luau` Variable | Official Potassium Doc Name | Live result (v2.7.0) |
 | :--- | :--- | :--- |
-| `getdeleteactors` | `getdeletedactors` | Docs specify `getdeletedactors` with 'd' |
-| `isparallel` | `is_parallel` | Docs specify `is_parallel` (underscore) |
-| `issourthread` | `isourthread` | Docs specify `isourthread` / `checkcaller` |
-| `cloneref` / `CLoneRef` | `cloneref` | Standard Luau reference isolation |
-| `gethiddenproperties` / `GetHiddenProperteis` | `gethiddenproperties` | Fix spelling in label |
-| `httpget or game.HttpGet` | `httpget` | Also exposed via `game:HttpGet` |
-| `dumpbytecode` | `dumpbytecode` | Dumps function bytecode |
-| `decompile` | `decompile` | Bytecode decompiler |
+| `getdeleteactors` | `getdeletedactors` | `getdeletedactors` and `get_deleted_actors` exist; `getdeleteactors` does **not**. Use the doc name. |
+| `isparallel` | `is_parallel` | Both `isparallel` and `is_parallel` exist; also `psm.isparallel` / `psm.is_parallel`. |
+| `issourthread` | `isourthread` | `isourthread` and `checkcaller` exist; `issourthread` does **not**. Use the doc name. |
+| `cloneref` / `CLoneRef` | `cloneref` | `cloneref` and `clonereference` exist; `CLoneRef` does not. |
+| `gethiddenproperties` / `GetHiddenProperteis` | `gethiddenproperties` | `gethiddenproperties`, `gethiddenprop` exist; `GetHiddenProperteis` does not. |
+| `httpget or game.HttpGet` | `httpget` | `httpget`, global `HttpGet`, `http_request` and `game:HttpGet` all exist. |
+| `dumpbytecode` | `dumpbytecode` | Present at root. |
+| `decompile` | `decompile` | Present at root. |
+| — | `debug.getconstant/getconstants/...` | Present both in `debug` and as root globals. |
+| — | `WebSocket.connect` | `WebSocket` and lowercase `websocket` tables are identical. |
+| — | `raknet` | 5 functions verified; no extra keys. |

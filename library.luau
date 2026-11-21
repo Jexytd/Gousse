@@ -1,6 +1,6 @@
 --[[
     ========================================================================
-    GousseUI - Authentic Modern Game Utility UI Library (v2.2.0)
+    GousseUI - Authentic Modern Game Utility UI Library (v2.4.0)
     Engineered for Gousse Hub & Roblox Execution Environments
     ========================================================================
     Design Direction & Features:
@@ -21,6 +21,7 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
+local HttpService = game:GetService("HttpService")
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -884,9 +885,18 @@ local FontRegular = Enum.Font.BuilderSans or Enum.Font.Gotham
 local FontCode = Enum.Font.RobotoMono or Enum.Font.Code
 
 local GousseUI = {
-    Version = "2.2.1",
+    Version = "2.4.0",
     Windows = {},
     ActiveKeybind = Enum.KeyCode.RightControl,
+    NotificationPosition = "BottomRight",
+    NotificationMax = 6,
+    CurrentTheme = "emerald",
+    UIScale = 1.0,
+    SettingsFolder = "GousseUI",
+    AutoSaveSettings = true,
+    AutoLoadSettings = true,
+    SettingsListeners = {},
+    _applyingSettings = false,
     Theme = {
         Background = Color3.fromRGB(11, 14, 20),        -- #0B0E14 Deep Obsidian Slate
         Sidebar = Color3.fromRGB(15, 19, 27),           -- #0F131B Elevated dark tone
@@ -1124,7 +1134,9 @@ end
 
 function GousseUI:SetTheme(themeName: string, customColors: { [string]: Color3 }?)
     if not themeName then return end
-    local target = Themes[themeName:lower()] or Themes["default"]
+    local themeKey = themeName:lower()
+    if Themes[themeKey] then GousseUI.CurrentTheme = themeKey end
+    local target = Themes[themeKey] or Themes["default"]
     for k, v in pairs(target) do
         GousseUI.Theme[k] = v
     end
@@ -1158,6 +1170,10 @@ function GousseUI:SetTheme(themeName: string, customColors: { [string]: Color3 }
 
     if GousseUI.OnThemeChanged then
         pcall(GousseUI.OnThemeChanged, GousseUI.Theme)
+    end
+
+    if GousseUI.AutoSaveSettings and not GousseUI._applyingSettings then
+        pcall(function() GousseUI:SaveSettings() end)
     end
 end
 
@@ -1197,6 +1213,10 @@ function GousseUI:SetAccentColor(color: Color3)
 
     if GousseUI.OnThemeChanged then
         pcall(GousseUI.OnThemeChanged, GousseUI.Theme)
+    end
+
+    if GousseUI.AutoSaveSettings and not GousseUI._applyingSettings then
+        pcall(function() GousseUI:SaveSettings() end)
     end
 end
 
@@ -1305,6 +1325,162 @@ local function HexToColor(hex: string): Color3?
         end
     end
     return nil
+end
+
+-- ============================================================================
+-- Settings Persistence (profiles stored via executor FileSystem API)
+-- ============================================================================
+local function SettingsPath(profile: string?): string
+    local clean = tostring(profile or "default"):gsub("[^%w%-_]", "_")
+    if clean == "" then clean = "default" end
+    return GousseUI.SettingsFolder .. "/" .. clean .. ".json"
+end
+
+local function DefaultSettings(): { [string]: any }
+    return {
+        Version = GousseUI.Version,
+        Theme = GousseUI.CurrentTheme or "emerald",
+        Accent = ColorToHex(GousseUI.Theme.Accent),
+        UIScale = GousseUI.UIScale or 1.0,
+        Keybind = (GousseUI.ActiveKeybind and GousseUI.ActiveKeybind.Name) or "RightControl",
+        NotificationPosition = GousseUI.NotificationPosition or "BottomRight",
+        NotificationMax = GousseUI.NotificationMax or 6,
+        AutoSave = GousseUI.AutoSaveSettings,
+        ShowFAB = true,
+        WindowSize = { X = 690, Y = 450, SX = 0, SY = 0 }
+    }
+end
+
+function GousseUI:GetSettings(): { [string]: any }
+    local settings = DefaultSettings()
+    settings.Theme = GousseUI.CurrentTheme or settings.Theme
+    settings.Accent = ColorToHex(GousseUI.Theme.Accent)
+    settings.Keybind = (GousseUI.ActiveKeybind and GousseUI.ActiveKeybind.Name) or settings.Keybind
+    settings.NotificationPosition = GousseUI.NotificationPosition or settings.NotificationPosition
+    settings.NotificationMax = GousseUI.NotificationMax or settings.NotificationMax
+    settings.AutoSave = GousseUI.AutoSaveSettings
+    return settings
+end
+
+function GousseUI:OnSettingsLoaded(callback: (settings: { [string]: any }) -> ())
+    if type(callback) ~= "function" then return function() end end
+    table.insert(GousseUI.SettingsListeners, callback)
+    return function()
+        for i = #GousseUI.SettingsListeners, 1, -1 do
+            if GousseUI.SettingsListeners[i] == callback then
+                table.remove(GousseUI.SettingsListeners, i)
+                break
+            end
+        end
+    end
+end
+
+function GousseUI:SetAutoSave(enabled: boolean)
+    GousseUI.AutoSaveSettings = enabled and true or false
+end
+
+function GousseUI:SetAutoLoad(enabled: boolean)
+    GousseUI.AutoLoadSettings = enabled and true or false
+end
+
+-- extra can hold window-specific fields (UIScale, WindowSize, Keybind, ShowFAB).
+function GousseUI:SaveSettings(extra: { [string]: any }?, profile: string?)
+    local settings = GousseUI:GetSettings()
+    if type(extra) == "table" then
+        for key, value in pairs(extra) do
+            settings[key] = value
+        end
+    end
+    settings.Version = GousseUI.Version
+
+    local ok, err = pcall(function()
+        if isfolder and not isfolder(GousseUI.SettingsFolder) then
+            makefolder(GousseUI.SettingsFolder)
+        end
+        writefile(SettingsPath(profile), HttpService:JSONEncode(settings))
+    end)
+    return ok, err
+end
+
+-- Applies values to live windows through OnSettingsLoaded subscribers.
+function GousseUI:ApplySettings(settings: { [string]: any }?)
+    if type(settings) ~= "table" then return false end
+    GousseUI._applyingSettings = true
+
+    if settings.Theme then GousseUI:SetTheme(settings.Theme) end
+    if settings.Accent then
+        local accent = HexToColor(settings.Accent)
+        if accent then GousseUI:SetAccentColor(accent) end
+    end
+    if settings.NotificationPosition then
+        GousseUI:SetNotificationPosition(settings.NotificationPosition)
+    end
+    if type(settings.NotificationMax) == "number" then
+        GousseUI.NotificationMax = math.clamp(math.floor(settings.NotificationMax), 1, 20)
+    end
+    if type(settings.AutoSave) == "boolean" then
+        GousseUI.AutoSaveSettings = settings.AutoSave
+    end
+    if settings.Keybind then
+        local key = Enum.KeyCode[settings.Keybind]
+        if key then GousseUI.ActiveKeybind = key end
+    end
+    if type(settings.UIScale) == "number" then
+        GousseUI.UIScale = math.clamp(settings.UIScale, 0.5, 1.8)
+    end
+
+    GousseUI._applyingSettings = false
+    for _, callback in ipairs(GousseUI.SettingsListeners) do
+        pcall(callback, settings)
+    end
+    return true
+end
+
+function GousseUI:LoadSettings(profile: string?)
+    local path = SettingsPath(profile)
+    local okRead, content = pcall(function()
+        if isfile and not isfile(path) then return nil end
+        return readfile(path)
+    end)
+    if not okRead or type(content) ~= "string" or content == "" then
+        return nil, false
+    end
+
+    local okDecode, settings = pcall(function()
+        return HttpService:JSONDecode(content)
+    end)
+    if not okDecode or type(settings) ~= "table" then
+        return nil, false
+    end
+
+    GousseUI:ApplySettings(settings)
+    return settings, true
+end
+
+function GousseUI:ListSettings(): { string }
+    local names = {}
+    pcall(function()
+        if not isfolder or not isfolder(GousseUI.SettingsFolder) then return end
+        for _, path in ipairs(listfiles(GousseUI.SettingsFolder)) do
+            local name = tostring(path):match("([^/\\]+)%.json$")
+            if name then names[#names + 1] = name end
+        end
+    end)
+    table.sort(names)
+    return names
+end
+
+function GousseUI:DeleteSettings(profile: string?)
+    local path = SettingsPath(profile)
+    local ok, err = pcall(function()
+        if isfile and isfile(path) then delfile(path) end
+    end)
+    return ok, err
+end
+
+function GousseUI:ResetSettings(profile: string?)
+    GousseUI:ApplySettings(DefaultSettings())
+    return GousseUI:SaveSettings(nil, profile)
 end
 
 -- Utility: Quick Tween
@@ -1444,10 +1620,45 @@ local function MakeResizable(gripHandle: GuiObject, targetFrame: GuiObject, resi
 end
 
 -- ============================================================================
--- Notification System
+-- Notification System — toasts, progress, dismissible, theme-reactive
 -- ============================================================================
 local NotificationGui = nil
 local NotificationContainer = nil
+local NotificationLayout = nil
+local ActiveNotifications = {}
+
+local NotificationPositions = {
+    TopLeft     = { Anchor = Vector2.new(0, 0), Position = UDim2.new(0, 20, 0, 20), Horizontal = Enum.HorizontalAlignment.Left,  Vertical = Enum.VerticalAlignment.Top },
+    TopRight    = { Anchor = Vector2.new(1, 0), Position = UDim2.new(1, -20, 0, 20), Horizontal = Enum.HorizontalAlignment.Right, Vertical = Enum.VerticalAlignment.Top },
+    BottomLeft  = { Anchor = Vector2.new(0, 1), Position = UDim2.new(0, 20, 1, -20), Horizontal = Enum.HorizontalAlignment.Left,  Vertical = Enum.VerticalAlignment.Bottom },
+    BottomRight = { Anchor = Vector2.new(1, 1), Position = UDim2.new(1, -20, 1, -20), Horizontal = Enum.HorizontalAlignment.Right, Vertical = Enum.VerticalAlignment.Bottom }
+}
+
+local TypeAccentKey = {
+    success = "Accent",
+    info = "Blue",
+    warning = "Warning",
+    error = "Danger"
+}
+
+local TypeIcon = {
+    success = "check-circle",
+    info = "info",
+    warning = "alert-triangle",
+    error = "x-circle"
+}
+
+local function ApplyNotificationPosition(name: string?)
+    local preset = NotificationPositions[name or "BottomRight"] or NotificationPositions.BottomRight
+    if NotificationContainer then
+        NotificationContainer.AnchorPoint = preset.Anchor
+        NotificationContainer.Position = preset.Position
+    end
+    if NotificationLayout then
+        NotificationLayout.HorizontalAlignment = preset.Horizontal
+        NotificationLayout.VerticalAlignment = preset.Vertical
+    end
+end
 
 local function EnsureNotificationGui()
     if NotificationGui and NotificationGui.Parent then return end
@@ -1462,32 +1673,76 @@ local function EnsureNotificationGui()
     NotificationContainer = Instance.new("Frame")
     NotificationContainer.Name = "Container"
     NotificationContainer.BackgroundTransparency = 1
-    NotificationContainer.Position = UDim2.new(1, -20, 1, -20)
-    NotificationContainer.AnchorPoint = Vector2.new(1, 1)
     NotificationContainer.Size = UDim2.new(0, 300, 1, 0)
     NotificationContainer.Parent = NotificationGui
 
-    local layout = Instance.new("UIListLayout")
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
-    layout.HorizontalAlignment = Enum.HorizontalAlignment.Right
-    layout.Padding = UDim.new(0, 6)
-    layout.Parent = NotificationContainer
+    NotificationLayout = Instance.new("UIListLayout")
+    NotificationLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    NotificationLayout.Padding = UDim.new(0, 6)
+    NotificationLayout.Parent = NotificationContainer
+
+    ApplyNotificationPosition(GousseUI.NotificationPosition)
 end
 
-function GousseUI:Notify(config: { Title: string?, Content: string, Duration: number?, Type: string? })
+local function DismissNotification(record, animated: boolean?)
+    if not record or record.Dead then return end
+    record.Dead = true
+
+    local index = table.find(ActiveNotifications, record)
+    if index then table.remove(ActiveNotifications, index) end
+    if record.ProgressTween then
+        record.ProgressTween:Cancel()
+        record.ProgressTween = nil
+    end
+
+    local card = record.Card
+    if not card or not card.Parent then return end
+
+    if animated ~= false then
+        local stroke = card:FindFirstChildOfClass("UIStroke")
+        Tween(card, { Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1 }, 0.15)
+        if stroke then Tween(stroke, { Transparency = 1 }, 0.15) end
+        task.delay(0.17, function()
+            if card and card.Parent then card:Destroy() end
+        end)
+    else
+        card:Destroy()
+    end
+end
+
+local function TrimNotifications()
+    local limit = math.max(1, GousseUI.NotificationMax or 6)
+    while #ActiveNotifications > limit do
+        local oldest = ActiveNotifications[1]
+        if not oldest then break end
+        DismissNotification(oldest, true)
+    end
+end
+
+-- Full toast builder. Duration = 0 means persistent until Close() is called.
+function GousseUI:Notify(config: {
+    Title: string?,
+    Content: string?,
+    Duration: number?,
+    Type: string?,
+    Icon: string?,
+    Position: string?,
+    Dismissible: boolean?,
+    ShowProgress: boolean?,
+    Callback: (() -> ())?
+})
+    config = config or {}
     EnsureNotificationGui()
 
     local titleText = config.Title or "Gousse Hub"
     local contentText = config.Content or ""
-    local duration = config.Duration or 3.5
+    local duration = config.Duration
+    if duration == nil then duration = 3.5 end
     local notifyType = config.Type or "success"
-
-    local accentColor = GousseUI.Theme.Accent
-    if notifyType == "info" then accentColor = GousseUI.Theme.Blue
-    elseif notifyType == "warning" then accentColor = GousseUI.Theme.Warning
-    elseif notifyType == "error" then accentColor = GousseUI.Theme.Danger
-    end
+    local accentKey = TypeAccentKey[notifyType] or "Accent"
+    local iconKey = config.Icon or TypeIcon[notifyType] or "info"
+    local cardHeight = (#contentText > 70) and 82 or 64
+    local textOffset = 14
 
     local card = Instance.new("Frame")
     card.Name = "NotificationCard"
@@ -1497,6 +1752,7 @@ function GousseUI:Notify(config: { Title: string?, Content: string, Duration: nu
     card.BorderSizePixel = 0
     card.ClipsDescendants = true
     card.Parent = NotificationContainer
+    GousseUI:RegisterThemeElement(card, "BackgroundColor3", "Surface")
 
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 8)
@@ -1507,30 +1763,52 @@ function GousseUI:Notify(config: { Title: string?, Content: string, Duration: nu
     stroke.Thickness = 1
     stroke.Transparency = 1
     stroke.Parent = card
+    GousseUI:RegisterThemeElement(stroke, "Color", "Border")
 
     local bar = Instance.new("Frame")
     bar.Name = "AccentBar"
     bar.Size = UDim2.new(0, 3, 1, 0)
-    bar.BackgroundColor3 = accentColor
+    bar.BackgroundColor3 = GousseUI.Theme[accentKey]
     bar.BorderSizePixel = 0
     bar.Parent = card
+    local unbindBarColor = GousseUI:RegisterThemeElement(bar, "BackgroundColor3", accentKey)
+    local unbindIconColor = nil
+    local unbindFillColor = nil
+
+    local iconAsset, rectOffset, rectSize = GousseUI:ResolveIcon(iconKey)
+    if iconAsset and iconAsset ~= "" then
+        local icon = Instance.new("ImageLabel")
+        icon.Name = "Icon"
+        icon.Size = UDim2.new(0, 18, 0, 18)
+        icon.Position = UDim2.new(0, 12, 0.5, -9)
+        icon.BackgroundTransparency = 1
+        icon.Image = iconAsset
+        if rectOffset then icon.ImageRectOffset = rectOffset end
+        if rectSize then icon.ImageRectSize = rectSize end
+        icon.ImageColor3 = GousseUI.Theme[accentKey]
+        icon.Parent = card
+        unbindIconColor = GousseUI:RegisterThemeElement(icon, "ImageColor3", accentKey)
+        textOffset = 38
+    end
 
     local title = Instance.new("TextLabel")
     title.Name = "Title"
-    title.Position = UDim2.new(0, 14, 0, 8)
-    title.Size = UDim2.new(1, -22, 0, 18)
+    title.Position = UDim2.new(0, textOffset, 0, 8)
+    title.Size = UDim2.new(1, -textOffset - 12, 0, 18)
     title.BackgroundTransparency = 1
     title.Font = FontBold
     title.Text = titleText
     title.TextColor3 = GousseUI.Theme.TextPrimary
     title.TextSize = 14
+    title.TextTruncate = Enum.TextTruncate.AtEnd
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = card
+    GousseUI:RegisterThemeElement(title, "TextColor3", "TextPrimary")
 
     local body = Instance.new("TextLabel")
     body.Name = "Body"
-    body.Position = UDim2.new(0, 14, 0, 28)
-    body.Size = UDim2.new(1, -22, 0, 32)
+    body.Position = UDim2.new(0, textOffset, 0, 28)
+    body.Size = UDim2.new(1, -textOffset - 12, 0, cardHeight - 38)
     body.BackgroundTransparency = 1
     body.Font = FontRegular
     body.Text = contentText
@@ -1540,18 +1818,175 @@ function GousseUI:Notify(config: { Title: string?, Content: string, Duration: nu
     body.TextXAlignment = Enum.TextXAlignment.Left
     body.TextYAlignment = Enum.TextYAlignment.Top
     body.Parent = card
+    GousseUI:RegisterThemeElement(body, "TextColor3", "TextSecondary")
 
-    Tween(card, { Size = UDim2.new(1, 0, 0, 64), BackgroundTransparency = 0 }, 0.18)
+    local progressFill = nil
+    if config.ShowProgress then
+        local track = Instance.new("Frame")
+        track.Name = "ProgressTrack"
+        track.Size = UDim2.new(1, -24, 0, 3)
+        track.Position = UDim2.new(0, 12, 1, -7)
+        track.BackgroundColor3 = GousseUI.Theme.BorderLight
+        track.BorderSizePixel = 0
+        track.Parent = card
+        GousseUI:RegisterThemeElement(track, "BackgroundColor3", "BorderLight")
+
+        progressFill = Instance.new("Frame")
+        progressFill.Name = "ProgressFill"
+        progressFill.Size = UDim2.new(1, 0, 1, 0)
+        progressFill.BackgroundColor3 = GousseUI.Theme[accentKey]
+        progressFill.BorderSizePixel = 0
+        progressFill.Parent = track
+        unbindFillColor = GousseUI:RegisterThemeElement(progressFill, "BackgroundColor3", accentKey)
+    end
+
+    local record = { Card = card, Dead = false, ProgressTween = nil }
+    local dismiss = nil
+
+    if config.Dismissible ~= false then
+        dismiss = Instance.new("ImageButton")
+        dismiss.Name = "Dismiss"
+        dismiss.Size = UDim2.new(0, 16, 0, 16)
+        dismiss.Position = UDim2.new(1, -22, 0, 8)
+        dismiss.BackgroundTransparency = 1
+        dismiss.AutoButtonColor = false
+        dismiss.Image = GousseUI:GetIcon("x") or "rbxassetid://10747384394"
+        dismiss.ImageColor3 = GousseUI.Theme.TextMuted
+        dismiss.Parent = card
+        GousseUI:RegisterThemeElement(dismiss, "ImageColor3", "TextMuted")
+
+        dismiss.MouseEnter:Connect(function()
+            Tween(dismiss, { ImageColor3 = GousseUI.Theme.TextPrimary }, 0.1)
+        end)
+        dismiss.MouseLeave:Connect(function()
+            Tween(dismiss, { ImageColor3 = GousseUI.Theme.TextMuted }, 0.1)
+        end)
+        dismiss.MouseButton1Click:Connect(function()
+            DismissNotification(record, true)
+        end)
+    end
+
+    if type(config.Callback) == "function" then
+        card.InputBegan:Connect(function(input)
+            if dismiss and input.Target == dismiss then return end
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                pcall(config.Callback)
+            end
+        end)
+    end
+
+    if config.Position then ApplyNotificationPosition(config.Position) end
+    if config.ShowProgress and duration > 0 and progressFill then
+        record.ProgressTween = TweenService:Create(progressFill,
+            TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.Out),
+            { Size = UDim2.new(0, 0, 1, 0) })
+        record.ProgressTween:Play()
+    end
+    if duration > 0 then
+        task.delay(duration, function()
+            DismissNotification(record, true)
+        end)
+    end
+
+    table.insert(ActiveNotifications, record)
+    TrimNotifications()
+    Tween(card, { Size = UDim2.new(1, 0, 0, cardHeight), BackgroundTransparency = 0 }, 0.18)
     Tween(stroke, { Transparency = 0 }, 0.18)
 
-    task.delay(duration, function()
-        if card and card.Parent then
-            Tween(card, { Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1 }, 0.15)
-            Tween(stroke, { Transparency = 1 }, 0.15)
-            task.wait(0.18)
-            card:Destroy()
+    return {
+        Card = card,
+        Close = function() DismissNotification(record, true) end,
+        Update = function(newContent: string?, newTitle: string?)
+            if newTitle then title.Text = newTitle end
+            if newContent then
+                body.Text = newContent
+                local nextHeight = (#newContent > 70) and 82 or 64
+                cardHeight = nextHeight
+                body.Size = UDim2.new(1, -textOffset - 12, 0, nextHeight - 38)
+                if not record.Dead and card.Parent then
+                    Tween(card, { Size = UDim2.new(1, 0, 0, nextHeight) }, 0.12)
+                end
+            end
+        end,
+        SetProgress = function(ratio: number)
+            if progressFill then
+                local value = math.clamp(ratio, 0, 1)
+                if record.ProgressTween then
+                    record.ProgressTween:Cancel()
+                    record.ProgressTween = nil
+                end
+                progressFill.Size = UDim2.new(value, 0, 1, 0)
+            end
+        end,
+        SetType = function(newType: string)
+            accentKey = TypeAccentKey[newType] or "Accent"
+            if unbindBarColor then unbindBarColor() end
+            unbindBarColor = GousseUI:RegisterThemeElement(bar, "BackgroundColor3", accentKey)
+            bar.BackgroundColor3 = GousseUI.Theme[accentKey]
+            if iconAsset and iconAsset ~= "" then
+                local icon = card:FindFirstChild("Icon")
+                if icon and icon:IsA("ImageLabel") then
+                    if unbindIconColor then unbindIconColor() end
+                    unbindIconColor = GousseUI:RegisterThemeElement(icon, "ImageColor3", accentKey)
+                    icon.ImageColor3 = GousseUI.Theme[accentKey]
+                end
+            end
+            if progressFill then
+                if unbindFillColor then unbindFillColor() end
+                unbindFillColor = GousseUI:RegisterThemeElement(progressFill, "BackgroundColor3", accentKey)
+                progressFill.BackgroundColor3 = GousseUI.Theme[accentKey]
+            end
         end
-    end)
+    }
+end
+
+function GousseUI:NotifySuccess(content: string, title: string?, duration: number?)
+    return self:Notify({ Title = title, Content = content, Duration = duration, Type = "success" })
+end
+
+function GousseUI:NotifyInfo(content: string, title: string?, duration: number?)
+    return self:Notify({ Title = title, Content = content, Duration = duration, Type = "info" })
+end
+
+function GousseUI:NotifyWarning(content: string, title: string?, duration: number?)
+    return self:Notify({ Title = title, Content = content, Duration = duration, Type = "warning" })
+end
+
+function GousseUI:NotifyError(content: string, title: string?, duration: number?)
+    return self:Notify({ Title = title, Content = content, Duration = duration, Type = "error" })
+end
+
+-- Persistent progress toast; drive it with SetProgress(0..1), then Close().
+function GousseUI:NotifyProgress(config: {
+    Title: string?,
+    Content: string?,
+    Type: string?,
+    Icon: string?,
+    Position: string?,
+    Dismissible: boolean?
+})
+    config = config or {}
+    return self:Notify({
+        Title = config.Title or "Gousse Hub",
+        Content = config.Content or "Working...",
+        Duration = 0,
+        Type = config.Type or "info",
+        Icon = config.Icon,
+        Position = config.Position,
+        Dismissible = config.Dismissible,
+        ShowProgress = true
+    })
+end
+
+function GousseUI:SetNotificationPosition(name: string)
+    GousseUI.NotificationPosition = name
+    ApplyNotificationPosition(name)
+end
+
+function GousseUI:ClearNotifications()
+    for _, record in ipairs(table.clone(ActiveNotifications)) do
+        DismissNotification(record, true)
+    end
 end
 
 -- ============================================================================
@@ -2375,6 +2810,10 @@ function GousseUI:CreateWindow(config: {
         isUnloaded = true
         if WindowObj then
             WindowObj.IsUnloaded = true
+            if WindowObj.SettingsUnbind then
+                WindowObj.SettingsUnbind()
+                WindowObj.SettingsUnbind = nil
+            end
         end
 
         HideTooltip()
@@ -2782,6 +3221,53 @@ function GousseUI:CreateWindow(config: {
 
     function WindowObj:Unload()
         UnloadNow()
+    end
+
+    -- Persisted window state is applied to every open window by the listener.
+    WindowObj.SettingsUnbind = GousseUI:OnSettingsLoaded(function(settings)
+        if WindowObj.IsUnloaded then return end
+        if type(settings.UIScale) == "number" then
+            uiScale.Scale = math.clamp(settings.UIScale, 0.5, 1.8)
+            GousseUI.UIScale = uiScale.Scale
+        end
+        if type(settings.WindowSize) == "table" then
+            local size = settings.WindowSize
+            if type(size.X) == "number" and type(size.Y) == "number" then
+                mainFrame.Size = UDim2.new(size.SX or 0, size.X, size.SY or 0, size.Y)
+            end
+        end
+        if settings.Keybind then
+            local key = Enum.KeyCode[settings.Keybind]
+            if key then
+                toggleKey = key
+                GousseUI.ActiveKeybind = key
+            end
+        end
+        if type(settings.ShowFAB) == "boolean" and fabBtn then
+            fabBtn.Visible = settings.ShowFAB
+        end
+    end)
+
+    function WindowObj:SaveSettings(profile: string?)
+        return GousseUI:SaveSettings({
+            UIScale = uiScale.Scale,
+            WindowSize = {
+                X = mainFrame.Size.X.Offset,
+                Y = mainFrame.Size.Y.Offset,
+                SX = mainFrame.Size.X.Scale,
+                SY = mainFrame.Size.Y.Scale
+            },
+            Keybind = toggleKey.Name,
+            ShowFAB = fabBtn and fabBtn.Visible or false
+        }, profile)
+    end
+
+    function WindowObj:LoadSettings(profile: string?)
+        return GousseUI:LoadSettings(profile)
+    end
+
+    if config.LoadSettings ~= false and GousseUI.AutoLoadSettings then
+        pcall(function() GousseUI:LoadSettings(config.SettingsProfile) end)
     end
 
     -- Real-time Search Filter Bar in ContentArea
@@ -4883,6 +5369,7 @@ function GousseUI:CreateWindow(config: {
     function WindowObj:SetScale(scale: number)
         if uiScale then
             uiScale.Scale = math.clamp(scale, 0.5, 1.8)
+            GousseUI.UIScale = uiScale.Scale
         end
     end
 
@@ -4993,6 +5480,7 @@ function GousseUI:CreateWindow(config: {
             Callback = function(val)
                 if uiScale then
                     uiScale.Scale = val
+                    GousseUI.UIScale = val
                 end
             end
         })
@@ -5075,7 +5563,102 @@ function GousseUI:CreateWindow(config: {
             })
         end
 
-        -- Section 4: Hotkeys & Lifecycle
+        -- Section 4: Settings Persistence
+        settingsTab:CreateSection("Settings & Profiles")
+
+        local profileInput = settingsTab:CreateInput({
+            Name = "Profile Name",
+            SubTitle = "File name used by Save / Load / Delete (default: default)",
+            Placeholder = "default",
+            Callback = function() end
+        })
+        profileInput.Set("default")
+
+        local profileDropdown = settingsTab:CreateDropdown({
+            Name = "Saved Profile",
+            SubTitle = "Profiles found in the executor workspace",
+            Options = GousseUI:ListSettings(),
+            Default = "default",
+            Callback = function(choice)
+                profileInput.Set(choice)
+            end
+        })
+
+        local function RefreshProfiles()
+            local profiles = GousseUI:ListSettings()
+            if #profiles == 0 then profiles = { "default" } end
+            profileDropdown.Refresh(profiles, profiles[1])
+        end
+        RefreshProfiles()
+
+        settingsTab:CreateButton({
+            Name = "Save Settings",
+            SubTitle = "Stores theme, accent, scale, keybind, notifications and window size",
+            ButtonText = "Save",
+            Variant = "primary",
+            Callback = function()
+                local profile = profileInput.Get()
+                local ok, err = WindowObj:SaveSettings(profile)
+                if ok then
+                    RefreshProfiles()
+                    GousseUI:NotifySuccess("Settings saved to '" .. tostring(profile) .. "'.", "GousseUI", 2.5)
+                else
+                    GousseUI:NotifyError(tostring(err), "Save failed", 3)
+                end
+            end
+        })
+
+        settingsTab:CreateButton({
+            Name = "Load Settings",
+            SubTitle = "Restores the selected profile and applies it to every open window",
+            ButtonText = "Load",
+            Callback = function()
+                local settings, ok = GousseUI:LoadSettings(profileInput.Get())
+                if ok then
+                    GousseUI:NotifySuccess("Profile loaded.", "GousseUI", 2.5)
+                else
+                    GousseUI:NotifyError("No saved profile with that name.", "Load failed", 3)
+                end
+            end
+        })
+
+        settingsTab:CreateButton({
+            Name = "Delete Profile",
+            SubTitle = "Removes the selected profile file from the executor workspace",
+            ButtonText = "Delete",
+            Variant = "danger",
+            Callback = function()
+                local ok, err = GousseUI:DeleteSettings(profileInput.Get())
+                RefreshProfiles()
+                if ok then
+                    GousseUI:NotifyInfo("Profile deleted.", "GousseUI", 2.5)
+                else
+                    GousseUI:NotifyError(tostring(err), "Delete failed", 3)
+                end
+            end
+        })
+
+        settingsTab:CreateToggle({
+            Name = "Auto Save",
+            SubTitle = "Automatically persists theme and accent changes to the default profile",
+            Default = GousseUI.AutoSaveSettings,
+            Callback = function(enabled)
+                GousseUI:SetAutoSave(enabled)
+            end
+        })
+
+        settingsTab:CreateButton({
+            Name = "Reset to Defaults",
+            SubTitle = "Restores built-in theme, scale, keybind and notification defaults",
+            ButtonText = "Reset",
+            Callback = function()
+                GousseUI:ResetSettings(profileInput.Get())
+                RefreshProfiles()
+                GousseUI:NotifyInfo("Settings reset to defaults.", "GousseUI", 2.5)
+            end
+        })
+
+        -- Section 5: Hotkeys & Lifecycle
         settingsTab:CreateSection("Hotkeys & Lifecycle")
 
         settingsTab:CreateKeybind({
