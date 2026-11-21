@@ -1,6 +1,6 @@
 # GousseUI Library API & Agent Developer Guide
 
-> **Target Version**: GousseUI v2.4.0  
+> **Target Version**: GousseUI v2.4.1  
 > **Environment**: Roblox Luau (Executor / Client)  
 > **Repository Core**: [`library.luau`](file:///c:/Users/Gouang/Desktop/Gousse/library.luau)  
 > **Agent Skill**: [`.agents/skills/gousse-gui/SKILL.md`](file:///c:/Users/Gouang/Desktop/Gousse/.agents/skills/gousse-gui/SKILL.md)
@@ -63,7 +63,8 @@ GousseUI provides a fully reactive theming pipeline. When the user changes a the
 
 ### 2.1 Theme Presets
 Accessible via `GousseUI:SetTheme(name)`:
-- `"emerald"`: Default Obsidian & Emerald Green (`#10B981`)
+- `"default"`: Blended dark navy + amber (`#F59E0B`) — shared with the Burger Planet lobby. Added in v2.4.1; also adds `PillIdle`, `PillIdleText`, `PillStrokeIdle`, `PillActiveText` tokens for segmented controls.
+- `"emerald"`: Obsidian & Emerald Green (`#10B981`) — still available as an opt-in preset
 - `"cyberpunk"`: Dark Night & Neon Cyan (`#00F0FF`)
 - `"amethyst"`: Gothic Slate & Amethyst Violet (`#A855F7`)
 - `"crimson"`: Crimson Ruby (`#F43F5E`)

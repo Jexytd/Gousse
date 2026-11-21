@@ -261,11 +261,11 @@ end
 
 -- Visibility pills use the same amber highlight as the create modal so the
 -- two surfaces read as one palette instead of a green/amber clash.
-local PILL_ACTIVE = GousseUI.Theme.Warning
-local PILL_IDLE = Color3.fromRGB(17, 24, 39)
-local PILL_TEXT_ACTIVE = Color3.fromRGB(11, 14, 20)
-local PILL_TEXT_IDLE = Color3.fromRGB(107, 114, 128)
-local PILL_STROKE_IDLE = Color3.fromRGB(31, 41, 55)
+local PILL_ACTIVE = GousseUI.Theme.Accent
+local PILL_IDLE = GousseUI.Theme.PillIdle or Color3.fromRGB(17, 24, 39)
+local PILL_TEXT_ACTIVE = GousseUI.Theme.PillActiveText or GousseUI.Theme.Background
+local PILL_TEXT_IDLE = GousseUI.Theme.PillIdleText or GousseUI.Theme.TextMuted
+local PILL_STROKE_IDLE = GousseUI.Theme.PillStrokeIdle or GousseUI.Theme.Border
 
 local function Pill(parent, text, x, width, active, onClick)
     local btn = New("TextButton", {

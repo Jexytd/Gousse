@@ -1,6 +1,6 @@
 --[[
     ========================================================================
-    GousseUI - Authentic Modern Game Utility UI Library (v2.4.0)
+    GousseUI - Authentic Modern Game Utility UI Library (v2.4.1)
     Engineered for Gousse Hub & Roblox Execution Environments
     ========================================================================
     Design Direction & Features:
@@ -885,12 +885,12 @@ local FontRegular = Enum.Font.BuilderSans or Enum.Font.Gotham
 local FontCode = Enum.Font.RobotoMono or Enum.Font.Code
 
 local GousseUI = {
-    Version = "2.4.0",
+    Version = "2.4.1",
     Windows = {},
     ActiveKeybind = Enum.KeyCode.RightControl,
     NotificationPosition = "BottomRight",
     NotificationMax = 6,
-    CurrentTheme = "emerald",
+    CurrentTheme = "default",
     UIScale = 1.0,
     SettingsFolder = "GousseUI",
     AutoSaveSettings = true,
@@ -898,24 +898,29 @@ local GousseUI = {
     SettingsListeners = {},
     _applyingSettings = false,
     Theme = {
-        Background = Color3.fromRGB(11, 14, 20),        -- #0B0E14 Deep Obsidian Slate
-        Sidebar = Color3.fromRGB(15, 19, 27),           -- #0F131B Elevated dark tone
-        Surface = Color3.fromRGB(19, 25, 35),           -- #131923 Sleek card background
-        SurfaceHover = Color3.fromRGB(26, 35, 50),      -- #1A2332 Interactive hover highlight
-        TooltipBg = Color3.fromRGB(26, 34, 48),         -- #1A2230 Floating tooltip background
-        Border = Color3.fromRGB(30, 41, 59),            -- #1E293B Soft slate perimeter border
-        BorderLight = Color3.fromRGB(51, 65, 85),       -- #334155 Subtle separator
-        WindowOutline = Color3.fromRGB(16, 185, 129),  -- #10B981 Modern Emerald Accent
-        Accent = Color3.fromRGB(16, 185, 129),         -- #10B981 Modern Emerald
-        AccentDark = Color3.fromRGB(5, 150, 105),       -- #059669 Darker Emerald
-        Primary = Color3.fromRGB(16, 185, 129),        -- Green brand accent
+        -- Blended dark/amber palette shared with the Burger Planet lobby UI.
+        Background = Color3.fromRGB(11, 14, 20),        -- #0B0E14
+        Sidebar = Color3.fromRGB(17, 24, 39),           -- #111827
+        Surface = Color3.fromRGB(21, 28, 40),           -- #151C28
+        SurfaceHover = Color3.fromRGB(31, 41, 55),      -- #1F2937
+        TooltipBg = Color3.fromRGB(31, 41, 55),         -- #1F2937
+        Border = Color3.fromRGB(31, 41, 55),            -- #1F2937
+        BorderLight = Color3.fromRGB(55, 65, 81),       -- #374151
+        WindowOutline = Color3.fromRGB(245, 158, 11),  -- #F59E0B Amber
+        Accent = Color3.fromRGB(245, 158, 11),         -- #F59E0B Amber
+        AccentDark = Color3.fromRGB(217, 119, 6),      -- #D97706
+        Primary = Color3.fromRGB(245, 158, 11),        -- Amber
         Blue = Color3.fromRGB(56, 189, 248),            -- #38BDF8 Sky Cyan
-        Success = Color3.fromRGB(16, 185, 129),        -- Green
-        Warning = Color3.fromRGB(245, 158, 11),         -- #F59E0B Amber
-        Danger = Color3.fromRGB(244, 63, 94),           -- #F43F5E Modern Red
-        TextPrimary = Color3.fromRGB(243, 244, 246),    -- #F3F4F6 Neutral white
-        TextSecondary = Color3.fromRGB(148, 163, 184),  -- #94A3B8 Slate-400 (High contrast WCAG AAA)
-        TextMuted = Color3.fromRGB(100, 116, 139)        -- #64748B Slate-500 section labels
+        Success = Color3.fromRGB(245, 158, 11),        -- Amber
+        Warning = Color3.fromRGB(251, 191, 36),        -- #FBBF24
+        Danger = Color3.fromRGB(244, 63, 94),          -- #F43F5E
+        TextPrimary = Color3.fromRGB(243, 244, 246),   -- #F3F4F6
+        TextSecondary = Color3.fromRGB(156, 163, 175), -- #9CA3AF
+        TextMuted = Color3.fromRGB(107, 114, 128),     -- #6B7280
+        PillIdle = Color3.fromRGB(17, 24, 39),         -- #111827
+        PillIdleText = Color3.fromRGB(107, 114, 128),  -- #6B7280
+        PillStrokeIdle = Color3.fromRGB(31, 41, 55),   -- #1F2937
+        PillActiveText = Color3.fromRGB(11, 14, 20)    -- #0B0E14
     }
 }
 
@@ -923,23 +928,27 @@ local GousseUI = {
 local Themes = {
     ["default"] = {
         Background = Color3.fromRGB(11, 14, 20),
-        Sidebar = Color3.fromRGB(15, 19, 27),
-        Surface = Color3.fromRGB(19, 25, 35),
-        SurfaceHover = Color3.fromRGB(26, 35, 50),
-        TooltipBg = Color3.fromRGB(26, 34, 48),
-        Border = Color3.fromRGB(30, 41, 59),
-        BorderLight = Color3.fromRGB(51, 65, 85),
-        WindowOutline = Color3.fromRGB(16, 185, 129),
-        Accent = Color3.fromRGB(16, 185, 129),
-        AccentDark = Color3.fromRGB(5, 150, 105),
-        Primary = Color3.fromRGB(16, 185, 129),
+        Sidebar = Color3.fromRGB(17, 24, 39),
+        Surface = Color3.fromRGB(21, 28, 40),
+        SurfaceHover = Color3.fromRGB(31, 41, 55),
+        TooltipBg = Color3.fromRGB(31, 41, 55),
+        Border = Color3.fromRGB(31, 41, 55),
+        BorderLight = Color3.fromRGB(55, 65, 81),
+        WindowOutline = Color3.fromRGB(245, 158, 11),
+        Accent = Color3.fromRGB(245, 158, 11),
+        AccentDark = Color3.fromRGB(217, 119, 6),
+        Primary = Color3.fromRGB(245, 158, 11),
         Blue = Color3.fromRGB(56, 189, 248),
-        Success = Color3.fromRGB(16, 185, 129),
-        Warning = Color3.fromRGB(245, 158, 11),
+        Success = Color3.fromRGB(245, 158, 11),
+        Warning = Color3.fromRGB(251, 191, 36),
         Danger = Color3.fromRGB(244, 63, 94),
         TextPrimary = Color3.fromRGB(243, 244, 246),
-        TextSecondary = Color3.fromRGB(148, 163, 184),
-        TextMuted = Color3.fromRGB(100, 116, 139)
+        TextSecondary = Color3.fromRGB(156, 163, 175),
+        TextMuted = Color3.fromRGB(107, 114, 128),
+        PillIdle = Color3.fromRGB(17, 24, 39),
+        PillIdleText = Color3.fromRGB(107, 114, 128),
+        PillStrokeIdle = Color3.fromRGB(31, 41, 55),
+        PillActiveText = Color3.fromRGB(11, 14, 20)
     },
     ["emerald"] = {
         Background = Color3.fromRGB(11, 14, 20),
@@ -1140,6 +1149,12 @@ function GousseUI:SetTheme(themeName: string, customColors: { [string]: Color3 }
     for k, v in pairs(target) do
         GousseUI.Theme[k] = v
     end
+    -- Pill tokens are not duplicated in every preset; keep them aligned with
+    -- the active palette so the lobby controls blend after a theme switch.
+    GousseUI.Theme.PillIdle = target.PillIdle or Color3.fromRGB(17, 24, 39)
+    GousseUI.Theme.PillIdleText = target.PillIdleText or target.TextMuted or Color3.fromRGB(107, 114, 128)
+    GousseUI.Theme.PillStrokeIdle = target.PillStrokeIdle or target.Border or Color3.fromRGB(31, 41, 55)
+    GousseUI.Theme.PillActiveText = target.PillActiveText or target.Background or Color3.fromRGB(11, 14, 20)
     if customColors then
         for k, v in pairs(customColors) do
             GousseUI.Theme[k] = v
