@@ -58,7 +58,7 @@ local FontBold = Enum.Font.BuilderSansBold or Enum.Font.GothamBold
 local FontMedium = Enum.Font.BuilderSansMedium or Enum.Font.GothamMedium
 local FontRegular = Enum.Font.BuilderSans or Enum.Font.Gotham
 
-local state = { unloaded = false, statusDirty = true, customersDirty = true, tick = 0 }
+local state = { unloaded = false, statusDirty = true, customersDirty = true, siteDirty = true, tick = 0, siteTick = 0 }
 
 local function New(class, props, parent)
     local inst = Instance.new(class)
@@ -92,8 +92,34 @@ local function Countdown(deadline)
     return string.format("%02d:%02d", math.floor(left / 60), math.floor(left % 60))
 end
 
+local Remotes = FastFood:WaitForChild("Remotes", 10)
+local Computer = Remotes and Remotes:FindFirstChild("Computer")
+
+local function SiteRoot()
+    -- The active site is the root that actually has Items/NPCs replicated.
+    local restaurant = workspace:FindFirstChild("FastFood", true)
+    local truck = workspace:FindFirstChild("FoodTruck", true)
+    if truck and truck:FindFirstChild("Items") then return truck end
+    if restaurant and restaurant:FindFirstChild("Items") then return restaurant end
+    return restaurant or truck
+end
+
+local function AskComputer(command, payload)
+    if not Computer then
+        return { Ok = false, Message = "Computer remote is unavailable." }
+    end
+    local ok, result = pcall(function()
+        return Computer:InvokeServer(command, payload)
+    end)
+    if not ok then return { Ok = false, Message = tostring(result) } end
+    if type(result) ~= "table" then
+        return { Ok = false, Message = "No response from the server." }
+    end
+    return result
+end
+
 local function FindNPCs()
-    local root = workspace:FindFirstChild("FastFood", true)
+    local root = SiteRoot()
     return root and root:FindFirstChild("NPCs") or nil
 end
 
@@ -116,6 +142,7 @@ local Window = GousseUI:CreateWindow({
 
 local statusTab = Window:CreateTab({ Name = "Status", Icon = "activity" })
 local customerTab = Window:CreateTab({ Name = "Customers", Icon = "users" })
+local siteTab = Window:CreateTab({ Name = "Site", Icon = "store" })
 
 local CARD_W, STATUS_H, CUSTOMER_H = 196, 92, 124
 
@@ -348,9 +375,141 @@ local function RenderCustomers()
     end
 end
 
+local function ActionButton(parent, text, position, width, color, callback)
+    local btn = New("TextButton", {
+        Position = position,
+        Size = UDim2.new(0, width, 0, 32),
+        BackgroundColor3 = color,
+        BorderSizePixel = 0,
+        Font = FontBold,
+        Text = text,
+        TextColor3 = GousseUI.Theme.TextPrimary,
+        TextSize = 11.5,
+        AutoButtonColor = false
+    }, parent)
+    New("UICorner", { CornerRadius = UDim.new(0, 6) }, btn)
+    btn.MouseButton1Click:Connect(function()
+        task.spawn(callback)
+    end)
+    return btn
+end
+
+local function RenderSite()
+    if state.unloaded then return end
+    ClearPage(siteTab.Page)
+
+    local phase = tostring(Attr("Phase", "Idle"))
+    New("TextLabel", {
+        Size = UDim2.new(1, -8, 0, 26),
+        BackgroundTransparency = 1,
+        Font = FontMedium,
+        Text = "Phase " .. phase .. "   ·   Front " .. (Attr("FrontOpen") and "open" or "shut")
+            .. "   ·   Drive " .. (Attr("DriveOpen") and "open" or "shut")
+            .. "   ·   " .. tostring(Attr("GameMode", "Career")),
+        TextColor3 = GousseUI.Theme.TextSecondary,
+        TextSize = 11.5,
+        TextXAlignment = Enum.TextXAlignment.Left
+    }, siteTab.Page)
+
+    local actionRow = New("Frame", {
+        Size = UDim2.new(1, -8, 0, 32),
+        BackgroundTransparency = 1
+    }, siteTab.Page)
+    ActionButton(actionRow, "OPEN SITE", UDim2.new(0, 0, 0, 0), 150, GousseUI.Theme.Accent, function()
+        local result = AskComputer("Open")
+        GousseUI:Notify({
+            Title = "Burger Planet",
+            Content = result.Ok and "Site opened." or (result.Message or "Could not open the site."),
+            Type = result.Ok and "success" or "error",
+            Duration = 3
+        })
+        Schedule("site")
+    end)
+    ActionButton(actionRow, "CLOSE EARLY", UDim2.new(0, 158, 0, 0), 150, Color3.fromRGB(190, 45, 65), function()
+        local result = AskComputer("CloseEarly")
+        GousseUI:Notify({
+            Title = "Burger Planet",
+            Content = result.Ok and "Shift closed early." or (result.Message or "Could not close the site."),
+            Type = result.Ok and "success" or "error",
+            Duration = 3
+        })
+        Schedule("site")
+    end)
+
+    local laneRow = New("Frame", {
+        Size = UDim2.new(1, -8, 0, 32),
+        BackgroundTransparency = 1
+    }, siteTab.Page)
+    local lanes = {
+        { "Front", "FrontOpen" },
+        { "Drive", "DriveOpen" },
+        { "Delivery", "DeliveryOpen" }
+    }
+    for i, lane in ipairs(lanes) do
+        local opened = Attr(lane[2]) ~= false
+        ActionButton(laneRow, lane[1] .. ": " .. (opened and "OPEN" or "SHUT"),
+            UDim2.new(0, (i - 1) * 116, 0, 0), 108,
+            opened and GousseUI.Theme.Warning or GousseUI.Theme.SurfaceHover,
+            function()
+                local result = AskComputer("SetLane", { Lane = lane[1], Open = not opened })
+                GousseUI:Notify({
+                    Title = "Burger Planet",
+                    Content = result.Ok and (lane[1] .. " updated.") or (result.Message or "Could not update the lane."),
+                    Type = result.Ok and "success" or "error",
+                    Duration = 2.5
+                })
+                Schedule("site")
+            end)
+    end
+
+    New("TextLabel", {
+        Size = UDim2.new(1, -8, 0, 22),
+        BackgroundTransparency = 1,
+        Font = FontBold,
+        Text = "SUPPLIES ON HAND",
+        TextColor3 = GousseUI.Theme.TextMuted,
+        TextSize = 10,
+        TextXAlignment = Enum.TextXAlignment.Left
+    }, siteTab.Page)
+
+    local root = SiteRoot()
+    local items = root and root:FindFirstChild("Items")
+    local entries = {}
+    for _, item in ipairs(items and items:GetChildren() or {}) do
+        local amount = tonumber(item:GetAttribute("Amount")) or 0
+        entries[#entries + 1] = {
+            name = tostring(item:GetAttribute("Supply") or item:GetAttribute("Ingredient") or item.Name),
+            label = tostring(item:GetAttribute("Label") or item.Name),
+            amount = amount
+        }
+    end
+    table.sort(entries, function(a, b) return a.amount < b.amount end)
+
+    if #entries == 0 then
+        New("TextLabel", {
+            Size = UDim2.new(1, -8, 0, 30),
+            BackgroundTransparency = 1,
+            Font = FontRegular,
+            Text = "No stock items replicated yet.",
+            TextColor3 = GousseUI.Theme.TextMuted,
+            TextSize = 11
+        }, siteTab.Page)
+        return
+    end
+
+    local grid = MakeGrid(siteTab.Page)
+    for i, entry in ipairs(entries) do
+        local color = entry.amount <= 5 and GousseUI.Theme.Danger
+            or (entry.amount <= 12 and GousseUI.Theme.Warning or GousseUI.Theme.Success)
+        MakeCard(grid, entry.name, i, "package", color, tostring(entry.amount), entry.label)
+    end
+end
+
 -- Refresh scheduling: attribute storms coalesce into one rebuild per frame.
 local function Schedule(kind)
-    if kind == "status" then state.statusDirty = true else state.customersDirty = true end
+    if kind == "status" then state.statusDirty = true
+    elseif kind == "site" then state.siteDirty = true
+    else state.customersDirty = true end
 end
 
 local connections = {}
@@ -371,12 +530,23 @@ end
 
 Watch(Orders.ChildAdded, function() Schedule("customers") end)
 Watch(Orders.ChildRemoved, function() Schedule("customers") end)
+for _, name in ipairs({ "Phase", "FrontOpen", "DriveOpen", "DeliveryOpen", "Site" }) do
+    Watch(State:GetAttributeChangedSignal(name), function() Schedule("site") end)
+end
+
 Watch(RunService.Heartbeat, function()
     -- Countdowns are second-resolution; rebuild at most once per second.
-    if os.clock() - state.tick < 1 then return end
-    state.tick = os.clock()
-    state.customersDirty = false
-    RenderCustomers()
+    if os.clock() - state.tick >= 1 then
+        state.tick = os.clock()
+        state.customersDirty = false
+        RenderCustomers()
+    end
+    -- Stock amounts change on every pickup; refresh the site panel on a slower tick.
+    if os.clock() - state.siteTick >= 2 then
+        state.siteTick = os.clock()
+        state.siteDirty = false
+        RenderSite()
+    end
 end)
 
 local npcRoot = FindNPCs()
@@ -405,4 +575,5 @@ env.BPStatus = {
 
 RenderStatus()
 RenderCustomers()
-GousseUI:NotifySuccess("Status & customer tracker ready.", "Burger Planet", 3)
+RenderSite()
+GousseUI:NotifySuccess("Status, customers & site controls ready.", "Burger Planet", 3)
