@@ -54,7 +54,7 @@ if not GousseUI then
     end
 end
 if not GousseUI then error("[Burger Planet] GousseUI failed to load") end
-GousseUI:SetTheme("emerald")
+GousseUI:SetTheme("default")
 
 -- Re-execution guard: shut the previous instance down first, otherwise every
 -- run leaves another set of workers + POS listeners behind (duplicate submits).

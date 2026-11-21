@@ -1,12 +1,12 @@
 --[[
     ========================================================================
-    GousseUI - Authentic Modern Game Utility UI Library (v2.4.3)
+    GousseUI - Authentic Modern Game Utility UI Library (v2.4.4)
     Engineered for Gousse Hub & Roblox Execution Environments
     ========================================================================
     Design Direction & Features:
       - Modern tactical gaming aesthetic (deep obsidian slate #0B0E14 & #131923)
       - High-contrast BuilderSans typography hierarchy (WCAG AAA readability)
-      - Refined 2px emerald top accent bar preserving Gousse Hub brand identity
+      - Refined 2px amber top accent bar preserving Gousse Hub brand identity
       - Lucide icon engine with vector assets
       - Scaled desktop window (690x450) & responsive mobile scaling
       - Dedicated Lucide window controls (Minimize & Exit) with tactile hover states
@@ -885,7 +885,7 @@ local FontRegular = Enum.Font.BuilderSans or Enum.Font.Gotham
 local FontCode = Enum.Font.RobotoMono or Enum.Font.Code
 
 local GousseUI = {
-    Version = "2.4.3",
+    Version = "2.4.4",
     Windows = {},
     ActiveKeybind = Enum.KeyCode.RightControl,
     NotificationPosition = "BottomRight",
@@ -1334,7 +1334,7 @@ end
 local function DefaultSettings(): { [string]: any }
     return {
         Version = GousseUI.Version,
-        Theme = GousseUI.CurrentTheme or "emerald",
+        Theme = GousseUI.CurrentTheme or "default",
         Accent = ColorToHex(GousseUI.Theme.Accent),
         UIScale = GousseUI.UIScale or 1.0,
         Keybind = (GousseUI.ActiveKeybind and GousseUI.ActiveKeybind.Name) or "RightControl",
@@ -2027,7 +2027,7 @@ function GousseUI:CreateLoader(config: {
     modalStroke.Thickness = 1.2
     modalStroke.Parent = modal
 
-    -- Top 2px Emerald Accent Line
+    -- Top 2px Amber Accent Line
     local topAccent = Instance.new("Frame")
     topAccent.Name = "TopAccent"
     topAccent.Size = UDim2.new(1, 0, 0, 2)
@@ -2383,7 +2383,7 @@ function GousseUI:CreateWindow(config: {
     mainStroke.Parent = mainFrame
     GousseUI:RegisterThemeElement(mainStroke, "Color", "Border")
 
-    -- Signature top emerald accent bar (2px)
+    -- Signature top amber accent bar (2px)
     local topAccentBar = Instance.new("Frame")
     topAccentBar.Name = "TopAccentBar"
     topAccentBar.Size = UDim2.new(1, 0, 0, 2)
@@ -5412,7 +5412,7 @@ function GousseUI:CreateWindow(config: {
         settingsTab:CreateSection("Appearance & Theme")
 
         local themeOptions = {
-            "Emerald (Default)",
+            "Amber (Default)",
             "Cyber Cyan",
             "Amethyst Violet",
             "Crimson Ruby",
@@ -5423,7 +5423,7 @@ function GousseUI:CreateWindow(config: {
         }
 
         local themeKeyMap = {
-            ["Emerald (Default)"] = "emerald",
+            ["Amber (Default)"] = "default",
             ["Cyber Cyan"] = "cyberpunk",
             ["Amethyst Violet"] = "amethyst",
             ["Crimson Ruby"] = "crimson",
@@ -5437,7 +5437,7 @@ function GousseUI:CreateWindow(config: {
             Name = "Theme Preset",
             SubTitle = "Select interface color theme and glowing accent highlights",
             Options = themeOptions,
-            Default = "Emerald (Default)",
+            Default = "Amber (Default)",
             Callback = function(sel)
                 local key = themeKeyMap[sel] or "default"
                 GousseUI:SetTheme(key)

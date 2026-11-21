@@ -43,7 +43,7 @@ GousseUI features an authentic modern tactical aesthetic: deep obsidian/slate ba
 ### 1.2 Preset Palettes
 
 The library provides 8 built-in themes accessible via `GousseUI:SetTheme(name)`:
-1. `"emerald"`: Emerald Green (Default)
+1. `"default"`: Amber Blend (Default) — dark navy + `#F59E0B`
 2. `"cyberpunk"`: Cyber Cyan (`#00F0FF`)
 3. `"amethyst"`: Amethyst Violet (`#A855F7`)
 4. `"crimson"`: Crimson Ruby (`#F43F5E`)
@@ -221,7 +221,7 @@ Full dual-axis Saturation/Value canvas, 360° Hue spectrum bar, preset color swa
 local myColorPicker = Tab:CreateColorPicker({
     Name = "ESP Highlight Color",
     SubTitle = "Color for player bounding box and tracers",
-    Default = Color3.fromRGB(16, 185, 129), -- Emerald default
+    Default = Color3.fromRGB(245, 158, 11), -- Amber default
     Callback = function(col: Color3)
         print("Selected Color3:", col)
     end

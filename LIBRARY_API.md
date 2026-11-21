@@ -1,6 +1,6 @@
 # GousseUI Library API & Agent Developer Guide
 
-> **Target Version**: GousseUI v2.4.3  
+> **Target Version**: GousseUI v2.4.4  
 > **Environment**: Roblox Luau (Executor / Client)  
 > **Repository Core**: [`library.luau`](file:///c:/Users/Gouang/Desktop/Gousse/library.luau)  
 > **Agent Skill**: [`.agents/skills/gousse-gui/SKILL.md`](file:///c:/Users/Gouang/Desktop/Gousse/.agents/skills/gousse-gui/SKILL.md)
