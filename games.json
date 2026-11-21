@@ -70,11 +70,11 @@
       "status": "public",
       "lead": "Gouang",
       "scriptType": "Modular (modules/)",
-      "entry": "games/burger_planet/main.luau",
+      "entry": "games/burger_planet/status.luau",
       "places": {
         "101107153774667": {
-          "name": "Burger Planet: Fast Food Simulator",
-          "script": "games/burger_planet/main.luau"
+          "name": "Restaurant - Status & Customers",
+          "script": "games/burger_planet/status.luau"
         },
         "121348681731705": {
           "name": "Lobby - Restaurants",
