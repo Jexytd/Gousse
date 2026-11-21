@@ -762,7 +762,8 @@ local function StorageUnits()
                     key = key,
                     capacity = capacity,
                     contents = contents,
-                    cold = isCold
+                    cold = isCold,
+                    station = station
                 }
             end
         end
@@ -779,6 +780,123 @@ local function SupplyColor(id)
         end
     end
     return GousseUI.Theme.TextMuted
+end
+
+-- World-space billboards over each storage unit: which slots are filled and
+-- which are empty, visible without opening the GUI.
+local Billboards = {}
+
+local function AnchorFor(station)
+    if not station then return nil end
+    local direct = station:FindFirstChild("ColdZone")
+        or station:FindFirstChild("SlotAnchor")
+        or station:FindFirstChild("Art")
+    if direct and direct:IsA("BasePart") then return direct end
+    if direct then
+        local part = direct:FindFirstChildWhichIsA("BasePart", true)
+        if part then return part end
+    end
+    return station:FindFirstChildWhichIsA("BasePart", true)
+end
+
+local function DestroyBillboards()
+    for _, rec in ipairs(Billboards) do
+        pcall(function() rec.gui:Destroy() end)
+    end
+    Billboards = {}
+end
+
+local function BuildBillboards()
+    DestroyBillboards()
+    for _, unit in ipairs(StorageUnits()) do
+        local anchor = AnchorFor(unit.station)
+        if anchor then
+            local gui = New("BillboardGui", {
+                Name = "GousseStorageBoard",
+                Size = UDim2.new(0, 208, 0, 78),
+                StudsOffset = Vector3.new(0, 2.4, 0),
+                AlwaysOnTop = true,
+                MaxDistance = 70,
+                Enabled = true
+            }, anchor)
+
+            New("Frame", {
+                Size = UDim2.new(1, 0, 1, 0),
+                BackgroundColor3 = GousseUI.Theme.Background,
+                BackgroundTransparency = 0.18,
+                BorderSizePixel = 0
+            }, gui)
+
+            local title = New("TextLabel", {
+                Name = "Title",
+                Position = UDim2.new(0, 8, 0, 5),
+                Size = UDim2.new(1, -16, 0, 18),
+                BackgroundTransparency = 1,
+                Font = FontBold,
+                Text = unit.site .. "/" .. unit.name,
+                TextColor3 = GousseUI.Theme.TextPrimary,
+                TextSize = 11,
+                TextXAlignment = Enum.TextXAlignment.Left
+            }, gui)
+
+            local status = New("TextLabel", {
+                Name = "Status",
+                Position = UDim2.new(0, 8, 0, 23),
+                Size = UDim2.new(1, -16, 0, 15),
+                BackgroundTransparency = 1,
+                Font = FontMedium,
+                Text = "",
+                TextColor3 = unit.cold and GousseUI.Theme.Blue or GousseUI.Theme.Warning,
+                TextSize = 10,
+                TextXAlignment = Enum.TextXAlignment.Left
+            }, gui)
+
+            local dots = {}
+            local dotFrame = New("Frame", {
+                Name = "Dots",
+                Position = UDim2.new(0, 8, 0, 44),
+                Size = UDim2.new(1, -16, 0, 26),
+                BackgroundTransparency = 1
+            }, gui)
+            local perRow = 8
+            for i = 1, math.min(unit.capacity, 32) do
+                local col = (i - 1) % perRow
+                local row = math.floor((i - 1) / perRow)
+                local dot = New("Frame", {
+                    LayoutOrder = i,
+                    Position = UDim2.new(0, col * 24, 0, row * 12),
+                    Size = UDim2.new(0, 20, 0, 9),
+                    BackgroundColor3 = GousseUI.Theme.SurfaceHover,
+                    BorderSizePixel = 0
+                }, dotFrame)
+                New("UICorner", { CornerRadius = UDim.new(0, 2) }, dot)
+                dots[i] = dot
+            end
+
+            Billboards[#Billboards + 1] = {
+                gui = gui,
+                unit = unit,
+                title = title,
+                status = status,
+                dots = dots
+            }
+        end
+    end
+end
+
+local function UpdateBillboards()
+    for _, rec in ipairs(Billboards) do
+        local unit = rec.unit
+        local contents = type(state.inventory) == "table"
+            and type(state.inventory[unit.key]) == "table" and state.inventory[unit.key] or unit.contents
+        local filled = #contents
+        rec.status.Text = filled .. " / " .. unit.capacity .. " terisi"
+            .. (filled == 0 and "   ·   KOSONG" or "")
+        for i, dot in ipairs(rec.dots) do
+            local entry = contents[i]
+            dot.BackgroundColor3 = entry and SupplyColor(entry.S) or GousseUI.Theme.SurfaceHover
+        end
+    end
 end
 
 local function RenderStorage()
@@ -1056,6 +1174,7 @@ Watch(RunService.Heartbeat, function()
         state.siteTick = os.clock()
         state.siteDirty = false
         RenderSite()
+        UpdateBillboards()
         if Window.ActiveTab == deliveryTab then RenderDelivery() end
         if Window.ActiveTab == storageTab then RenderStorage() end
     end
@@ -1069,6 +1188,7 @@ end
 
 Window:OnUnload(function()
     state.unloaded = true
+    DestroyBillboards()
     for _, conn in ipairs(connections) do
         pcall(function() conn:Disconnect() end)
     end
@@ -1092,4 +1212,6 @@ RenderCustomers()
 RenderSite()
 RenderDelivery()
 RenderStorage()
+BuildBillboards()
+UpdateBillboards()
 GousseUI:NotifySuccess("Status, customers, site, delivery & storage ready.", "Burger Planet", 3)
