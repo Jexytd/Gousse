@@ -67,6 +67,7 @@ local state = {
     siteTick = 0,
     orderQty = 1,
     catalog = nil,
+    inventory = nil,
     pending = 0,
     baselineBoxes = {}
 }
@@ -138,6 +139,7 @@ local function FetchCatalog()
     local data = AskComputer("GetData")
     if type(data) == "table" then
         if type(data.Supplies) == "table" then state.catalog = data.Supplies end
+        if type(data.Inventory) == "table" then state.inventory = data.Inventory end
         state.pending = tonumber(data.Pending) or 0
     end
     return state.catalog
@@ -244,6 +246,7 @@ local statusTab = Window:CreateTab({ Name = "Status", Icon = "activity" })
 local customerTab = Window:CreateTab({ Name = "Customers", Icon = "users" })
 local siteTab = Window:CreateTab({ Name = "Site", Icon = "store" })
 local deliveryTab = Window:CreateTab({ Name = "Delivery", Icon = "truck" })
+local storageTab = Window:CreateTab({ Name = "Storage", Icon = "archive" })
 
 local CARD_W, STATUS_H, CUSTOMER_H = 196, 92, 124
 
@@ -726,6 +729,178 @@ local function RenderSite()
     end
 end
 
+local function StorageUnits()
+    local inv = type(state.inventory) == "table" and state.inventory or {}
+    local out = {}
+    for _, siteName in ipairs({ "FoodTruck", "FastFood" }) do
+        local root = workspace:FindFirstChild(siteName, true)
+        local stations = root and root:FindFirstChild("Stations")
+        for _, station in ipairs(stations and stations:GetChildren() or {}) do
+            local name = station.Name
+            local isCabinet = name == "Cupboards" or tostring(name):lower():find("cabinet")
+            local isCold = station:GetAttribute("Station") == "ColdStorage"
+            if isCabinet or isCold then
+                local capacity = 0
+                for _, descendant in ipairs(station:GetDescendants()) do
+                    if descendant.Name == "BoxSlot" then capacity += 1 end
+                end
+                if capacity == 0 then
+                    for _, descendant in ipairs(station:GetDescendants()) do
+                        if descendant:GetAttribute("Shelf") == true then capacity += 1 end
+                    end
+                end
+                if capacity == 0 then capacity = #station:GetChildren() end
+
+                local key = isCabinet and "Dry" or tostring(station:GetAttribute("StorageId") or "")
+                local contents = type(inv[key]) == "table" and inv[key] or {}
+                capacity = math.max(capacity, #contents)
+                out[#out + 1] = {
+                    site = siteName,
+                    name = name,
+                    key = key,
+                    capacity = capacity,
+                    contents = contents,
+                    cold = isCold
+                }
+            end
+        end
+    end
+    return out
+end
+
+local function SupplyColor(id)
+    for _, supply in ipairs(state.catalog or {}) do
+        if type(supply) == "table" and supply.Id == id then
+            if supply.Storage == "Frozen" then return GousseUI.Theme.Blue end
+            if supply.Storage == "Cold" then return GousseUI.Theme.Warning end
+            return GousseUI.Theme.Accent
+        end
+    end
+    return GousseUI.Theme.TextMuted
+end
+
+local function RenderStorage()
+    if state.unloaded then return end
+    ClearPage(storageTab.Page)
+
+    local inv = type(state.inventory) == "table" and state.inventory or {}
+    local dry = type(inv.Dry) == "table" and #inv.Dry or 0
+    local fridge = type(inv.Fridge) == "table" and #inv.Fridge or 0
+    local freezer = type(inv.Freezer) == "table" and #inv.Freezer or 0
+    New("TextLabel", {
+        Size = UDim2.new(1, -8, 0, 26),
+        BackgroundTransparency = 1,
+        Font = FontMedium,
+        Text = "Inventory   ·   Dry " .. dry .. "   Fridge " .. fridge .. "   Freezer " .. freezer,
+        TextColor3 = GousseUI.Theme.TextSecondary,
+        TextSize = 11.5,
+        TextXAlignment = Enum.TextXAlignment.Left
+    }, storageTab.Page)
+
+    local units = StorageUnits()
+    if #units == 0 then
+        New("TextLabel", {
+            Position = UDim2.new(0, 0, 0, 40),
+            Size = UDim2.new(1, -8, 0, 40),
+            BackgroundTransparency = 1,
+            Font = FontRegular,
+            Text = "Tidak ada unit storage yang ter-replikasi di site ini.",
+            TextColor3 = GousseUI.Theme.TextMuted,
+            TextSize = 11
+        }, storageTab.Page)
+        return
+    end
+
+    local grid = New("Frame", {
+        Size = UDim2.new(1, -8, 0, 1),
+        Position = UDim2.new(0, 0, 0, 34),
+        BackgroundTransparency = 1,
+        AutomaticSize = Enum.AutomaticSize.Y
+    }, storageTab.Page)
+    New("UIGridLayout", {
+        CellSize = UDim2.new(0, 250, 0, 168),
+        CellPadding = UDim2.new(0, 8, 0, 8),
+        FillDirection = Enum.FillDirection.Horizontal,
+        FillDirectionMaxCells = 2,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        HorizontalAlignment = Enum.HorizontalAlignment.Center,
+        VerticalAlignment = Enum.VerticalAlignment.Top
+    }, grid)
+
+    for i, unit in ipairs(units) do
+        local card = New("Frame", {
+            Name = "Storage_" .. unit.name,
+            LayoutOrder = i,
+            Size = UDim2.new(0, 250, 0, 168),
+            BackgroundColor3 = GousseUI.Theme.Surface,
+            BorderSizePixel = 0,
+            ClipsDescendants = true
+        }, grid)
+        New("UICorner", { CornerRadius = UDim.new(0, 8) }, card)
+        New("UIStroke", { Color = GousseUI.Theme.Border, Thickness = 1 }, card)
+        New("Frame", {
+            Size = UDim2.new(1, 0, 0, 3),
+            BackgroundColor3 = unit.cold and GousseUI.Theme.Blue or GousseUI.Theme.Warning,
+            BorderSizePixel = 0
+        }, card)
+
+        New("TextLabel", {
+            Position = UDim2.new(0, 10, 0, 9),
+            Size = UDim2.new(1, -20, 0, 22),
+            BackgroundTransparency = 1,
+            Font = FontBold,
+            Text = unit.site .. "/" .. unit.name,
+            TextColor3 = GousseUI.Theme.TextPrimary,
+            TextSize = 13,
+            TextXAlignment = Enum.TextXAlignment.Left
+        }, card)
+        New("TextLabel", {
+            Position = UDim2.new(0, 10, 0, 32),
+            Size = UDim2.new(1, -20, 0, 18),
+            BackgroundTransparency = 1,
+            Font = FontRegular,
+            Text = unit.key .. "   ·   " .. #unit.contents .. " / " .. unit.capacity .. " slot terisi",
+            TextColor3 = unit.cold and GousseUI.Theme.Blue or GousseUI.Theme.Warning,
+            TextSize = 10.5,
+            TextXAlignment = Enum.TextXAlignment.Left
+        }, card)
+
+        local slotFrame = New("Frame", {
+            Position = UDim2.new(0, 10, 0, 58),
+            Size = UDim2.new(1, -20, 0, 66),
+            BackgroundTransparency = 1
+        }, card)
+        for slot = 1, math.min(unit.capacity, 24) do
+            local col = (slot - 1) % 6
+            local row = math.floor((slot - 1) / 6)
+            local entry = unit.contents[slot]
+            New("Frame", {
+                Position = UDim2.new(0, col * 38, 0, row * 32),
+                Size = UDim2.new(0, 32, 0, 26),
+                BackgroundColor3 = entry and SupplyColor(entry.S) or GousseUI.Theme.SurfaceHover,
+                BorderSizePixel = 0
+            }, slotFrame)
+        end
+
+        local names = {}
+        for _, entry in ipairs(unit.contents) do
+            names[#names + 1] = tostring(entry.S or "?") .. " x" .. tostring(entry.A or 0)
+        end
+        New("TextLabel", {
+            Position = UDim2.new(0, 10, 0, 130),
+            Size = UDim2.new(1, -20, 0, 28),
+            BackgroundTransparency = 1,
+            Font = FontRegular,
+            Text = #names > 0 and table.concat(names, "  ·  ") or "Kosong",
+            TextColor3 = GousseUI.Theme.TextMuted,
+            TextSize = 10,
+            TextWrapped = true,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Top
+        }, card)
+    end
+end
+
 local function RenderDelivery()
     if state.unloaded then return end
     ClearPage(deliveryTab.Page)
@@ -880,6 +1055,7 @@ Watch(RunService.Heartbeat, function()
         state.siteDirty = false
         RenderSite()
         if Window.ActiveTab == deliveryTab then RenderDelivery() end
+        if Window.ActiveTab == storageTab then RenderStorage() end
     end
 end)
 
@@ -913,4 +1089,5 @@ RenderStatus()
 RenderCustomers()
 RenderSite()
 RenderDelivery()
-GousseUI:NotifySuccess("Status, customers, site & delivery tracking ready.", "Burger Planet", 3)
+RenderStorage()
+GousseUI:NotifySuccess("Status, customers, site, delivery & storage ready.", "Burger Planet", 3)
