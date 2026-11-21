@@ -1,6 +1,6 @@
 --[[
     ========================================================================
-    GousseUI - Authentic Modern Game Utility UI Library (v2.4.2)
+    GousseUI - Authentic Modern Game Utility UI Library (v2.4.3)
     Engineered for Gousse Hub & Roblox Execution Environments
     ========================================================================
     Design Direction & Features:
@@ -885,7 +885,7 @@ local FontRegular = Enum.Font.BuilderSans or Enum.Font.Gotham
 local FontCode = Enum.Font.RobotoMono or Enum.Font.Code
 
 local GousseUI = {
-    Version = "2.4.2",
+    Version = "2.4.3",
     Windows = {},
     ActiveKeybind = Enum.KeyCode.RightControl,
     NotificationPosition = "BottomRight",
@@ -920,7 +920,7 @@ local GousseUI = {
         PillIdle = Color3.fromRGB(17, 24, 39),         -- #111827
         PillIdleText = Color3.fromRGB(107, 114, 128),  -- #6B7280
         PillStrokeIdle = Color3.fromRGB(31, 41, 55),   -- #1F2937
-        PillActiveText = Color3.fromRGB(11, 14, 20)    -- #0B0E14
+        PillActiveText = Color3.fromRGB(243, 244, 246) -- #F3F4F6
     }
 }
 
@@ -948,27 +948,7 @@ local Themes = {
         PillIdle = Color3.fromRGB(17, 24, 39),
         PillIdleText = Color3.fromRGB(107, 114, 128),
         PillStrokeIdle = Color3.fromRGB(31, 41, 55),
-        PillActiveText = Color3.fromRGB(11, 14, 20)
-    },
-    ["emerald"] = {
-        Background = Color3.fromRGB(11, 14, 20),
-        Sidebar = Color3.fromRGB(15, 19, 27),
-        Surface = Color3.fromRGB(19, 25, 35),
-        SurfaceHover = Color3.fromRGB(26, 35, 50),
-        TooltipBg = Color3.fromRGB(26, 34, 48),
-        Border = Color3.fromRGB(30, 41, 59),
-        BorderLight = Color3.fromRGB(51, 65, 85),
-        WindowOutline = Color3.fromRGB(16, 185, 129),
-        Accent = Color3.fromRGB(16, 185, 129),
-        AccentDark = Color3.fromRGB(5, 150, 105),
-        Primary = Color3.fromRGB(16, 185, 129),
-        Blue = Color3.fromRGB(56, 189, 248),
-        Success = Color3.fromRGB(16, 185, 129),
-        Warning = Color3.fromRGB(245, 158, 11),
-        Danger = Color3.fromRGB(244, 63, 94),
-        TextPrimary = Color3.fromRGB(243, 244, 246),
-        TextSecondary = Color3.fromRGB(148, 163, 184),
-        TextMuted = Color3.fromRGB(100, 116, 139)
+        PillActiveText = Color3.fromRGB(243, 244, 246)
     },
     ["halloween"] = {
         Background = Color3.fromRGB(10, 6, 18),         -- Deep spooky purple-black
@@ -1154,7 +1134,7 @@ function GousseUI:SetTheme(themeName: string, customColors: { [string]: Color3 }
     GousseUI.Theme.PillIdle = target.PillIdle or Color3.fromRGB(17, 24, 39)
     GousseUI.Theme.PillIdleText = target.PillIdleText or target.TextMuted or Color3.fromRGB(107, 114, 128)
     GousseUI.Theme.PillStrokeIdle = target.PillStrokeIdle or target.Border or Color3.fromRGB(31, 41, 55)
-    GousseUI.Theme.PillActiveText = target.PillActiveText or target.Background or Color3.fromRGB(11, 14, 20)
+    GousseUI.Theme.PillActiveText = target.PillActiveText or target.TextPrimary or Color3.fromRGB(243, 244, 246)
     if customColors then
         for k, v in pairs(customColors) do
             GousseUI.Theme[k] = v
@@ -2070,7 +2050,7 @@ function GousseUI:CreateLoader(config: {
     logoBadge.BackgroundColor3 = GousseUI.Theme.Accent
     logoBadge.Font = FontBold
     logoBadge.Text = "G"
-    logoBadge.TextColor3 = GousseUI.Theme.Background
+    logoBadge.TextColor3 = GousseUI.Theme.TextPrimary
     logoBadge.TextSize = 16
     logoBadge.Parent = header
 
@@ -3852,7 +3832,7 @@ function GousseUI:CreateWindow(config: {
             local function ApplyVariantStyle(th)
                 if variant == "primary" then
                     actionBtn.BackgroundColor3 = th.Accent
-                    actionBtn.TextColor3 = th.Background
+                    actionBtn.TextColor3 = th.TextPrimary
                     actStroke.Color = th.AccentDark
                 elseif variant == "danger" then
                     actionBtn.BackgroundColor3 = Color3.fromRGB(225, 29, 72)

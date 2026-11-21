@@ -263,7 +263,7 @@ end
 -- two surfaces read as one palette instead of a green/amber clash.
 local PILL_ACTIVE = GousseUI.Theme.Accent
 local PILL_IDLE = GousseUI.Theme.PillIdle or Color3.fromRGB(17, 24, 39)
-local PILL_TEXT_ACTIVE = GousseUI.Theme.PillActiveText or GousseUI.Theme.Background
+local PILL_TEXT_ACTIVE = GousseUI.Theme.TextPrimary
 local PILL_TEXT_IDLE = GousseUI.Theme.PillIdleText or GousseUI.Theme.TextMuted
 local PILL_STROKE_IDLE = GousseUI.Theme.PillStrokeIdle or GousseUI.Theme.Border
 
@@ -601,7 +601,7 @@ local function OpenCreateModal()
                 BackgroundTransparency = 1,
                 Font = FontBold,
                 Text = "NEW",
-                TextColor3 = GousseUI.Theme.Background,
+                TextColor3 = GousseUI.Theme.TextPrimary,
                 TextSize = 10,
                 ZIndex = 6
             }, badge)
@@ -685,7 +685,7 @@ local function OpenCreateModal()
         BorderSizePixel = 0,
         Font = FontBold,
         Text = "CREATE  →",
-        TextColor3 = GousseUI.Theme.Background,
+        TextColor3 = GousseUI.Theme.TextPrimary,
         TextSize = 12,
         AutoButtonColor = false,
         ZIndex = 4
@@ -788,7 +788,7 @@ local function MakeCard(parent, entry, layoutOrder)
         BorderSizePixel = 0,
         Font = FontMedium,
         Text = "Load",
-        TextColor3 = GousseUI.Theme.Background,
+        TextColor3 = GousseUI.Theme.TextPrimary,
         TextSize = 11.5,
         AutoButtonColor = false
     }, card)

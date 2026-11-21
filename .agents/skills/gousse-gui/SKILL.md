@@ -17,9 +17,9 @@ GousseUI features an authentic modern tactical aesthetic: deep obsidian/slate ba
 
 ### 1.1 Palette Tokens
 
-> **v2.4.1**: the default theme is now a blended dark-navy/amber palette (`Sidebar #111827`, `Surface #151C28`, `Accent #F59E0B`, `TextMuted #6B7280`) to match the Burger Planet lobby. `"emerald"` remains available as an opt-in preset. Segmented controls use `PillIdle`, `PillIdleText`, `PillStrokeIdle`, `PillActiveText`.
+> **v2.4.3**: the only palette is the blended dark-navy/amber theme (`Sidebar #111827`, `Surface #151C28`, `Accent #F59E0B`, `TextMuted #6B7280`). The old emerald preset was removed. Text on amber surfaces uses `TextPrimary`. Segmented controls use `PillIdle`, `PillIdleText`, `PillStrokeIdle`, `PillActiveText`.
 
-| Token | Emerald (opt-in preset) | Hex | Usage |
+| Token | Default (amber blend) | Hex | Usage |
 | :--- | :--- | :--- | :--- |
 | `Background` | `10, 15, 26` | `#0A0F1A` | Main window outer canvas |
 | `Sidebar` | `13, 20, 34` | `#0D1422` | Navigation sidebar & control container fill |
