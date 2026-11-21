@@ -67,12 +67,15 @@ end
 -- or an older executor tab, leaves an instance that still owns worker loops and
 -- keeps driving the character -- the new copy then fights it for the register,
 -- the grill and the hands. Retire every live instance we can still reach.
+-- Do NOT require prep.sweep here: that field only exists on recent builds, so
+-- older instances survived the guard and kept looping at
+-- "could not clear the hatch" while the new build took the orders. The
+-- running/enabled/job signature is common to every build and is enough.
 if type(getgc) == "function" then
     pcall(function()
         for _, t in getgc(true) do
             if type(t) == "table" and t.running == true
-                and type(t.enabled) == "table" and type(t.job) == "table"
-                and type(t.prep) == "table" and t.prep.sweep ~= nil then
+                and type(t.enabled) == "table" and type(t.job) == "table" then
                 t.running = false
                 for k in pairs(t.enabled) do t.enabled[k] = false end
             end
@@ -1812,6 +1815,16 @@ local function orderIsLive(o)
         and dl > os.time()
 end
 
+-- Snapshot for the live log. Only one order can own the job lock at a time;
+-- passive cooking may overlap, but packing/serving never does.
+function PackMod.targetInfo()
+    local o = PackMod._order
+    if not o then return "target=none mode=single-job" end
+    local id = tonumber(o.Name) or o:GetAttribute("Id")
+    return string.format("target=%s live=%s status=%s mode=single-job",
+        tostring(id), tostring(orderIsLive(o)), tostring(o:GetAttribute("Status") or "?"))
+end
+
 -- a bag is stale when its ticket belongs to an order the game has already
 -- ended. Describe then reports no needs, which used to be read as "ready to
 -- serve" and produced endless fake serves that never credited DayServed.
@@ -3445,34 +3458,80 @@ local function usableHatchBag()
     return bag
 end
 
--- pick the stale bag off the hatch and set it down out of the way so
--- the slot is free again (the hatch only accepts one bag at a time).
--- MUST be called with empty hands: takeInto verifies only HeldKind, so
--- holding a fresh bag made it "succeed" without picking anything up and
--- clearHands() then dropped the fresh bag instead of the stale one.
+-- The game's own dispose path. A nil-target Drop is read as "put it back"
+-- and is refused for cooked patties and wrappers, leaving them stuck in our
+-- hands forever; the trash can accepts whatever is held and destroys it
+-- (verified live: Bag and Burger both cleared, bag model removed). Stored on
+-- PackMod rather than a local because this file is near the 200-local ceiling.
+PackMod.binHeld = function()
+    if heldId() == nil then return true end
+    local best, bestD
+    for _, can in ipairs(findTrashCans()) do
+        -- findTrashCans also matches cupboard doors ("...Bin..."); only real
+        -- cans answer the dispose interaction.
+        if tostring(can:GetAttribute("Interact") or ""):lower() == "trashcan" then
+            local p = primaryPart(can)
+            if p then
+                local r = root()
+                local d = r and (p.Position - r.Position).Magnitude or 0
+                if not bestD or d < bestD then best, bestD = can, d end
+            end
+        end
+    end
+    if not best then return false end
+    local p = primaryPart(best)
+    act(best, "Primary", p.Position, 0.6, function() return heldId() == nil end)
+    return heldId() == nil
+end
+
+-- Take an expired bag off the hatch and actually throw it away. Clicking a
+-- bag can hand us a neighbouring burger or wrapper instead of the bag (the
+-- stuck "Burger" bug), so always check what got held: bin the stray item and
+-- try the bag again until the real bag is in hand.
+PackMod.binStaleBag = function(bag)
+    if not bag then return true end
+    for _ = 1, 4 do
+        if not bag.Parent then return true end
+        if heldId() ~= nil and not PackMod.binHeld() then return false end
+        PackMod.step = "binning expired bag " .. tostring(bag:GetAttribute("OrderId"))
+        if takeInto(bag, "Bag") then
+            return PackMod.binHeld()
+        end
+        -- wrong item grabbed: dispose of it before trying the bag again
+        if heldId() ~= nil then PackMod.binHeld() end
+        task.wait(0.2)
+    end
+    return heldId() == nil and not bag.Parent
+end
+
+-- Free the hatch for a fresh bag. Expired bags are binned, not just pushed
+-- aside: a bag stamped to a dead order kept being picked up and "served"
+-- forever. MUST be called with empty hands -- takeInto verifies only
+-- HeldKind, so a held bag made it "succeed" without picking anything up.
 local function clearHatch()
-    -- takeInto verifies only HeldKind, so with anything already in hand
-    -- "pick up the stale bag" silently succeeds without picking anything up.
-    -- A bag left held by a refused drop then killed every later order at
-    -- "could not clear the hatch". Return receipts to the printer and bags
-    -- to the hatch first, and only bin what is still stuck in our hands.
+    -- A leftover patty/wrapper refuses a nil drop; bin it instead of
+    -- reporting success with a full hand.
     if heldId() ~= nil then
         PackMod.parkHeld()
         if heldId() ~= nil then clearHands() end
-        if heldId() ~= nil then return false end
+        if heldId() ~= nil and not PackMod.binHeld() then return false end
     end
     local spot = hatchSpot()
     if not spot then return false end
-    local stale = hatchBag()
-    if not stale then return true end
-    if not takeInto(stale, "Bag") then return false end
-    if heldId() == nil then return false end
-    standNear(spot + Vector3.new(-6, 0, 0))
-    settle()
-    -- put it well away from the hatch so it cannot be picked up as the
-    -- bag we are about to place for the live order
-    dropAt(spot + Vector3.new(-8, 0, 0), PackMod.hatchYaw)
-    return heldId() == nil
+    -- bounded: a bag that cannot be binned must surface as a clear failure
+    -- in the live log instead of looping "could not clear the hatch" forever
+    for _ = 1, 3 do
+        local stale = hatchBag()
+        if not stale then return true end
+        -- never destroy a bag that still belongs to a live order
+        if stale:GetAttribute("OrderId") ~= nil and not API.staleBag(stale) then
+            PackMod.step = "live bag still on hatch"
+            return false
+        end
+        if not PackMod.binStaleBag(stale) then return false end
+        task.wait(0.2)
+    end
+    return hatchBag() == nil and heldId() == nil
 end
 
 -- Put whatever is in hand somewhere it can be picked up again. Dropping a
@@ -3493,7 +3552,18 @@ function PackMod.parkHeld()
             if heldId() == nil then return true end
         end
     end
-    return not clearHands()
+    -- A fountain cup cannot be dropped with a nil target: the game reads
+    -- that as "put it back" and there is no cup slot under us, so the drop
+    -- is refused and the cup stays in hand. Seat it on the drink station
+    -- instead, where makeDrink can pick it up again.
+    if heldKind() == "Cup" then
+        local seat = cupSlot("Ice") or cupSlot("Cola")
+        if seat then
+            dropAt(seat, 0)
+            if heldId() == nil then return true end
+        end
+    end
+    return clearHands()
 end
 
 -- A receipt lying about instead of sitting on the printer is still that
@@ -3766,6 +3836,16 @@ function PackMod.runOrder(order)
     local fed = 0
     for _ = 1, 12 do
         if PackMod.epoch ~= (PackMod._runEpoch or 0) then return false end
+        -- The customer can walk out while we are cooking. Once the game says
+        -- the ticket is over, every further click on that bag is a fake serve
+        -- that never credits DayServed. Drop it and move to the next order.
+        local nowOrder = findOrderById(boundId)
+        if not nowOrder or not orderIsLive(nowOrder) then
+            PackMod.step = "order " .. tostring(boundId) .. " ended; dropping its bag"
+            clearHands()
+            clearHatch()
+            return false
+        end
         local needs = needsOf(bag)
         if needs == nil then
             PackMod.step = "cannot read the bag"
@@ -3779,7 +3859,15 @@ function PackMod.runOrder(order)
         end
         PackMod.stats.fed += 1
         fed += 1
-        bag = findBagFor(boundId) or bag
+        local fresh = findBagFor(boundId)
+        if not fresh then
+            -- the bag belonging to this ticket vanished mid-cook; never fall
+            -- back to the old reference (it may now belong to a dead order)
+            PackMod.step = "bag for order " .. tostring(boundId) .. " vanished"
+            clearHands()
+            return false
+        end
+        bag = fresh
         task.wait(0.2)
     end
 
@@ -3787,6 +3875,15 @@ function PackMod.runOrder(order)
     local finalNeeds = needsOf(bag)
     if finalNeeds == nil or #finalNeeds > 0 then
         PackMod.step = "bag still incomplete"
+        return false
+    end
+    -- last check before handing it over: the order may have expired between
+    -- the final ingredient and the serve click
+    local serveOrder = findOrderById(boundId)
+    if not serveOrder or not orderIsLive(serveOrder) then
+        PackMod.step = "order " .. tostring(boundId) .. " ended before serving"
+        clearHands()
+        clearHatch()
         return false
     end
 
@@ -4678,6 +4775,9 @@ local function shutdown()
         safe(function() c:Disconnect() end)
     end
     table.clear(API.connections)
+    if PackMod.log and PackMod.log.gui then
+        safe(function() PackMod.log.gui:Destroy() end)
+    end
     if Window then safe(function() Window:Destroy() end) end
 end
 
@@ -4703,6 +4803,111 @@ local DriveTab   = Window:CreateTab({ Name = "DriveThru",Icon = "car" })
 local SessionTab = Window:CreateTab({ Name = "Session",  Icon = "radio" })
 local ToolsTab   = Window:CreateTab({ Name = "Tools",    Icon = "wrench" })
 local InfoTab    = Window:CreateTab({ Name = "Info",     Icon = "info" })
+
+-- ============================================================
+-- LIVE LOG OVERLAY
+-- GousseUI's paragraph card has no setter, so this is a plain ScreenGui that
+-- mirrors the exact step/telemetry the order loop uses. It stays visible while
+-- the menu is closed, so a shift can be watched at a glance. The header names
+-- the single order currently holding the job lock; passive cooking may keep
+-- running alongside it.
+-- ============================================================
+;(function()
+    local function guiParent()
+        if gethui then
+            local ok, h = pcall(gethui)
+            if ok and h then return h end
+        end
+        local okCore, cg = pcall(function() return game:GetService("CoreGui") end)
+        if okCore and cg then return cg end
+        return LP:WaitForChild("PlayerGui")
+    end
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "BP_LiveLog"
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.DisplayOrder = 50
+    gui.Parent = guiParent()
+
+    local panel = Instance.new("Frame")
+    panel.Name = "Panel"
+    panel.Size = UDim2.new(0, 560, 0, 216)
+    panel.Position = UDim2.new(0, 12, 1, -232)
+    panel.BackgroundColor3 = Color3.fromRGB(10, 15, 26)
+    panel.BackgroundTransparency = 0.08
+    panel.BorderSizePixel = 1
+    panel.BorderColor3 = Color3.fromRGB(16, 185, 129)
+    panel.Parent = gui
+
+    local header = Instance.new("TextLabel")
+    header.Name = "Header"
+    header.Size = UDim2.new(1, -34, 0, 24)
+    header.Position = UDim2.new(0, 10, 0, 5)
+    header.BackgroundTransparency = 1
+    header.Font = Enum.Font.BuilderSans or Enum.Font.Gotham
+    header.TextSize = 12
+    header.TextColor3 = Color3.fromRGB(16, 185, 129)
+    header.TextXAlignment = Enum.TextXAlignment.Left
+    header.Text = "BP LOG  " .. PackMod.targetInfo()
+    header.Parent = panel
+
+    local close = Instance.new("TextButton")
+    close.Name = "Close"
+    close.Size = UDim2.new(0, 22, 0, 22)
+    close.Position = UDim2.new(1, -26, 0, 5)
+    close.BackgroundColor3 = Color3.fromRGB(51, 65, 85)
+    close.BorderSizePixel = 0
+    close.Font = Enum.Font.BuilderSans or Enum.Font.Gotham
+    close.TextSize = 12
+    close.TextColor3 = Color3.fromRGB(243, 244, 246)
+    close.Text = "x"
+    close.Parent = panel
+    close.MouseButton1Click:Connect(function() gui.Enabled = false end)
+
+    local body = Instance.new("TextLabel")
+    body.Name = "Body"
+    body.Size = UDim2.new(1, -20, 1, -32)
+    body.Position = UDim2.new(0, 10, 0, 30)
+    body.BackgroundTransparency = 1
+    body.Font = Enum.Font.Code or Enum.Font.BuilderSans
+    body.TextSize = 11
+    body.TextColor3 = Color3.fromRGB(243, 244, 246)
+    body.TextXAlignment = Enum.TextXAlignment.Left
+    body.TextYAlignment = Enum.TextYAlignment.Top
+    body.TextWrapped = true
+    body.Text = "waiting for first step..."
+    body.Parent = panel
+
+    PackMod.log = { gui = gui, body = body, header = header, lines = {} }
+
+    task.spawn(function()
+        local lastSig = ""
+        while API.running and gui.Parent do
+            task.wait(0.3)
+            local target = PackMod.targetInfo()
+            header.Text = "BP LOG  " .. target
+            local sig = table.concat({
+                tostring(PackMod.step), tostring(LP:GetAttribute("HeldKind")),
+                tostring(PackMod.stats.fed), tostring(State:GetAttribute("DayServed")),
+                tostring(API.watchdog.resets), target,
+            }, "|")
+            if sig ~= lastSig then
+                lastSig = sig
+                local line = string.format(
+                    "%s c=%s g=%s wd=%s fed=%s held=%-10s %s",
+                    os.date("%H:%M:%S"), tostring(State:GetAttribute("Clock")),
+                    tostring(State:GetAttribute("DayServed")), tostring(API.watchdog.resets),
+                    tostring(PackMod.stats.fed), tostring(LP:GetAttribute("HeldKind") or "-"),
+                    tostring(PackMod.step))
+                local lines = PackMod.log.lines
+                lines[#lines + 1] = line
+                if #lines > 10 then table.remove(lines, 1) end
+                body.Text = table.concat(lines, "\n") .. "\n" .. target
+            end
+        end
+    end)
+end)()
 
 -- FARM TAB ----------------------------------------------------
 FarmTab:CreateSection("Automation")
@@ -4813,6 +5018,17 @@ CookTab:CreateSlider({
     Min = 0.2, Max = 2.0, Default = 0.4,
     Decimals = 2, Step = 0.05, Suffix = "s",
     Callback = function(v) PackMod.interval = v end,
+})
+CookTab:CreateButton({
+    Name = "Live Log",
+    SubTitle = "Show / hide the order log overlay (target order + step)",
+    ButtonText = "Toggle",
+    Variant = "secondary",
+    Callback = function()
+        if PackMod.log and PackMod.log.gui then
+            PackMod.log.gui.Enabled = not PackMod.log.gui.Enabled
+        end
+    end,
 })
 CookTab:CreateButton({
     Name = "Pack Status",
